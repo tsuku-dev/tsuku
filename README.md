@@ -3,7 +3,7 @@
 [![Tests](https://github.com/tsuku-dev/tsuku/actions/workflows/test.yml/badge.svg)](https://github.com/tsuku-dev/tsuku/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/tsuku-dev/tsuku/graph/badge.svg)](https://codecov.io/gh/tsuku-dev/tsuku)
 
-A modern, universal package manager for development tools.
+A modern, self-contained package manager for development tools.
 
 ## Overview
 
