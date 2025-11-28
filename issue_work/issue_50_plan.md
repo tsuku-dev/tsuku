@@ -24,12 +24,12 @@ The `matrix` job already runs as a prerequisite for integration jobs. Rather tha
 
 ## Implementation Steps
 
-- [ ] Add paths-filter action to detect code changes (not just docs)
-- [ ] Add output for `code` filter (true when non-docs files changed)
-- [ ] Merge filter logic into existing `matrix` job
-- [ ] Add `if:` condition to `integration-linux` job
-- [ ] Add `if:` condition to `integration-macos` job
-- [ ] Add comments documenting skip patterns
+- [x] Add paths-filter action to detect code changes (not just docs)
+- [x] Add output for `code` filter (true when non-docs files changed)
+- [x] Merge filter logic into existing `matrix` job
+- [x] Add `if:` condition to `integration-linux` job
+- [x] Add `if:` condition to `integration-macos` job
+- [x] Add comments documenting skip patterns
 
 ## Skip Patterns
 
