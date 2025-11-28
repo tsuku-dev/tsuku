@@ -80,7 +80,7 @@ func TestCompareVersions(t *testing.T) {
 func TestNew(t *testing.T) {
 	resolver := New()
 	if resolver == nil {
-		t.Error("New() returned nil")
+		t.Fatal("New() returned nil")
 	}
 	if resolver.httpClient == nil {
 		t.Error("New() did not initialize httpClient")
@@ -90,7 +90,7 @@ func TestNew(t *testing.T) {
 func TestNewWithNpmRegistry(t *testing.T) {
 	resolver := NewWithNpmRegistry("express")
 	if resolver == nil {
-		t.Error("NewWithNpmRegistry() returned nil")
+		t.Fatal("NewWithNpmRegistry() returned nil")
 	}
 	if resolver.httpClient == nil {
 		t.Error("NewWithNpmRegistry() did not initialize httpClient")
@@ -100,7 +100,7 @@ func TestNewWithNpmRegistry(t *testing.T) {
 func TestNewWithCratesIORegistry(t *testing.T) {
 	resolver := NewWithCratesIORegistry("ripgrep")
 	if resolver == nil {
-		t.Error("NewWithCratesIORegistry() returned nil")
+		t.Fatal("NewWithCratesIORegistry() returned nil")
 	}
 	if resolver.httpClient == nil {
 		t.Error("NewWithCratesIORegistry() did not initialize httpClient")
@@ -110,7 +110,7 @@ func TestNewWithCratesIORegistry(t *testing.T) {
 func TestNewWithRubyGemsRegistry(t *testing.T) {
 	resolver := NewWithRubyGemsRegistry("rails")
 	if resolver == nil {
-		t.Error("NewWithRubyGemsRegistry() returned nil")
+		t.Fatal("NewWithRubyGemsRegistry() returned nil")
 	}
 	if resolver.httpClient == nil {
 		t.Error("NewWithRubyGemsRegistry() did not initialize httpClient")
@@ -120,7 +120,7 @@ func TestNewWithRubyGemsRegistry(t *testing.T) {
 func TestNewWithPyPIRegistry(t *testing.T) {
 	resolver := NewWithPyPIRegistry("requests")
 	if resolver == nil {
-		t.Error("NewWithPyPIRegistry() returned nil")
+		t.Fatal("NewWithPyPIRegistry() returned nil")
 	}
 	if resolver.httpClient == nil {
 		t.Error("NewWithPyPIRegistry() did not initialize httpClient")

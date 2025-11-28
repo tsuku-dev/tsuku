@@ -52,7 +52,7 @@ func TestDownloadAction_Execute_NonHTTPS(t *testing.T) {
 func TestDownloadAction_Execute_WithHTTPSServer(t *testing.T) {
 	// Create a test HTTPS server
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("test content"))
+		_, _ = w.Write([]byte("test content"))
 	}))
 	defer ts.Close()
 

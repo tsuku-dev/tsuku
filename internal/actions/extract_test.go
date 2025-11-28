@@ -236,8 +236,8 @@ func TestExtractAction_ExtractTarGz(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tw.Close()
-	gzw.Close()
+	_ = tw.Close()
+	_ = gzw.Close()
 
 	// Write archive to file
 	archivePath := filepath.Join(tmpDir, "test.tar.gz")
@@ -288,8 +288,8 @@ func TestExtractAction_ExtractTarGz_StripDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tw.Close()
-	gzw.Close()
+	_ = tw.Close()
+	_ = gzw.Close()
 
 	archivePath := filepath.Join(tmpDir, "test.tar.gz")
 	if err := os.WriteFile(archivePath, buf.Bytes(), 0644); err != nil {
@@ -335,8 +335,8 @@ func TestExtractAction_ExtractZip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	zw.Close()
-	zipFile.Close()
+	_ = zw.Close()
+	_ = zipFile.Close()
 
 	// Extract
 	destPath := filepath.Join(tmpDir, "extracted")
