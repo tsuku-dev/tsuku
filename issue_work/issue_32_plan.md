@@ -49,11 +49,11 @@ Recipes are accessed via raw GitHub URLs:
 - `cmd/tsuku/main.go` - Add `update-registry` command
 
 ## Implementation Steps
-- [ ] Add registry URL to config
-- [ ] Create registry client to fetch recipes from GitHub
-- [ ] Update Loader to check cache, fetch remote, fallback to bundled
-- [ ] Add `update-registry` command to clear/refresh cache
-- [ ] Update tests
+- [x] Add registry URL to config
+- [x] Create registry client to fetch recipes from GitHub
+- [x] Update Loader to check cache, fetch remote, fallback to bundled
+- [x] Add `update-registry` command to clear/refresh cache
+- [x] Update tests
 - [ ] Test with actual registry
 
 ## API Design
