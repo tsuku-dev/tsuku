@@ -23,8 +23,9 @@ Use GoReleaser for cross-compilation and release management. GoReleaser is the d
 
 ## Implementation Steps
 
-- [ ] Create `.goreleaser.yaml` with multi-platform build configuration
-- [ ] Create `.github/workflows/release.yml` workflow
+- [x] Create `.goreleaser.yaml` with multi-platform build configuration
+- [x] Create `.github/workflows/release.yml` workflow
+- [x] Update `install.sh` to parse `checksums.txt`
 - [ ] Test with a dry-run (snapshot) to verify configuration
 
 ## Configuration Details
