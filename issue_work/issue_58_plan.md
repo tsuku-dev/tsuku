@@ -40,7 +40,7 @@ With `every` mode, a file must match ALL patterns. A `.md` file matches `**` but
 None
 
 ## Implementation Steps
-- [x] Add `predicate-quantifier: 'every'` to the dorny/paths-filter step
+- [x] Add `predicate-quantifier: 'every'` to the dorny/paths-filter step (done)
 
 ## Testing Strategy
 - The PR itself only modifies a .yml file (workflow code)
