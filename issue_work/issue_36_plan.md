@@ -30,13 +30,13 @@ None
 
 ## Implementation Steps
 
-- [ ] Add `TSUKU_HOME` env var support to `DefaultConfig()`
-- [ ] Add `ToolsDir` field to `ExecutionContext` in `action.go`
-- [ ] Update executor to set `ToolsDir` in context
-- [ ] Update `gem_install.go` to use `ctx.ToolsDir`
-- [ ] Update `findPythonStandalone` in `manager.go` to use config
-- [ ] Add unit tests for `TSUKU_HOME` env var behavior
-- [ ] Verify all tests pass
+- [x] Add `TSUKU_HOME` env var support to `DefaultConfig()`
+- [x] Add `ToolsDir` field to `ExecutionContext` in `action.go`
+- [x] Update executor to set `ToolsDir` in context
+- [x] Update `gem_install.go` to use `ctx.ToolsDir`
+- [x] Update `findPythonStandalone` in `manager.go` to use config
+- [x] Add unit tests for `TSUKU_HOME` env var behavior
+- [x] Verify all tests pass
 
 Mark each step [x] after it is implemented and committed. This enables clear resume detection.
 
@@ -57,12 +57,12 @@ Mark each step [x] after it is implemented and committed. This enables clear res
 
 ## Success Criteria
 
-- [ ] `TSUKU_HOME` environment variable is checked in `DefaultConfig()` before falling back to `~/.tsuku`
-- [ ] Hardcoded path in `internal/install/manager.go:325` uses config instead
-- [ ] Hardcoded path in `internal/actions/gem_install.go:132` uses config instead
-- [ ] Unit tests verify env var override behavior
-- [ ] All existing tests pass
-- [ ] Build succeeds
+- [x] `TSUKU_HOME` environment variable is checked in `DefaultConfig()` before falling back to `~/.tsuku`
+- [x] Hardcoded path in `internal/install/manager.go:325` uses config instead
+- [x] Hardcoded path in `internal/actions/gem_install.go:132` uses config instead
+- [x] Unit tests verify env var override behavior
+- [x] All existing tests pass
+- [x] Build succeeds
 
 ## Open Questions
 
