@@ -23,8 +23,8 @@ This matches the pattern used by `integration-linux` and `integration-macos` job
 None
 
 ## Implementation Steps
-- [ ] Add `needs: matrix` to unit-tests job
-- [ ] Add `if: ${{ needs.matrix.outputs.code == 'true' }}` to unit-tests job
+- [x] Add `needs: matrix` to unit-tests job
+- [x] Add `if: ${{ needs.matrix.outputs.code == 'true' }}` to unit-tests job
 
 ## Testing Strategy
 - This PR modifies a .yml file (code), so unit tests WILL run
