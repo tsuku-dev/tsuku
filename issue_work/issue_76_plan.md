@@ -20,10 +20,10 @@ Move slow cargo/rust integration tests (T18, T27) from PR CI to a daily schedule
 - `.github/workflows/scheduled-tests.yml` - Daily workflow running full test suite
 
 ## Implementation Steps
-- [ ] Update test-matrix.json to add ci.scheduled list
-- [ ] Modify test.yml to exclude scheduled tests from PR runs
-- [ ] Create scheduled-tests.yml workflow for daily runs
-- [ ] Verify workflows are syntactically correct
+- [x] Update test-matrix.json to add ci.scheduled list
+- [x] Modify test.yml to exclude scheduled tests from PR runs (done via test-matrix.json)
+- [x] Create scheduled-tests.yml workflow for daily runs
+- [x] Verify workflows are syntactically correct
 
 ## Testing Strategy
 - Syntax validation: YAML linting
