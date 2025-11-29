@@ -39,7 +39,7 @@ jobs:
         run: go build -o tsuku ./cmd/tsuku
 
       - name: Setup PATH
-        run: echo "$HOME/.tsuku/bin" >> $GITHUB_PATH
+        run: echo "$HOME/.tsuku/tools/current" >> $GITHUB_PATH
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -82,7 +82,7 @@ jobs:
         run: go build -o tsuku ./cmd/tsuku
 
       - name: Setup PATH
-        run: echo "$HOME/.tsuku/bin" >> $GITHUB_PATH
+        run: echo "$HOME/.tsuku/tools/current" >> $GITHUB_PATH
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
