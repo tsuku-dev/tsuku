@@ -42,7 +42,7 @@ jobs:
         run: echo "$HOME/.tsuku/bin" >> $GITHUB_PATH
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Create recipe for hyperfine
         run: ./tsuku create hyperfine --from crates.io
@@ -85,7 +85,7 @@ jobs:
         run: echo "$HOME/.tsuku/bin" >> $GITHUB_PATH
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Create recipe for hyperfine
         run: ./tsuku create hyperfine --from crates.io
