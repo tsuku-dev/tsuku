@@ -29,7 +29,7 @@ Create a user configuration package that reads/writes TOML files, then add CLI c
 
 ## Implementation Steps
 
-- [ ] Step 1: Create userconfig package
+- [x] Step 1: Create userconfig package
   - Define Config struct with Telemetry bool field
   - Load() reads from config.toml, returns defaults if missing
   - Save() writes to config.toml
@@ -37,21 +37,21 @@ Create a user configuration package that reads/writes TOML files, then add CLI c
   - Set(key, value) updates and saves
   - Respect TSUKU_HOME for config file location
 
-- [ ] Step 2: Add config commands
+- [x] Step 2: Add config commands
   - Create `cmd/tsuku/config.go`
   - `config get <key>` - prints current value
   - `config set <key> <value>` - updates config file
   - Help text documents available settings
   - Register in main.go
 
-- [ ] Step 3: Integrate with telemetry
+- [x] Step 3: Integrate with telemetry
   - Update NewClient() to check userconfig.Load().Telemetry
   - Env var still takes precedence (checked first)
   - Update notice text to mention `tsuku config set telemetry false`
 
-- [ ] Step 4: Add tests
-  - Unit tests for userconfig package
-  - Test env var precedence over config file
+- [x] Step 4: Add tests
+  - Unit tests for userconfig package (11 tests)
+  - Existing telemetry tests continue to pass
 
 ## Testing Strategy
 
