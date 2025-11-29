@@ -1,6 +1,6 @@
 # Design Document: Ecosystem-Specific Recipe Builders
 
-**Status**: Planned
+**Status**: Accepted
 
 ## Context and Problem Statement
 
@@ -723,9 +723,32 @@ Milestone: [Recipe Builders](https://github.com/tsuku-dev/tsuku/milestone/4)
 
 | Issue | Phase | Description |
 |-------|-------|-------------|
-| #40 | Phase 1 | Local recipe support + Cargo builder |
+| TBD | Phase 1a | Recipe writer with atomic file operations |
+| #40 | Phase 1b | Local recipe support + Cargo builder |
 | #41 | Phase 2 | Gem builder for RubyGems |
 | #42 | Phase 3 | PyPI builder for Python packages |
 | #43 | Phase 3 | npm builder for Node.js packages |
 | #44 | Phase 4 | Recipe management UX improvements |
 | #45 | Phase 5 | Toolchain bootstrapping |
+
+### Dependency Graph
+
+```
+Phase 1a: Recipe Writer (TBD)
+    │
+    v
+Phase 1b: Local Recipe Support + Cargo Builder (#40)
+    │
+    ├──────────┬──────────┐
+    v          v          v
+Phase 2    Phase 3a   Phase 3b
+Gem (#41)  PyPI (#42) npm (#43)
+    │          │          │
+    └──────────┴──────────┘
+               │
+               v
+         Phase 4: UX Polish (#44)
+               │
+               v
+         Phase 5: Toolchain (#45)
+```
