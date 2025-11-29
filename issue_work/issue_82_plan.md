@@ -22,14 +22,14 @@ Simple package with minimal dependencies. Use standard library `net/http` for HT
 
 ## Implementation Steps
 
-- [ ] Create Event struct with all schema fields
-- [ ] Create constructor helpers (NewInstallEvent, NewUpdateEvent, NewRemoveEvent)
-- [ ] Create Client struct with disabled/debug flags
-- [ ] Implement NewClient() that checks env vars
-- [ ] Implement Send() with fire-and-forget goroutine
-- [ ] Add unit tests for Event construction
-- [ ] Add unit tests for Client (mock HTTP server)
-- [ ] Add unit tests for env var opt-out logic
+- [x] Create Event struct with all schema fields
+- [x] Create constructor helpers (NewInstallEvent, NewUpdateEvent, NewRemoveEvent)
+- [x] Create Client struct with disabled/debug flags
+- [x] Implement NewClient() that checks env vars
+- [x] Implement Send() with fire-and-forget goroutine
+- [x] Add unit tests for Event construction
+- [x] Add unit tests for Client (mock HTTP server)
+- [x] Add unit tests for env var opt-out logic
 
 ## Testing Strategy
 
