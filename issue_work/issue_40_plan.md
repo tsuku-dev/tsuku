@@ -29,16 +29,16 @@ Follow the design in `docs/DESIGN-recipe-builders.md`:
 - `cmd/tsuku/helpers.go` - Add `loader` global variable (if needed)
 
 ## Implementation Steps
-- [ ] 1. Add local recipe lookup to Loader.GetWithContext()
-- [ ] 2. Add warning when local recipe shadows registry recipe
-- [ ] 3. Create Builder interface and BuildResult types
-- [ ] 4. Create Builder registry
-- [ ] 5. Implement CargoBuilder with crates.io API integration
-- [ ] 6. Add Cargo.toml parsing for executable discovery
-- [ ] 7. Add fallback to crate name when Cargo.toml unavailable
-- [ ] 8. Create `tsuku create` command
-- [ ] 9. Add unit tests for CargoBuilder with mocked API responses
-- [ ] 10. Run full test suite and verify end-to-end flow
+- [x] 1. Add local recipe lookup to Loader.GetWithContext()
+- [x] 2. Add warning when local recipe shadows registry recipe
+- [x] 3. Create Builder interface and BuildResult types
+- [x] 4. Create Builder registry
+- [x] 5. Implement CargoBuilder with crates.io API integration
+- [x] 6. Add Cargo.toml parsing for executable discovery
+- [x] 7. Add fallback to crate name when Cargo.toml unavailable
+- [x] 8. Create `tsuku create` command
+- [x] 9. Add unit tests for CargoBuilder with mocked API responses
+- [x] 10. Run full test suite and verify end-to-end flow
 
 ## Testing Strategy
 - **Unit tests**:
@@ -56,14 +56,14 @@ Follow the design in `docs/DESIGN-recipe-builders.md`:
 - **Cargo.toml parsing edge cases**: Conservative parsing, fallback to crate name
 
 ## Success Criteria
-- [ ] `Loader.Get()` checks `~/.tsuku/recipes/{name}.toml` before registry
-- [ ] Warning displayed when local recipe shadows registry recipe
-- [ ] Builder interface defined with `Name()`, `CanBuild()`, `Build()` methods
-- [ ] `tsuku create ripgrep --from crates.io` generates valid recipe
-- [ ] Generated recipe written to `~/.tsuku/recipes/ripgrep.toml`
-- [ ] `tsuku install ripgrep` executes the generated local recipe
-- [ ] Generated recipe is version-agnostic (uses `source = "crates_io"`)
-- [ ] Unit tests with mocked crates.io API responses
+- [x] `Loader.Get()` checks `~/.tsuku/recipes/{name}.toml` before registry
+- [x] Warning displayed when local recipe shadows registry recipe
+- [x] Builder interface defined with `Name()`, `CanBuild()`, `Build()` methods
+- [x] `tsuku create ripgrep --from crates_io` generates valid recipe
+- [x] Generated recipe written to `~/.tsuku/recipes/ripgrep.toml`
+- [x] `tsuku install ripgrep` executes the generated local recipe
+- [x] Generated recipe is version-agnostic (uses `source = "crates_io"`)
+- [x] Unit tests with mocked crates.io API responses
 
 ## Open Questions
 None - design document is comprehensive.
