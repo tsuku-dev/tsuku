@@ -19,9 +19,9 @@ Instead, `go mod tidy` should be run as part of normal development and committed
 None
 
 ## Implementation Steps
-- [ ] Remove `before.hooks` section from `.goreleaser.yaml`
-- [ ] Verify local build produces clean version
-- [ ] Run tests to ensure nothing is broken
+- [x] Remove `before.hooks` section from `.goreleaser.yaml`
+- [x] Verify local build produces clean version
+- [x] Run tests to ensure nothing is broken
 
 Mark each step [x] after it is implemented and committed. This enables clear resume detection.
 
