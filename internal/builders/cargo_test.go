@@ -149,8 +149,8 @@ path = "src/main.rs"
 	}
 
 	// Check version source
-	if result.Recipe.Version.Source != "crates_io:ripgrep" {
-		t.Errorf("Recipe.Version.Source = %q, want %q", result.Recipe.Version.Source, "crates_io:ripgrep")
+	if result.Recipe.Version.Source != "crates_io" {
+		t.Errorf("Recipe.Version.Source = %q, want %q", result.Recipe.Version.Source, "crates_io")
 	}
 
 	// Check steps

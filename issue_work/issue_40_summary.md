@@ -67,7 +67,7 @@ description = "ripgrep recursively searches directories for a regex pattern"
 homepage = "https://github.com/BurntSushi/ripgrep"
 
 [version]
-source = "crates_io:ripgrep"
+source = "crates_io"
 
 [[steps]]
 action = "cargo_install"

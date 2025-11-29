@@ -131,7 +131,7 @@ func (b *CargoBuilder) Build(ctx context.Context, packageName string, version st
 			Homepage:    crateInfo.Crate.Homepage,
 		},
 		Version: recipe.VersionSection{
-			Source: fmt.Sprintf("crates_io:%s", packageName),
+			Source: "crates_io",
 		},
 		Steps: []recipe.Step{
 			{
