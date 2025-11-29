@@ -20,9 +20,9 @@ Add notice functionality to the existing `internal/telemetry` package. The `Clie
 - `internal/telemetry/notice_test.go` - Unit tests for notice
 
 ## Implementation Steps
-- [ ] Create `notice.go` with notice text constant and ShowNoticeIfNeeded function
-- [ ] Add unit tests in `notice_test.go`
-- [ ] Verify all tests pass and linting succeeds
+- [x] Create `notice.go` with notice text constant and ShowNoticeIfNeeded function
+- [x] Add unit tests in `notice_test.go`
+- [x] Verify all tests pass and linting succeeds
 
 ## Testing Strategy
 - Unit tests:
