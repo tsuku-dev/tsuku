@@ -1,6 +1,6 @@
 # Design Document: Go Ecosystem Support
 
-**Status**: Proposed
+**Status**: Accepted
 
 ## Context and Problem Statement
 
