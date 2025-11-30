@@ -1,6 +1,6 @@
 # Design Document: Go Ecosystem Support
 
-**Status**: Accepted
+**Status**: Planned
 
 ## Context and Problem Statement
 
@@ -781,3 +781,14 @@ registry.Register(NewGoBuilder(resolver))
 - The go_install action explicitly sets GOPROXY to the official proxy
 - Users who need custom proxies must configure at the recipe level (future work)
 
+## Implementation Issues
+
+### Milestone: [Go Ecosystem Support](https://github.com/tsuku-dev/tsuku/milestone/5)
+
+- [#117](https://github.com/tsuku-dev/tsuku/issues/117): feat(version): add Go toolchain version provider
+- [#118](https://github.com/tsuku-dev/tsuku/issues/118): feat(version): add Go module version provider
+- [#119](https://github.com/tsuku-dev/tsuku/issues/119): feat(registry): add Go toolchain recipe
+- [#120](https://github.com/tsuku-dev/tsuku/issues/120): feat(actions): add go_install action
+- [#121](https://github.com/tsuku-dev/tsuku/issues/121): feat(builders): add Go builder
+- [#122](https://github.com/tsuku-dev/tsuku/issues/122): feat(registry): add popular Go tool recipes
+- [#123](https://github.com/tsuku-dev/tsuku/issues/123): test: add integration test for Go tool installation
