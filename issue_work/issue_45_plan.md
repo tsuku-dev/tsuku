@@ -26,6 +26,9 @@ Add a new `internal/toolchain` package with functions to check if toolchains are
 - [x] Add tests for toolchain checking
 - [x] Verify all tests pass
 
+## Implementation Complete
+All steps have been implemented and tested.
+
 ## Testing Strategy
 - Unit tests: Mock exec.LookPath behavior via interface/function injection
 - Manual verification: Run `tsuku create foo --from crates.io` without cargo installed
