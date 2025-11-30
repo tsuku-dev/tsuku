@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tsuku-dev/tsuku/internal/config"
+	"github.com/tsuku-dev/tsuku/internal/errmsg"
 	"github.com/tsuku-dev/tsuku/internal/install"
 	"github.com/tsuku-dev/tsuku/internal/telemetry"
 )
@@ -23,6 +24,7 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		toolName := args[0]
+		errCtx := &errmsg.ErrorContext{ToolName: toolName}
 
 		// Initialize telemetry
 		telemetryClient := telemetry.NewClient()
@@ -31,14 +33,14 @@ Examples:
 		// Check if installed
 		cfg, err := config.DefaultConfig()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to get config: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
 		mgr := install.New(cfg)
 		tools, err := mgr.List()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to list tools: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to list tools: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
@@ -53,14 +55,17 @@ Examples:
 		}
 
 		if !installed {
-			fmt.Fprintf(os.Stderr, "Error: %s is not installed. Use 'tsuku install %s' to install it.\n", toolName, toolName)
+			fmt.Fprintf(os.Stderr, "Error: %s is not installed\n", toolName)
+			fmt.Fprintf(os.Stderr, "\nSuggestions:\n")
+			fmt.Fprintf(os.Stderr, "  - Run 'tsuku install %s' to install it\n", toolName)
+			fmt.Fprintf(os.Stderr, "  - Run 'tsuku list' to see installed tools\n")
 			exitWithCode(ExitGeneral)
 		}
 
 		if updateDryRun {
 			printInfof("Checking updates for %s...\n", toolName)
 			if err := runDryRun(toolName, ""); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error: %s\n", errmsg.Format(err, errCtx))
 				exitWithCode(ExitInstallFailed)
 			}
 			return

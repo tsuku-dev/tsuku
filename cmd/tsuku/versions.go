@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/tsuku-dev/tsuku/internal/errmsg"
 	"github.com/tsuku-dev/tsuku/internal/version"
 )
 
@@ -17,11 +18,12 @@ var versionsCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		toolName := args[0]
 		jsonOutput, _ := cmd.Flags().GetBool("json")
+		errCtx := &errmsg.ErrorContext{ToolName: toolName}
 
 		// Load recipe
 		r, err := loader.Get(toolName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitRecipeNotFound)
 		}
 
@@ -30,7 +32,7 @@ var versionsCmd = &cobra.Command{
 		factory := version.NewProviderFactory()
 		provider, err := factory.ProviderFromRecipe(res, r)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
@@ -51,7 +53,7 @@ var versionsCmd = &cobra.Command{
 
 		versions, err := lister.ListVersions(ctx)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to list versions: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to list versions: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitNetwork)
 		}
 

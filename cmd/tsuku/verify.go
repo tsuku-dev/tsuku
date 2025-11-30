@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tsuku-dev/tsuku/internal/config"
+	"github.com/tsuku-dev/tsuku/internal/errmsg"
 	"github.com/tsuku-dev/tsuku/internal/install"
 	"github.com/tsuku-dev/tsuku/internal/recipe"
 )
@@ -160,11 +161,12 @@ var verifyCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		toolName := args[0]
+		errCtx := &errmsg.ErrorContext{ToolName: toolName}
 
 		// Get config and manager
 		cfg, err := config.DefaultConfig()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to get config: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
@@ -173,20 +175,23 @@ var verifyCmd = &cobra.Command{
 		// Check if tool is installed
 		state, err := mgr.GetState().Load()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load state: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to load state: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
 		toolState, ok := state.Installed[toolName]
 		if !ok {
 			fmt.Fprintf(os.Stderr, "Tool '%s' is not installed\n", toolName)
+			fmt.Fprintf(os.Stderr, "\nSuggestions:\n")
+			fmt.Fprintf(os.Stderr, "  - Run 'tsuku install %s' to install it\n", toolName)
+			fmt.Fprintf(os.Stderr, "  - Run 'tsuku list' to see installed tools\n")
 			exitWithCode(ExitGeneral)
 		}
 
 		// Load recipe
 		r, err := loader.Get(toolName)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load recipe: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to load recipe: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitRecipeNotFound)
 		}
 

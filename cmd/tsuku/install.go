@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tsuku-dev/tsuku/internal/config"
+	"github.com/tsuku-dev/tsuku/internal/errmsg"
 	"github.com/tsuku-dev/tsuku/internal/executor"
 	"github.com/tsuku-dev/tsuku/internal/install"
 	"github.com/tsuku-dev/tsuku/internal/recipe"
@@ -49,16 +50,17 @@ Examples:
 				resolveVersion = ""
 			}
 
+			ctx := &errmsg.ErrorContext{ToolName: toolName}
 			if installDryRun {
 				if err := runDryRun(toolName, resolveVersion); err != nil {
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					fmt.Fprintf(os.Stderr, "Error: %s\n", errmsg.Format(err, ctx))
 					exitWithCode(ExitInstallFailed)
 				}
 			} else {
 				if err := runInstallWithTelemetry(toolName, resolveVersion, versionConstraint, true, "", telemetryClient); err != nil {
 					// Continue installing other tools even if one fails?
 					// For now, exit on first failure to be safe
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					fmt.Fprintf(os.Stderr, "Error: %s\n", errmsg.Format(err, ctx))
 					exitWithCode(ExitInstallFailed)
 				}
 			}

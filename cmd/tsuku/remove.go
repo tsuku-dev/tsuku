@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/tsuku-dev/tsuku/internal/config"
+	"github.com/tsuku-dev/tsuku/internal/errmsg"
 	"github.com/tsuku-dev/tsuku/internal/install"
 	"github.com/tsuku-dev/tsuku/internal/telemetry"
 )
@@ -22,6 +23,7 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		toolName := args[0]
+		errCtx := &errmsg.ErrorContext{ToolName: toolName}
 
 		// Initialize telemetry
 		telemetryClient := telemetry.NewClient()
@@ -29,7 +31,7 @@ Examples:
 
 		cfg, err := config.DefaultConfig()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to get config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Failed to get config: %s\n", errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
@@ -51,14 +53,15 @@ Examples:
 			if ts, ok := state.Installed[toolName]; ok {
 				if len(ts.RequiredBy) > 0 {
 					fmt.Fprintf(os.Stderr, "Error: %s is required by: %s\n", toolName, strings.Join(ts.RequiredBy, ", "))
-					fmt.Fprintf(os.Stderr, "Please remove them first.\n")
+					fmt.Fprintf(os.Stderr, "\nSuggestions:\n")
+					fmt.Fprintf(os.Stderr, "  - Remove the dependent tools first: tsuku remove %s\n", strings.Join(ts.RequiredBy, " "))
 					exitWithCode(ExitDependencyFailed)
 				}
 			}
 		}
 
 		if err := mgr.Remove(toolName); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to remove %s: %v\n", toolName, err)
+			fmt.Fprintf(os.Stderr, "Failed to remove %s: %s\n", toolName, errmsg.Format(err, errCtx))
 			exitWithCode(ExitGeneral)
 		}
 
