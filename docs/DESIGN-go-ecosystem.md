@@ -247,43 +247,22 @@ asset_pattern = "lazygit_{version}_{os}_{arch}.tar.gz"
 
 **Note:** This option could be a v1 implementation, with go_install added in v2 if coverage gaps prove significant.
 
-### Option 4: Hybrid Approach (Prefer Binaries, Fallback to Build)
-
-Combine Options 2 and 3. A Go builder would:
-1. First, check if the tool publishes GitHub releases with binary assets
-2. If yes, generate a recipe using `github_archive`
-3. If no, generate a recipe using `go_install` with hidden toolchain
-
-**Pros:**
-- Best of both worlds: fast binary installs when available
-- Fallback ensures any Go module can be installed
-- Builder decides, user doesn't need to know
-- Future-proof: Works today with binaries, works tomorrow if a project stops publishing binaries
-- Per-tool optimization: Builder can make smart choices based on project characteristics
-
-**Cons:**
-- Most complex implementation
-- Two code paths means more maintenance
-- Inconsistent installation method per tool (kubectl takes 5s, niche-tool takes 2min)
-- Recipe format differs based on availability of binaries
-- Recipe debugging harder: Troubleshooting requires understanding which path was chosen
-
 ### Evaluation Against Decision Drivers
 
-| Driver | Option 1 (Explicit) | Option 2 (Hidden) | Option 3 (Binaries) | Option 4 (Hybrid) |
-|--------|---------------------|-------------------|---------------------|-------------------|
-| Self-contained | Good | Excellent | Excellent | Excellent |
-| Isolation | Good | Good | N/A | Good |
-| Consistency | Good | Fair | Good | Poor |
-| Registry API | Good | Good | N/A (uses GitHub) | Partial |
-| Executable discovery | Fair | Fair | Poor | Fair |
+| Driver | Option 1 (Explicit) | Option 2 (Hidden) | Option 3 (Binaries) |
+|--------|---------------------|-------------------|---------------------|
+| Self-contained | Good | Excellent | Excellent |
+| Isolation | Good | Good | N/A |
+| Consistency | Good | Fair | Good |
+| Registry API | Good | Good | N/A (uses GitHub) |
+| Executable discovery | Fair | Fair | Poor |
 
 ### Uncertainties
 
 - **Go version pinning**: We haven't determined how to choose which Go version to bootstrap, or how to update it. Most Go tools don't specify a minimum Go version in their go.mod. A reasonable policy would be "latest stable Go" with user override.
 - **Module cache sharing**: Should GOMODCACHE be shared across all go_install invocations? This improves performance but may cause version conflicts. Go's module system is designed for sharing, so this is likely safe.
 - **Compilation time**: Some Go tools take significant time to compile. We haven't measured this for typical tools. Initial estimates: small tools (1-2 min), large tools like k9s (3-5 min).
-- **Binary asset patterns**: For Option 3/4, we haven't validated how consistently Go projects name their release assets. Anecdotal evidence suggests most popular tools follow conventions, but a builder would need heuristics.
+- **Binary asset patterns**: For Option 3, we haven't validated how consistently Go projects name their release assets. Anecdotal evidence suggests most popular tools follow conventions, but a builder would need heuristics.
 - **User Go preference**: DevOps engineers often have Go installed. Should tsuku prefer a user's existing Go installation via environment variable (e.g., `TSUKU_GO_PATH`)? This could reduce disk usage and respect user preferences.
 
 ## Decision Outcome
@@ -311,8 +290,6 @@ This option was chosen because:
 - **Option 2 (Hidden Bootstrap)**: While cleaner UX, the hidden state creates maintenance burden (separate upgrade mechanism), user confusion (unexpected disk usage), and security audit challenges. The complexity isn't justified.
 
 - **Option 3 (Binaries Only)**: Viable as a v1 approach, but doesn't solve the core problem (users cannot leverage `go install`). Many Go tools don't publish binaries, limiting coverage. Could be considered for high-priority tools while go_install is developed.
-
-- **Option 4 (Hybrid)**: Combines complexity of Options 2 and 3 without clear benefit. Inconsistent user experience and difficult debugging. The complexity is not justified for v1.
 
 ### Trade-offs Accepted
 
@@ -686,7 +663,7 @@ registry.Register(NewGoBuilder(resolver))
 
 ### Mitigations
 
-1. **Compilation time**: Display progress during compilation. Consider future work on pre-built binary preference (Option 4 from alternatives).
+1. **Compilation time**: Display progress during compilation. Future LLM layer could prefer pre-built binaries when available.
 2. **Disk usage**: Document in user guide. Add `tsuku gc` command to clean module cache (future work).
 3. **Go version coupling**: Document limitation. In practice, Go has excellent backward compatibility, so this rarely matters.
 4. **CGO limitation**: Document clearly. Suggest users install cgo-dependent tools via system package manager.
