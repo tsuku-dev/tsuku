@@ -183,3 +183,32 @@ func TestRunCommandAction_Execute_CustomWorkDir(t *testing.T) {
 		t.Errorf("Execute() with custom working_dir failed: %v", err)
 	}
 }
+
+func TestRunCommandAction_Execute_ContextCancellation(t *testing.T) {
+	action := &RunCommandAction{}
+	tmpDir := t.TempDir()
+
+	// Create a context that is already cancelled
+	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	ctx := &ExecutionContext{
+		Context:    cancelledCtx,
+		WorkDir:    tmpDir,
+		InstallDir: tmpDir,
+		Version:    "1.0.0",
+		Recipe: &recipe.Recipe{
+			Metadata: recipe.MetadataSection{
+				Name: "test-tool",
+			},
+		},
+	}
+
+	// Command should fail due to cancelled context
+	err := action.Execute(ctx, map[string]interface{}{
+		"command": "sleep 10",
+	})
+	if err == nil {
+		t.Error("Execute() should fail when context is cancelled")
+	}
+}
