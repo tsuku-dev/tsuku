@@ -34,8 +34,8 @@ The key insight is that both error types already have `Suggestion()` methods ret
 
 ## Implementation Steps
 
-- [ ] Create `internal/errmsg/errmsg.go` with FormatError function
-- [ ] Create `internal/errmsg/errmsg_test.go` with comprehensive tests
+- [x] Create `internal/errmsg/errmsg.go` with FormatError function
+- [x] Create `internal/errmsg/errmsg_test.go` with comprehensive tests
 - [ ] Add printError helper to `cmd/tsuku/helpers.go`
 - [ ] Update install.go to use printError
 - [ ] Update other commands (versions, update, outdated, info) to use printError
