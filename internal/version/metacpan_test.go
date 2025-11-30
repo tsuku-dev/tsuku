@@ -289,7 +289,7 @@ func TestResolveMetaCPAN_HTTPSEnforcement(t *testing.T) {
 func TestResolveMetaCPAN_InvalidContentType(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("<html>Not JSON</html>"))
+		_, _ = w.Write([]byte("<html>Not JSON</html>"))
 	}))
 	defer server.Close()
 

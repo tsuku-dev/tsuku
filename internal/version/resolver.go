@@ -159,14 +159,14 @@ func New() *Resolver {
 
 	return &Resolver{
 		client:              github.NewClient(githubHTTPClient),
-		httpClient:          NewHTTPClient(),                        // HTTP client with proper timeouts
-		registry:            NewRegistry(),                          // Initialize with default resolvers
-		npmRegistryURL:      "https://registry.npmjs.org",           // Production default
-		pypiRegistryURL:     "https://pypi.org",                     // Production default
-		cratesIORegistryURL: "https://crates.io",                    // Production default
-		rubygemsRegistryURL: "https://rubygems.org",                 // Production default
-		metacpanRegistryURL: "https://fastapi.metacpan.org/v1",      // Production default
-		goDevURL:            "https://go.dev",                       // Production default
+		httpClient:          NewHTTPClient(),                   // HTTP client with proper timeouts
+		registry:            NewRegistry(),                     // Initialize with default resolvers
+		npmRegistryURL:      "https://registry.npmjs.org",      // Production default
+		pypiRegistryURL:     "https://pypi.org",                // Production default
+		cratesIORegistryURL: "https://crates.io",               // Production default
+		rubygemsRegistryURL: "https://rubygems.org",            // Production default
+		metacpanRegistryURL: "https://fastapi.metacpan.org/v1", // Production default
+		goDevURL:            "https://go.dev",                  // Production default
 		authenticated:       authenticated,
 	}
 }
@@ -188,11 +188,11 @@ func NewWithNpmRegistry(registryURL string) *Resolver {
 		httpClient:          NewHTTPClient(),
 		registry:            NewRegistry(),
 		npmRegistryURL:      registryURL,
-		pypiRegistryURL:     "https://pypi.org",                     // Default PyPI
-		cratesIORegistryURL: "https://crates.io",                    // Default crates.io
-		rubygemsRegistryURL: "https://rubygems.org",                 // Default RubyGems
-		metacpanRegistryURL: "https://fastapi.metacpan.org/v1",      // Default MetaCPAN
-		goDevURL:            "https://go.dev",                       // Default go.dev
+		pypiRegistryURL:     "https://pypi.org",                // Default PyPI
+		cratesIORegistryURL: "https://crates.io",               // Default crates.io
+		rubygemsRegistryURL: "https://rubygems.org",            // Default RubyGems
+		metacpanRegistryURL: "https://fastapi.metacpan.org/v1", // Default MetaCPAN
+		goDevURL:            "https://go.dev",                  // Default go.dev
 		authenticated:       authenticated,
 	}
 }
@@ -213,12 +213,12 @@ func NewWithPyPIRegistry(registryURL string) *Resolver {
 		client:              github.NewClient(githubHTTPClient),
 		httpClient:          NewHTTPClient(),
 		registry:            NewRegistry(),
-		npmRegistryURL:      "https://registry.npmjs.org",           // Default npm
+		npmRegistryURL:      "https://registry.npmjs.org", // Default npm
 		pypiRegistryURL:     registryURL,
-		cratesIORegistryURL: "https://crates.io",                    // Default crates.io
-		rubygemsRegistryURL: "https://rubygems.org",                 // Default RubyGems
-		metacpanRegistryURL: "https://fastapi.metacpan.org/v1",      // Default MetaCPAN
-		goDevURL:            "https://go.dev",                       // Default go.dev
+		cratesIORegistryURL: "https://crates.io",               // Default crates.io
+		rubygemsRegistryURL: "https://rubygems.org",            // Default RubyGems
+		metacpanRegistryURL: "https://fastapi.metacpan.org/v1", // Default MetaCPAN
+		goDevURL:            "https://go.dev",                  // Default go.dev
 		authenticated:       authenticated,
 	}
 }
@@ -239,12 +239,12 @@ func NewWithCratesIORegistry(registryURL string) *Resolver {
 		client:              github.NewClient(githubHTTPClient),
 		httpClient:          NewHTTPClient(),
 		registry:            NewRegistry(),
-		npmRegistryURL:      "https://registry.npmjs.org",           // Default npm
-		pypiRegistryURL:     "https://pypi.org",                     // Default PyPI
+		npmRegistryURL:      "https://registry.npmjs.org", // Default npm
+		pypiRegistryURL:     "https://pypi.org",           // Default PyPI
 		cratesIORegistryURL: registryURL,
-		rubygemsRegistryURL: "https://rubygems.org",                 // Default RubyGems
-		metacpanRegistryURL: "https://fastapi.metacpan.org/v1",      // Default MetaCPAN
-		goDevURL:            "https://go.dev",                       // Default go.dev
+		rubygemsRegistryURL: "https://rubygems.org",            // Default RubyGems
+		metacpanRegistryURL: "https://fastapi.metacpan.org/v1", // Default MetaCPAN
+		goDevURL:            "https://go.dev",                  // Default go.dev
 		authenticated:       authenticated,
 	}
 }
@@ -265,12 +265,12 @@ func NewWithRubyGemsRegistry(registryURL string) *Resolver {
 		client:              github.NewClient(githubHTTPClient),
 		httpClient:          NewHTTPClient(),
 		registry:            NewRegistry(),
-		npmRegistryURL:      "https://registry.npmjs.org",           // Default npm
-		pypiRegistryURL:     "https://pypi.org",                     // Default PyPI
-		cratesIORegistryURL: "https://crates.io",                    // Default crates.io
+		npmRegistryURL:      "https://registry.npmjs.org", // Default npm
+		pypiRegistryURL:     "https://pypi.org",           // Default PyPI
+		cratesIORegistryURL: "https://crates.io",          // Default crates.io
 		rubygemsRegistryURL: registryURL,
-		metacpanRegistryURL: "https://fastapi.metacpan.org/v1",      // Default MetaCPAN
-		goDevURL:            "https://go.dev",                       // Default go.dev
+		metacpanRegistryURL: "https://fastapi.metacpan.org/v1", // Default MetaCPAN
+		goDevURL:            "https://go.dev",                  // Default go.dev
 		authenticated:       authenticated,
 	}
 }
@@ -291,10 +291,10 @@ func NewWithMetaCPANRegistry(registryURL string) *Resolver {
 		client:              github.NewClient(githubHTTPClient),
 		httpClient:          NewHTTPClient(),
 		registry:            NewRegistry(),
-		npmRegistryURL:      "https://registry.npmjs.org",           // Default npm
-		pypiRegistryURL:     "https://pypi.org",                     // Default PyPI
-		cratesIORegistryURL: "https://crates.io",                    // Default crates.io
-		rubygemsRegistryURL: "https://rubygems.org",                 // Default RubyGems
+		npmRegistryURL:      "https://registry.npmjs.org", // Default npm
+		pypiRegistryURL:     "https://pypi.org",           // Default PyPI
+		cratesIORegistryURL: "https://crates.io",          // Default crates.io
+		rubygemsRegistryURL: "https://rubygems.org",       // Default RubyGems
 		metacpanRegistryURL: registryURL,
 		goDevURL:            "https://go.dev",                       // Default go.dev
 		authenticated:       authenticated,

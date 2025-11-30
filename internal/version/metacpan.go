@@ -255,7 +255,7 @@ func (r *Resolver) ListMetaCPANVersions(ctx context.Context, distribution string
 				"distribution": distribution,
 			},
 		},
-		"size": 1000,
+		"size":    1000,
 		"_source": []string{"version", "status"},
 		"sort": []map[string]interface{}{
 			{"date": map[string]string{"order": "desc"}},
