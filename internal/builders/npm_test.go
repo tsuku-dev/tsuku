@@ -229,6 +229,7 @@ func TestNpmBuilder_Build(t *testing.T) {
 	})
 }
 
+//nolint:dupl // Test structure similar to other builder tests by design
 func TestNpmBuilder_fetchPackageInfo(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
