@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"testing"
 
 	"github.com/tsuku-dev/tsuku/internal/recipe"
@@ -18,6 +19,7 @@ func TestRunCommandAction_Execute(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.0.0",
@@ -41,6 +43,7 @@ func TestRunCommandAction_Execute_MissingCommand(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.0.0",
@@ -62,6 +65,7 @@ func TestRunCommandAction_Execute_RequiresSudo(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.0.0",
@@ -87,6 +91,7 @@ func TestRunCommandAction_Execute_WithDescription(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.0.0",
@@ -111,6 +116,7 @@ func TestRunCommandAction_Execute_VariableExpansion(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.2.3",
@@ -134,6 +140,7 @@ func TestRunCommandAction_Execute_FailingCommand(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.0.0",
@@ -157,6 +164,7 @@ func TestRunCommandAction_Execute_CustomWorkDir(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	ctx := &ExecutionContext{
+		Context:    context.Background(),
 		WorkDir:    tmpDir,
 		InstallDir: tmpDir,
 		Version:    "1.0.0",
