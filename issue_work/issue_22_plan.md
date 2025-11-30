@@ -36,7 +36,7 @@ None - all changes are to existing files.
 ## Implementation Steps
 
 - [x] Step 1: Add signal handler in main.go with cancellable context
-- [ ] Step 2: Update install.go to pass context from signal handler
+- [x] Step 2: Update install.go to pass context from signal handler
 - [ ] Step 3: Update run_command.go to use exec.CommandContext
 - [ ] Step 4: Update download.go to use http.NewRequestWithContext
 - [ ] Step 5: Update package manager actions (npm, cargo, gem, pipx, nix) to use exec.CommandContext
