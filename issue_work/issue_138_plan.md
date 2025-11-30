@@ -33,12 +33,12 @@ None - reusing existing pattern
 
 ## Implementation Steps
 
-- [ ] Export `NewHTTPClient()` from resolver.go (rename from unexported `newHTTPClient`)
-- [ ] Update nixpkgs provider to use `NewHTTPClient()`
-- [ ] Harden download action HTTP client with decompression protection and SSRF checks
-- [ ] Harden registry client HTTP client with decompression protection
-- [ ] Add security tests for the hardened clients
-- [ ] Run all tests and verify
+- [x] Export `NewHTTPClient()` from resolver.go (rename from unexported `newHTTPClient`)
+- [x] Update nixpkgs provider to use `NewHTTPClient()`
+- [x] Harden download action HTTP client with decompression protection and SSRF checks
+- [x] Harden registry client HTTP client with decompression protection
+- [x] Add security tests for the hardened clients
+- [x] Run all tests and verify
 
 ## Testing Strategy
 
@@ -58,10 +58,10 @@ None - reusing existing pattern
 
 ## Success Criteria
 
-- [ ] All HTTP clients in the codebase have `DisableCompression: true`
-- [ ] All tests pass
-- [ ] No regressions in basic tool installation functionality
-- [ ] Build succeeds
+- [x] All HTTP clients in the codebase have `DisableCompression: true`
+- [x] All tests pass
+- [x] No regressions in basic tool installation functionality
+- [x] Build succeeds
 
 ## Open Questions
 
