@@ -219,3 +219,43 @@ func TestDownloadAction_verifyChecksum_CustomAlgo(t *testing.T) {
 		t.Errorf("verifyChecksum() with SHA512 failed: %v", err)
 	}
 }
+
+func TestDownloadAction_downloadFile_ContextCancellation(t *testing.T) {
+	action := &DownloadAction{}
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "test.txt")
+
+	// Create a context that is already canceled
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	// Try to download with canceled context - should fail
+	err := action.downloadFile(canceledCtx, "https://example.com/file.txt", destPath)
+	if err == nil {
+		t.Error("downloadFile() should fail when context is canceled")
+	}
+}
+
+func TestDownloadAction_Execute_ContextCancellation(t *testing.T) {
+	action := &DownloadAction{}
+	tmpDir := t.TempDir()
+
+	// Create a context that is already canceled
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	ctx := &ExecutionContext{
+		Context:    canceledCtx,
+		WorkDir:    tmpDir,
+		InstallDir: tmpDir,
+		Version:    "1.0.0",
+	}
+
+	// Try to execute with canceled context - should fail
+	err := action.Execute(ctx, map[string]interface{}{
+		"url": "https://example.com/file.tar.gz",
+	})
+	if err == nil {
+		t.Error("Execute() should fail when context is canceled")
+	}
+}
