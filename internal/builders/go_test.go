@@ -114,66 +114,80 @@ func TestGoBuilder_Build_SimpleModule(t *testing.T) {
 		t.Fatalf("Build() error = %v", err)
 	}
 
-	// Verify recipe structure
+	// Verify recipe is not nil
 	if result.Recipe == nil {
 		t.Fatal("Build() result.Recipe is nil")
 	}
 
-	// Name should be inferred executable (lazygit)
-	if result.Recipe.Metadata.Name != "lazygit" {
-		t.Errorf("Recipe.Metadata.Name = %q, want %q", result.Recipe.Metadata.Name, "lazygit")
+	// Verify Go-specific recipe structure using helper
+	verifyGoRecipe(t, result, "lazygit", "github.com/jesseduffield/lazygit")
+}
+
+// verifyGoRecipe is a helper that validates Go builder recipe structure
+func verifyGoRecipe(t *testing.T, result *BuildResult, expectedExe, modulePath string) {
+	t.Helper()
+
+	r := result.Recipe
+
+	// Check metadata
+	if r.Metadata.Name != expectedExe {
+		t.Errorf("Recipe.Metadata.Name = %q, want %q", r.Metadata.Name, expectedExe)
 	}
 
-	if result.Recipe.Metadata.Description != "Go CLI tool from github.com/jesseduffield/lazygit" {
-		t.Errorf("Recipe.Metadata.Description = %q", result.Recipe.Metadata.Description)
+	wantDesc := "Go CLI tool from " + modulePath
+	if r.Metadata.Description != wantDesc {
+		t.Errorf("Recipe.Metadata.Description = %q, want %q", r.Metadata.Description, wantDesc)
 	}
 
-	if result.Recipe.Metadata.Homepage != "https://pkg.go.dev/github.com/jesseduffield/lazygit" {
-		t.Errorf("Recipe.Metadata.Homepage = %q", result.Recipe.Metadata.Homepage)
+	wantHomepage := "https://pkg.go.dev/" + modulePath
+	if r.Metadata.Homepage != wantHomepage {
+		t.Errorf("Recipe.Metadata.Homepage = %q, want %q", r.Metadata.Homepage, wantHomepage)
 	}
 
-	// Check dependencies
-	if len(result.Recipe.Metadata.Dependencies) != 1 || result.Recipe.Metadata.Dependencies[0] != "go" {
-		t.Errorf("Recipe.Metadata.Dependencies = %v, want [go]", result.Recipe.Metadata.Dependencies)
+	// Go tools require go dependency
+	if len(r.Metadata.Dependencies) != 1 || r.Metadata.Dependencies[0] != "go" {
+		t.Errorf("Recipe.Metadata.Dependencies = %v, want [go]", r.Metadata.Dependencies)
 	}
 
-	// Check version source
-	if result.Recipe.Version.Source != "goproxy" {
-		t.Errorf("Recipe.Version.Source = %q, want %q", result.Recipe.Version.Source, "goproxy")
+	// Version source should be goproxy
+	if r.Version.Source != "goproxy" {
+		t.Errorf("Recipe.Version.Source = %q, want %q", r.Version.Source, "goproxy")
 	}
 
-	// Check steps
-	if len(result.Recipe.Steps) != 1 {
-		t.Fatalf("len(Recipe.Steps) = %d, want 1", len(result.Recipe.Steps))
+	// Check single step with go_install action
+	if len(r.Steps) != 1 {
+		t.Fatalf("len(Recipe.Steps) = %d, want 1", len(r.Steps))
 	}
 
-	if result.Recipe.Steps[0].Action != "go_install" {
-		t.Errorf("Recipe.Steps[0].Action = %q, want %q", result.Recipe.Steps[0].Action, "go_install")
+	if r.Steps[0].Action != "go_install" {
+		t.Errorf("Recipe.Steps[0].Action = %q, want %q", r.Steps[0].Action, "go_install")
 	}
 
-	// Check module param
-	module, ok := result.Recipe.Steps[0].Params["module"].(string)
-	if !ok || module != "github.com/jesseduffield/lazygit" {
-		t.Errorf("module param = %v, want github.com/jesseduffield/lazygit", result.Recipe.Steps[0].Params["module"])
+	// Verify module param
+	module, ok := r.Steps[0].Params["module"].(string)
+	if !ok || module != modulePath {
+		t.Errorf("module param = %v, want %s", r.Steps[0].Params["module"], modulePath)
 	}
 
-	// Check executables param
-	executables, ok := result.Recipe.Steps[0].Params["executables"].([]string)
-	if !ok || len(executables) != 1 || executables[0] != "lazygit" {
-		t.Errorf("executables param = %v, want [lazygit]", result.Recipe.Steps[0].Params["executables"])
+	// Verify executables param
+	executables, ok := r.Steps[0].Params["executables"].([]string)
+	if !ok || len(executables) != 1 || executables[0] != expectedExe {
+		t.Errorf("executables param = %v, want [%s]", r.Steps[0].Params["executables"], expectedExe)
 	}
 
-	// Check verify command
-	if result.Recipe.Verify.Command != "lazygit --version" {
-		t.Errorf("Verify.Command = %q, want %q", result.Recipe.Verify.Command, "lazygit --version")
+	// Verify command
+	wantVerify := expectedExe + " --version"
+	if r.Verify.Command != wantVerify {
+		t.Errorf("Verify.Command = %q, want %q", r.Verify.Command, wantVerify)
 	}
 
 	// Check source
-	if result.Source != "goproxy:github.com/jesseduffield/lazygit" {
-		t.Errorf("result.Source = %q, want %q", result.Source, "goproxy:github.com/jesseduffield/lazygit")
+	wantSource := "goproxy:" + modulePath
+	if result.Source != wantSource {
+		t.Errorf("result.Source = %q, want %q", result.Source, wantSource)
 	}
 
-	// Should not have warnings for simple module
+	// Should not have warnings for standard modules
 	if len(result.Warnings) != 0 {
 		t.Errorf("expected no warnings, got %v", result.Warnings)
 	}

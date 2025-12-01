@@ -86,9 +86,8 @@ func (b *GoBuilder) Build(ctx context.Context, packageName string, version strin
 		return nil, fmt.Errorf("invalid Go module path: %s", packageName)
 	}
 
-	// Fetch module metadata from Go proxy
-	moduleInfo, err := b.fetchModuleInfo(ctx, packageName)
-	if err != nil {
+	// Validate module exists by fetching info from Go proxy
+	if _, err := b.fetchModuleInfo(ctx, packageName); err != nil {
 		return nil, fmt.Errorf("failed to fetch module info: %w", err)
 	}
 
@@ -103,10 +102,9 @@ func (b *GoBuilder) Build(ctx context.Context, packageName string, version strin
 		result.Warnings = append(result.Warnings, warning)
 	}
 
-	// Use the version from the proxy if not specified
-	if version == "" {
-		version = moduleInfo.Version
-	}
+	// Note: version parameter is currently unused - recipes use goproxy for dynamic
+	// version resolution. The moduleInfo.Version is available if needed in future.
+	_ = version
 
 	// Build the recipe
 	r := &recipe.Recipe{
