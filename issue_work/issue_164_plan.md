@@ -21,11 +21,11 @@ When `module` parameter is provided, use it directly for cpanm instead of conver
 - `internal/actions/cpan_install.go` - Add optional `module` parameter handling and validation
 
 ## Implementation Steps
-- [ ] Add `isValidModuleName()` validation function
-- [ ] Add logic to use `module` parameter if provided, otherwise convert from distribution
-- [ ] Update function docs to document the new parameter
-- [ ] Add unit tests for module parameter handling
-- [ ] Verify all tests pass
+- [x] Add `isValidModuleName()` validation function
+- [x] Add logic to use `module` parameter if provided, otherwise convert from distribution
+- [x] Update function docs to document the new parameter
+- [x] Add unit tests for module parameter handling
+- [x] Verify all tests pass
 
 Mark each step [x] after it is implemented and committed.
 
