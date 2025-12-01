@@ -21,11 +21,11 @@ The project already has `config.GetAPITimeout()` which reads from `TSUKU_API_TIM
 None
 
 ## Implementation Steps
-- [ ] Update assets.go to use config.GetAPITimeout() instead of hardcoded constant
-- [ ] Update TestFetchReleaseAssets_Timeout to set TSUKU_API_TIMEOUT=100ms
-- [ ] Update mock server to sleep 200ms instead of 35 seconds
-- [ ] Verify test completes in under 5 seconds
-- [ ] Run full test suite to ensure no regressions
+- [x] Update assets.go to use config.GetAPITimeout() instead of hardcoded constant
+- [x] Update TestFetchReleaseAssets_Timeout to set TSUKU_API_TIMEOUT=1s (minimum allowed)
+- [x] Update mock server to sleep 2s instead of 35 seconds
+- [x] Verify test completes in under 5 seconds (actual: 2s)
+- [x] Run full test suite to ensure no regressions (all tests pass, 14s total vs 44s baseline)
 
 ## Testing Strategy
 - Unit tests: Run `TestFetchReleaseAssets_Timeout` to verify it still detects timeout correctly
@@ -39,10 +39,10 @@ None
   - **Mitigation**: Use 100ms timeout with 200ms sleep - 2x margin is sufficient
 
 ## Success Criteria
-- [ ] TestFetchReleaseAssets_Timeout completes in under 5 seconds
-- [ ] Test still validates timeout behavior correctly (returns timeout error)
-- [ ] All existing tests pass
-- [ ] No new test flakiness introduced
+- [x] TestFetchReleaseAssets_Timeout completes in under 5 seconds (actual: 2s)
+- [x] Test still validates timeout behavior correctly (returns timeout error)
+- [x] All existing tests pass
+- [x] No new test flakiness introduced
 
 ## Open Questions
 None - straightforward implementation using existing infrastructure.
