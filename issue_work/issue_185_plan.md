@@ -61,7 +61,7 @@ None - only creating new recipe files.
 - [x] Create godoc.toml recipe
 - [x] Create goimports.toml recipe
 - [x] Run tests to ensure recipes validate
-- [ ] Commit all recipes
+- [x] Commit all recipes
 
 ## Testing Strategy
 
@@ -102,10 +102,10 @@ pattern = "<version-pattern>"
 
 ## Success Criteria
 
-- [ ] 9 new Go tool recipes created
-- [ ] All recipes pass validation (`go test ./...`)
-- [ ] Recipe structure follows established patterns
-- [ ] Tools cover the acceptance criteria from issue (at least 10 Go tools validated - including existing go.toml)
+- [x] 9 new Go tool recipes created
+- [x] All recipes pass validation (`go test ./...`)
+- [x] Recipe structure follows established patterns
+- [x] Tools cover the acceptance criteria from issue (at least 10 Go tools validated - including existing go.toml)
 
 ## Open Questions
 
