@@ -15,5 +15,5 @@ module = "golang.org/x/tools/cmd/goimports"
 executables = ["goimports"]
 
 [verify]
-command = "goimports -h"
+command = "goimports -h 2>&1 || true"
 pattern = "usage:"
