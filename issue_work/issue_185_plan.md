@@ -51,16 +51,16 @@ None - only creating new recipe files.
 
 ## Implementation Steps
 
-- [ ] Create gofumpt.toml recipe
-- [ ] Create staticcheck.toml recipe
-- [ ] Create gore.toml recipe
-- [ ] Create cobra-cli.toml recipe
-- [ ] Create mockgen.toml recipe
-- [ ] Create dlv.toml recipe
-- [ ] Create gopls.toml recipe
-- [ ] Create godoc.toml recipe
-- [ ] Create goimports.toml recipe
-- [ ] Run tests to ensure recipes validate
+- [x] Create gofumpt.toml recipe
+- [x] Create staticcheck.toml recipe
+- [x] Create gore.toml recipe
+- [x] Create cobra-cli.toml recipe
+- [x] Create mockgen.toml recipe
+- [x] Create dlv.toml recipe
+- [x] Create gopls.toml recipe
+- [x] Create godoc.toml recipe
+- [x] Create goimports.toml recipe
+- [x] Run tests to ensure recipes validate
 - [ ] Commit all recipes
 
 ## Testing Strategy
