@@ -1,6 +1,6 @@
 # Design: Flexible Recipe Verification
 
-- **Status**: Accepted
+- **Status**: Planned
 - **Issue**: #192
 - **Author**: @dangazineu
 - **Created**: 2025-12-06
@@ -853,4 +853,24 @@ When adding verification methods:
 2. **Opt-in enhancement**: Version verification remains the required baseline; additional methods are optional
 3. **Clear failure modes**: Each layer should report distinct, actionable errors
 4. **Independent evolution**: Recipes can adopt new methods without changing existing verification
+
+## Implementation Issues
+
+### Milestone: Version Verification
+
+- [#196](https://github.com/tsukumogami/tsuku/issues/196): feat(recipe): add verification mode and version format fields
+- [#197](https://github.com/tsukumogami/tsuku/issues/197): feat(version): implement version format transforms with validation
+- [#198](https://github.com/tsukumogami/tsuku/issues/198): feat(validator): enforce verification mode rules and security checks
+- [#199](https://github.com/tsukumogami/tsuku/issues/199): feat(executor): apply version format transforms during verification
+- [#200](https://github.com/tsukumogami/tsuku/issues/200): chore(recipes): migrate recipes to use verification modes
+- [#201](https://github.com/tsukumogami/tsuku/issues/201): docs: document verification modes and version format transforms
+
+### Milestone: Defense-in-Depth Verification
+
+- [#202](https://github.com/tsukumogami/tsuku/issues/202): feat(verify): version verification (Layer 2) [umbrella]
+- [#203](https://github.com/tsukumogami/tsuku/issues/203): feat(verify): post-install checksum pinning (Layer 3) [needs-design]
+- [#204](https://github.com/tsukumogami/tsuku/issues/204): feat(verify): functional testing framework (Layer 4) [needs-design]
+- [#205](https://github.com/tsukumogami/tsuku/issues/205): feat(verify): import tests from Homebrew formulas (Layer 4) [needs-design]
+- [#207](https://github.com/tsukumogami/tsuku/issues/207): feat(verify): import tests from Nix derivations (Layer 4) [needs-design]
+- [#208](https://github.com/tsukumogami/tsuku/issues/208): feat(verify): signature and SLSA provenance verification (Layer 1) [needs-design]
 
