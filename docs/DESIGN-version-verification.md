@@ -59,7 +59,7 @@ Recipes should verify the exact installed version matches the requested version,
 
 1. **Version accuracy**: Users should know the exact version installed
 2. **Recipe simplicity**: Common cases should be simple, edge cases shouldn't complicate normal usage
-3. **Backward compatibility**: Existing recipes must continue working
+3. **Sensible defaults**: Default behavior should work for most recipes without configuration
 4. **Fail-safe defaults**: Missing or incorrect verification should be obvious, not silent
 5. **Minimal configuration**: Prefer convention over configuration where possible
 6. **Validation coverage**: CI should catch recipes with inadequate verification
@@ -258,9 +258,8 @@ Future (v2+):
 
 - Warn if `version` mode pattern doesn't contain `{version}` (likely mistake)
 - Error if `output` mode lacks `reason` field (missing documentation)
-- Existing recipes get warnings for backward compatibility
 
-**Rationale**: Encourages best practices without blocking adoption. The `reason` field ensures weak verification is documented and intentional.
+**Rationale**: The `reason` field ensures weak verification is documented and intentional.
 
 ---
 
@@ -309,7 +308,7 @@ These are **complementary**, not competing alternatives - each addresses differe
 
 2. **Recipe simplicity** (Driver 2): Four predefined formats (`semver`, `semver_full`, `strip_v`, `raw`) cover ~95% of cases. Most recipes won't need transforms at all.
 
-3. **Backward compatibility** (Driver 3): Existing recipes continue working. New fields are optional. Default mode is `version` with `raw` format.
+3. **Sensible defaults** (Driver 3): Default mode is `version` with `raw` format - recipes only need configuration for edge cases.
 
 4. **Fail-safe defaults** (Driver 4): The default mode is `version`, requiring `{version}` in pattern. The `output` mode is a fallback for tools that genuinely cannot report version, not an alternative strategy.
 
@@ -323,12 +322,9 @@ These are **complementary**, not competing alternatives - each addresses differe
 
 2. **Two new concepts**: Recipe authors may need to learn `version_format` (for transforms) and `mode` (for fallback). Most recipes need neither.
 
-3. **Migration burden**: Recipes currently using weak patterns should be updated to use `mode = "output"` with `reason`.
-
 These are acceptable because:
 - Verbosity is localized to the ~40 recipes with version mismatches
 - The common case (tool outputs clean version) requires zero configuration
-- Migration can be gradual; existing recipes continue working
 
 ## Solution Architecture
 
