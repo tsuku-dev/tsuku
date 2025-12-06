@@ -179,9 +179,21 @@ func (e *Executor) shouldExecute(when map[string]string) bool {
 
 // verify runs the verification command
 func (e *Executor) verify() error {
+	// Apply version format transform if specified in verify section
+	verifyVersion := e.ctx.Version
+	if e.recipe.Verify.VersionFormat != "" {
+		transformed, err := version.TransformVersion(e.ctx.Version, e.recipe.Verify.VersionFormat)
+		if err != nil {
+			// Log warning but continue with original version
+			fmt.Printf("   Warning: version transform failed: %v\n", err)
+		} else {
+			verifyVersion = transformed
+		}
+	}
+
 	// Expand variables in command
 	vars := map[string]string{
-		"version":     e.ctx.Version,
+		"version":     verifyVersion,
 		"install_dir": e.installDir,
 		"binary":      filepath.Join(e.installDir, "bin", e.recipe.Metadata.Name),
 	}

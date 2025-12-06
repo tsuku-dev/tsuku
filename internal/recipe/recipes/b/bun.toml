@@ -17,3 +17,4 @@ arch_mapping = { amd64 = "x64", arm64 = "aarch64" }
 [verify]
 command = "bun --version"
 pattern = "{version}"
+version_format = "semver"
