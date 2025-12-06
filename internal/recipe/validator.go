@@ -383,11 +383,16 @@ func validateVerify(result *ValidationResult, r *Recipe) {
 	}
 
 	// Check for dangerous patterns in verify command
-	dangerous := []string{"rm ", "rm\t", "> /", "| sh", "| bash", "curl |", "wget |"}
+	// Patterns with word boundaries to avoid false positives on tool names (e.g., "terraform")
+	dangerous := []string{" rm ", "\trm ", "> /", "| sh", "| bash", "curl |", "wget |"}
 	for _, pattern := range dangerous {
 		if strings.Contains(r.Verify.Command, pattern) {
 			result.addWarning("verify.command", fmt.Sprintf("verify command contains potentially dangerous pattern '%s'", strings.TrimSpace(pattern)))
 		}
+	}
+	// Check if command starts with rm (word boundary at start)
+	if strings.HasPrefix(r.Verify.Command, "rm ") || strings.HasPrefix(r.Verify.Command, "rm\t") {
+		result.addWarning("verify.command", "verify command contains potentially dangerous pattern 'rm'")
 	}
 
 	// Check if pattern contains version placeholder

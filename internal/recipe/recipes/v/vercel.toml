@@ -15,4 +15,4 @@ executables = ["vercel", "vc"]
 
 [verify]
 command = "vercel --version"
-pattern = "Vercel CLI"
+pattern = "Vercel CLI {version}"

@@ -15,4 +15,4 @@ executables = ["netlify", "ntl"]
 
 [verify]
 command = "netlify --version"
-pattern = "netlify-cli/"
+pattern = "netlify-cli/{version}"
