@@ -16,5 +16,6 @@ arch_mapping = { amd64 = "amd64", arm64 = "arm64" }
 
 [verify]
 command = "gron --version"
-pattern = "{version}"
-version_format = "semver"
+mode = "output"
+pattern = "gron"
+reason = "gron binary does not embed version information"
