@@ -440,8 +440,13 @@ func validateVerify(result *ValidationResult, r *Recipe) {
 
 	// Note: We don't warn about missing {version} in pattern because:
 	// 1. Many tools output versions in formats that differ from GitHub tags
+	//    (e.g., GitHub tag "biome@2.3.8" but tool outputs "Version: 2.3.8")
 	// 2. A pattern that matches the tool output (e.g., "Version:") is valid
 	// 3. Version verification is optional - some tools just need presence check
+	//
+	// TODO(#192): Once version format transformation is implemented, we can
+	// re-enable validation that patterns include {version} when transforms
+	// are available to normalize version formats.
 }
 
 // suggestSimilar finds a similar string from the known set
