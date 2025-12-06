@@ -23,11 +23,11 @@ None (tests added to existing `validator_test.go`)
 
 ## Implementation Steps
 
-- [ ] Add dangerous pattern detection for `||`, `&&`, `eval`, `exec`, `$()`, and backticks
-- [ ] Add warning when `mode = "version"` pattern lacks `{version}`
-- [ ] Add error when `mode = "output"` lacks `reason` field
-- [ ] Add error when `mode = "functional"` is used (reserved for v2)
-- [ ] Add unit tests for each validation rule
+- [x] Add dangerous pattern detection for `||`, `&&`, `eval`, `exec`, `$()`, and backticks
+- [x] Add warning when `mode = "version"` pattern lacks `{version}`
+- [x] Add error when `mode = "output"` lacks `reason` field
+- [x] Add error when `mode = "functional"` is used (reserved for v2)
+- [x] Add unit tests for each validation rule
 
 ## Testing Strategy
 
@@ -43,12 +43,12 @@ None (tests added to existing `validator_test.go`)
 
 ## Success Criteria
 
-- [ ] Warn if `mode = "version"` pattern lacks `{version}`
-- [ ] Error if `mode = "output"` lacks `reason` field
-- [ ] Error if `mode = "functional"` used
-- [ ] Detect dangerous patterns: `||`, `&&`, `eval`, `exec`, `$()`, backticks
-- [ ] All unit tests pass
-- [ ] No regressions in existing tests
+- [x] Warn if `mode = "version"` pattern lacks `{version}`
+- [x] Error if `mode = "output"` lacks `reason` field
+- [x] Error if `mode = "functional"` used
+- [x] Detect dangerous patterns: `||`, `&&`, `eval`, `exec`, `$()`, backticks
+- [x] All unit tests pass
+- [x] No regressions in existing tests
 
 ## Open Questions
 
