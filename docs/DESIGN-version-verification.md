@@ -455,9 +455,11 @@ Custom transforms can be added later (e.g., `strip_prefix:biome@`) but the commo
 - Update recipes with version mismatches to use appropriate `version_format`
 - Update recipes without version output to use `output` mode with `reason`
 
-### Phase 6 (Future): Homebrew Test Import
+### Phase 6 (Future): Upstream Test Import
 
-**Goal**: Leverage Homebrew's test corpus to provide stronger verification for tsuku recipes.
+**Goal**: Leverage existing test corpora from Homebrew and Nix to provide stronger verification for tsuku recipes without requiring recipe authors to write tests from scratch.
+
+#### 6a: Homebrew Test Import
 
 **Approach**: Manual curation rather than automated parsing
 - Homebrew's JSON API does not include `test do` blocks
@@ -469,19 +471,35 @@ Custom transforms can be added later (e.g., `strip_prefix:biome@`) but the commo
 2. Check if Homebrew formula has a `test do` block
 3. Manually translate test to tsuku `[verify]` format
 4. Document source in recipe comment: `# Test adapted from Homebrew formula`
-5. Track in registry metadata which recipes have Homebrew-derived tests
 
 **Example translations**:
 
 | Homebrew (Ruby) | Tsuku (TOML) |
 |-----------------|--------------|
-| `pipe_output("#{bin}/jq .bar", '{"foo":1, "bar":2}')` | `command = "sh"`, `args = ["-c", "echo '...' \| jq .bar"]` |
+| `pipe_output("#{bin}/jq .bar", '{"foo":1}')` | `command = "sh"`, `args = ["-c", "echo '...' \| jq .bar"]` |
 | `(testpath/"test.txt").write("data")` | Use temporary directory in shell script |
 | `system bin/"rg", "pattern", testpath` | `command = "sh"`, `args = ["-c", "echo 'data' > test.txt && rg 'pattern' ."]` |
 
-**Maintenance**: Update tests when Homebrew formulas change (quarterly audit)
+#### 6b: Nix Test Import
 
-**Out of scope for Phase 6**: Automated Ruby formula parsing, `test_dependencies` handling, complex multi-step tests requiring Homebrew helpers
+**Approach**: Leverage `installCheckPhase` from nixpkgs derivations for nix-based recipes
+
+**Strategy**:
+1. For recipes using `nixpkgs` action, check if derivation has `installCheckPhase`
+2. Translate Nix test expressions to tsuku `[verify]` format
+3. May be more automatable than Homebrew since Nix expressions are structured
+
+**Advantages**:
+- Nix tests are already designed for post-install verification
+- Natural fit for tsuku recipes that use `nixpkgs` action
+- Nix derivations are in a parseable format (not Ruby DSL)
+
+**Challenges**:
+- Nix tests may depend on sandbox features not available in tsuku
+- Some tests require `nix-shell` environment
+- Test expressions can be complex
+
+**Out of scope for Phase 6**: Automated parsing of either Homebrew or Nix tests, `test_dependencies` handling, complex multi-step tests requiring ecosystem-specific helpers
 
 ## Consequences
 
@@ -699,13 +717,19 @@ public_key_url = "https://example.com/cosign.pub"
 - Reduces per-recipe test authoring effort
 - Keeps tests in sync with upstream
 
-**Approach**: Manual curation rather than automated parsing (see Phase 6 in Implementation)
+**Sources**:
+- **Homebrew**: `test do` blocks from formulas - manual curation due to Ruby DSL
+- **Nix**: `installCheckPhase` from derivations - potentially more automatable, natural fit for `nixpkgs` action recipes
+
+**Approach**: See Phase 6 in Implementation for detailed strategy
 
 **Complexity**: High (if automated), Medium (if manually curated)
 
-**Dependencies**: Functional testing framework
+**Dependencies**: Functional testing framework (v2)
 
-**Suggested issue**: `Explore: Import verification tests from Homebrew formulas`
+**Suggested issues**:
+- `Explore: Import verification tests from Homebrew formulas`
+- `Explore: Import verification tests from Nix derivations`
 
 ### Future Feature: Platform-Specific Verification
 
