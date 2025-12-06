@@ -1,6 +1,6 @@
 # Design Document: Relocatable Library Dependency System
 
-**Status**: Accepted
+**Status**: Planned
 
 ## Context and Problem Statement
 
@@ -506,15 +506,25 @@ Security best practices for RPATH:
 
 ## Implementation Issues
 
-Implementation issues will be created after this design is accepted.
+### Milestone: [Relocatable Library Dependencies](https://github.com/tsukumogami/tsuku/milestone/10)
 
-### Proposed Milestone Structure
+**Foundation (no dependencies):**
+- [#214](https://github.com/tsukumogami/tsuku/issues/214): feat(recipe): add type field to recipe metadata schema
+- [#215](https://github.com/tsukumogami/tsuku/issues/215): feat(config): add libs directory to tsuku home
+- [#216](https://github.com/tsukumogami/tsuku/issues/216): feat(state): add libs section with used_by tracking
+- [#217](https://github.com/tsukumogami/tsuku/issues/217): feat(action): implement set_rpath action
+- [#218](https://github.com/tsukumogami/tsuku/issues/218): feat(version): implement homebrew version provider
 
-| Phase | Description |
-|-------|-------------|
-| Phase 1 | Dependency model foundation (type field, LibsDir config, used_by tracking) |
-| Phase 2 | RPATH utilities (cross-platform inspection/modification, binary format detection) |
-| Phase 3 | Library installation actions (install_libraries, link_dependencies with collision detection) |
-| Phase 4 | Homebrew integration (version provider, homebrew_bottle action, GHCR auth, placeholder relocation) |
-| Phase 5 | Ruby migration (libyaml recipe, ruby.toml update) |
-| Phase 6 | UX polish (prevent direct install, list filtering) |
+**Actions (blocked by foundation):**
+- [#219](https://github.com/tsukumogami/tsuku/issues/219): feat(action): implement install_libraries action
+- [#220](https://github.com/tsukumogami/tsuku/issues/220): feat(action): implement link_dependencies action
+- [#221](https://github.com/tsukumogami/tsuku/issues/221): feat(install): resolve library dependencies during tool installation
+- [#222](https://github.com/tsukumogami/tsuku/issues/222): feat(action): implement homebrew_bottle action
+
+**Migration (blocked by actions):**
+- [#223](https://github.com/tsukumogami/tsuku/issues/223): feat(recipe): add libyaml library recipe
+- [#224](https://github.com/tsukumogami/tsuku/issues/224): feat(recipe): migrate recipes to use library dependencies
+
+**UX Polish (blocked by foundation):**
+- [#225](https://github.com/tsukumogami/tsuku/issues/225): feat(cli): prevent direct library installation
+- [#226](https://github.com/tsukumogami/tsuku/issues/226): feat(cli): filter libraries from tsuku list output
