@@ -116,7 +116,7 @@ func validateVersion(result *ValidationResult, r *Recipe) {
 		"github_releases": true,
 		"github_tags":     true,
 		"nodejs_dist":     true,
-		"npm_registry":    true,
+		"npm":             true,
 		"pypi":            true,
 		"crates_io":       true,
 		"rubygems":        true,
