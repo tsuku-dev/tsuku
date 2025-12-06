@@ -544,6 +544,40 @@ expected_output = "1"
 - Some tests require `nix-shell` environment
 - Test expressions can be complex
 
+### Phase 9 (Future - Layer 1): Signature and Provenance Verification
+
+**Goal**: Complete Layer 1 by adding cryptographic signature verification and SLSA provenance attestation support.
+
+**Current state**: Layer 1 only supports SHA256 checksums, which verify integrity but not authenticity.
+
+**Scope**:
+- Signature verification (Cosign, Minisign, GPG)
+- SLSA provenance attestation verification
+- Key management and trust model
+
+**Recipe format**:
+```toml
+[download]
+url = "https://example.com/tool-{version}.tar.gz"
+checksum = "sha256:abc123..."  # existing
+
+[download.signature]
+method = "cosign"  # or "minisign", "gpg"
+public_key_url = "https://example.com/cosign.pub"
+
+[download.provenance]
+method = "slsa"
+source_repo = "github.com/org/tool"
+```
+
+**Challenges**:
+- Not all upstream projects provide signatures
+- Key distribution and trust model (how to ship/update trusted keys?)
+- Multiple signature standards to support
+- SLSA provenance is still emerging
+
+**Dependencies**: Download infrastructure changes
+
 ## Consequences
 
 ### Positive
@@ -662,9 +696,10 @@ Different verification methods provide different guarantees. They are **compleme
 │ Guarantees: Correct version was installed and reports correctly │
 │ Example: jq --version → jq-1.7                                  │
 ├─────────────────────────────────────────────────────────────────┤
-│ Layer 1: Cryptographic Verification (Existing)                  │
+│ Layer 1: Cryptographic Verification (Partial - Phase 9)         │
 │ Guarantees: Downloaded artifact matches expected checksum       │
-│ Example: SHA256 of downloaded archive                           │
+│ Current: SHA256 checksums only                                  │
+│ Future: Signatures (Cosign, Minisign, GPG) + SLSA provenance    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -807,8 +842,8 @@ pattern = "tool {version}"
 | Checksum pinning | 6 | 3 | Future | Medium |
 | Functional testing framework | 7 | 4 | Future | Medium |
 | Upstream test import | 8 | 4 | Future | High |
+| Signatures + SLSA provenance | 9 | 1 | Future | High |
 | Platform-specific verification | TBD | 2 | Future | Low |
-| Cryptographic signatures | TBD | 1 | Future | High |
 
 ### Design Principles for Future Work
 
