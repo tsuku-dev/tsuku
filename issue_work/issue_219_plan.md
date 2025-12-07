@@ -21,15 +21,16 @@ Create a new action following existing action patterns (like `install_binaries`)
 
 ## Files to Modify
 - `internal/actions/action.go` - Register the new action
+- `internal/actions/dependencies.go` - Add action to dependencies registry
 
 ## Implementation Steps
-- [ ] Create InstallLibrariesAction struct with Name() method
-- [ ] Implement Execute() with pattern parsing and glob matching
-- [ ] Copy matched files preserving symlinks
-- [ ] Register action in action.go
-- [ ] Add unit tests for basic file copying
-- [ ] Add unit tests for symlink preservation
-- [ ] Add unit tests for glob pattern matching
+- [x] Create InstallLibrariesAction struct with Name() method
+- [x] Implement Execute() with pattern parsing and glob matching
+- [x] Copy matched files preserving symlinks
+- [x] Register action in action.go
+- [x] Add unit tests for basic file copying
+- [x] Add unit tests for symlink preservation
+- [x] Add unit tests for glob pattern matching
 
 ## Testing Strategy
 - Unit tests:
@@ -44,8 +45,8 @@ Create a new action following existing action patterns (like `install_binaries`)
 - **Symlink resolution**: Use `os.Lstat` not `os.Stat` to detect symlinks
 
 ## Success Criteria
-- [ ] Action copies files matching glob patterns to destination
-- [ ] Symlinks copied as symlinks (not dereferenced)
-- [ ] Supports Linux (.so) and macOS (.dylib) patterns
-- [ ] Unit tests for symlink preservation pass
-- [ ] All existing tests continue to pass
+- [x] Action copies files matching glob patterns to destination
+- [x] Symlinks copied as symlinks (not dereferenced)
+- [x] Supports Linux (.so) and macOS (.dylib) patterns
+- [x] Unit tests for symlink preservation pass
+- [x] All existing tests continue to pass
