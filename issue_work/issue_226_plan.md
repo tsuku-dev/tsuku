@@ -21,10 +21,10 @@ Libraries are already hidden by default since they're in a separate `libs/` dire
 None
 
 ## Implementation Steps
-- [ ] Add ListLibraries method to Manager
-- [ ] Add `--all` flag to list command
-- [ ] Display libraries with `[lib]` marker when `--all` is used
-- [ ] Add unit test for ListLibraries
+- [x] Add ListLibraries method to Manager
+- [x] Add `--all` flag to list command
+- [x] Display libraries with `[lib]` marker when `--all` is used
+- [x] Add unit test for ListLibraries
 
 ## Testing Strategy
 - Unit tests: Test ListLibraries returns libraries from libs/ directory
