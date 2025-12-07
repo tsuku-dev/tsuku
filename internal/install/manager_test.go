@@ -1,8 +1,12 @@
 package install
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/tsukumogami/tsuku/internal/testutil"
 )
 
 func TestGenerateWrapperScript_NoPathAdditions(t *testing.T) {
@@ -172,5 +176,284 @@ func TestValidateShellSafePath_DangerousChars(t *testing.T) {
 				t.Errorf("expected error for path with %s, got nil", tc.name)
 			}
 		})
+	}
+}
+
+func TestCreateBinaryWrapper_Success(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create the tool directory structure
+	toolDir := cfg.ToolDir("mytool", "1.0.0")
+	binDir := filepath.Join(toolDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+
+	// Create a fake binary
+	binaryPath := filepath.Join(binDir, "mytool")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	// Ensure current dir exists
+	if err := os.MkdirAll(cfg.CurrentDir, 0755); err != nil {
+		t.Fatalf("failed to create current dir: %v", err)
+	}
+
+	// Create wrapper with runtime deps
+	runtimeDeps := map[string]string{
+		"nodejs": "20.10.0",
+	}
+
+	err := mgr.createBinaryWrapper("mytool", "1.0.0", "bin/mytool", runtimeDeps)
+	if err != nil {
+		t.Fatalf("createBinaryWrapper() error = %v", err)
+	}
+
+	// Verify wrapper was created
+	wrapperPath := cfg.CurrentSymlink("mytool")
+	content, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read wrapper: %v", err)
+	}
+
+	// Check wrapper content
+	contentStr := string(content)
+	if !strings.HasPrefix(contentStr, "#!/bin/sh\n") {
+		t.Errorf("wrapper should start with shebang")
+	}
+	if !strings.Contains(contentStr, "PATH=") {
+		t.Errorf("wrapper should contain PATH=")
+	}
+	if !strings.Contains(contentStr, "nodejs-20.10.0") {
+		t.Errorf("wrapper should contain nodejs path")
+	}
+	if !strings.Contains(contentStr, "exec") {
+		t.Errorf("wrapper should contain exec")
+	}
+
+	// Check wrapper is executable
+	info, err := os.Stat(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to stat wrapper: %v", err)
+	}
+	if info.Mode()&0111 == 0 {
+		t.Errorf("wrapper should be executable")
+	}
+}
+
+func TestCreateBinaryWrapper_InvalidBinaryPath(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	tests := []struct {
+		name       string
+		binaryPath string
+	}{
+		{"empty", ""},
+		{"dot", "."},
+		{"dotdot", ".."},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := mgr.createBinaryWrapper("tool", "1.0.0", tc.binaryPath, nil)
+			if err == nil {
+				t.Errorf("expected error for invalid binary path %q", tc.binaryPath)
+			}
+		})
+	}
+}
+
+func TestCreateBinaryWrapper_DeterministicOrder(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create the tool directory structure
+	toolDir := cfg.ToolDir("mytool", "1.0.0")
+	binDir := filepath.Join(toolDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+	if err := os.MkdirAll(cfg.CurrentDir, 0755); err != nil {
+		t.Fatalf("failed to create current dir: %v", err)
+	}
+
+	// Create wrapper multiple times with same deps in different order
+	// The output should be deterministic (sorted by dep name)
+	runtimeDeps := map[string]string{
+		"zebra":  "1.0.0",
+		"alpha":  "2.0.0",
+		"middle": "3.0.0",
+	}
+
+	var contents []string
+	for i := 0; i < 5; i++ {
+		err := mgr.createBinaryWrapper("mytool", "1.0.0", "bin/mytool", runtimeDeps)
+		if err != nil {
+			t.Fatalf("createBinaryWrapper() error = %v", err)
+		}
+
+		wrapperPath := cfg.CurrentSymlink("mytool")
+		content, err := os.ReadFile(wrapperPath)
+		if err != nil {
+			t.Fatalf("failed to read wrapper: %v", err)
+		}
+		contents = append(contents, string(content))
+	}
+
+	// All contents should be identical (deterministic)
+	for i := 1; i < len(contents); i++ {
+		if contents[i] != contents[0] {
+			t.Errorf("wrapper content not deterministic: run %d differs from run 0", i)
+		}
+	}
+
+	// Verify alphabetical order: alpha, middle, zebra
+	if !strings.Contains(contents[0], "alpha-2.0.0") {
+		t.Errorf("wrapper should contain alpha dep")
+	}
+	alphaIdx := strings.Index(contents[0], "alpha")
+	middleIdx := strings.Index(contents[0], "middle")
+	zebraIdx := strings.Index(contents[0], "zebra")
+
+	if alphaIdx > middleIdx || middleIdx > zebraIdx {
+		t.Errorf("deps should be in alphabetical order: alpha=%d, middle=%d, zebra=%d",
+			alphaIdx, middleIdx, zebraIdx)
+	}
+}
+
+func TestCreateWrappersForBinaries_MultipleBinaries(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create tool directory with multiple binaries
+	toolDir := cfg.ToolDir("multitool", "1.0.0")
+	binDir := filepath.Join(toolDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+	if err := os.MkdirAll(cfg.CurrentDir, 0755); err != nil {
+		t.Fatalf("failed to create current dir: %v", err)
+	}
+
+	// Create fake binaries
+	binaries := []string{"bin/tool1", "bin/tool2", "bin/tool3"}
+	for _, bin := range binaries {
+		binPath := filepath.Join(toolDir, bin)
+		if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho test"), 0755); err != nil {
+			t.Fatalf("failed to create binary %s: %v", bin, err)
+		}
+	}
+
+	runtimeDeps := map[string]string{"nodejs": "20.0.0"}
+
+	err := mgr.createWrappersForBinaries("multitool", "1.0.0", binaries, runtimeDeps)
+	if err != nil {
+		t.Fatalf("createWrappersForBinaries() error = %v", err)
+	}
+
+	// Verify all wrappers were created
+	for _, bin := range binaries {
+		binaryName := filepath.Base(bin)
+		wrapperPath := cfg.CurrentSymlink(binaryName)
+		if _, err := os.Stat(wrapperPath); os.IsNotExist(err) {
+			t.Errorf("wrapper for %s not created", binaryName)
+		}
+	}
+}
+
+func TestCreateWrappersForBinaries_FallbackToToolName(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create tool directory
+	toolDir := cfg.ToolDir("simpletool", "1.0.0")
+	binDir := filepath.Join(toolDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+	if err := os.MkdirAll(cfg.CurrentDir, 0755); err != nil {
+		t.Fatalf("failed to create current dir: %v", err)
+	}
+
+	// Create binary with tool name
+	binaryPath := filepath.Join(binDir, "simpletool")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	runtimeDeps := map[string]string{"python": "3.11.0"}
+
+	// Call with empty binaries slice - should fallback to bin/simpletool
+	err := mgr.createWrappersForBinaries("simpletool", "1.0.0", nil, runtimeDeps)
+	if err != nil {
+		t.Fatalf("createWrappersForBinaries() error = %v", err)
+	}
+
+	// Verify wrapper was created with tool name
+	wrapperPath := cfg.CurrentSymlink("simpletool")
+	if _, err := os.Stat(wrapperPath); os.IsNotExist(err) {
+		t.Errorf("wrapper for simpletool not created")
+	}
+}
+
+func TestCreateBinaryWrapper_AtomicWrite(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create tool directory
+	toolDir := cfg.ToolDir("atomictool", "1.0.0")
+	binDir := filepath.Join(toolDir, "bin")
+	if err := os.MkdirAll(binDir, 0755); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+	if err := os.MkdirAll(cfg.CurrentDir, 0755); err != nil {
+		t.Fatalf("failed to create current dir: %v", err)
+	}
+
+	// Create an existing wrapper (to test replacement)
+	wrapperPath := cfg.CurrentSymlink("atomictool")
+	if err := os.WriteFile(wrapperPath, []byte("old content"), 0755); err != nil {
+		t.Fatalf("failed to create old wrapper: %v", err)
+	}
+
+	runtimeDeps := map[string]string{"dep": "1.0.0"}
+
+	// Create new wrapper (should atomically replace)
+	err := mgr.createBinaryWrapper("atomictool", "1.0.0", "bin/atomictool", runtimeDeps)
+	if err != nil {
+		t.Fatalf("createBinaryWrapper() error = %v", err)
+	}
+
+	// Verify new content
+	content, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read wrapper: %v", err)
+	}
+	if string(content) == "old content" {
+		t.Errorf("wrapper was not replaced")
+	}
+	if !strings.HasPrefix(string(content), "#!/bin/sh") {
+		t.Errorf("wrapper should have new content with shebang")
+	}
+
+	// Verify no temp file left behind
+	tmpPath := wrapperPath + ".tmp"
+	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
+		t.Errorf("temp file should not exist after successful write")
 	}
 }
