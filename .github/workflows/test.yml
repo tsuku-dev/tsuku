@@ -21,7 +21,7 @@ jobs:
       - name: Check for issue_work files
         run: |
           if [ -d "issue_work" ] && [ "$(ls -A issue_work 2>/dev/null)" ]; then
-            echo "::error::issue_work/ directory contains files that should not be committed"
+            echo "::error::issue_work/ contains intermediate work artifacts that should not be merged into main. Delete this folder before merging the Pull Request."
             ls -la issue_work/
             exit 1
           fi
