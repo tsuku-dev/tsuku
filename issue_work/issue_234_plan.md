@@ -20,12 +20,12 @@ Create a separate file for the dependency registry to keep concerns separated. T
 
 ## Implementation Steps
 
-- [ ] Create `ActionDeps` struct with InstallTime and Runtime string slices
-- [ ] Create `ActionDependencies` map with all action dependencies
-- [ ] Add helper function `GetActionDeps(actionName string) ActionDeps`
-- [ ] Write unit tests verifying all ecosystem actions have correct deps
-- [ ] Write unit tests verifying compiled binary actions have no runtime deps
-- [ ] Write unit tests verifying download/extract actions have no deps
+- [x] Create `ActionDeps` struct with InstallTime and Runtime string slices
+- [x] Create `ActionDependencies` map with all action dependencies
+- [x] Add helper function `GetActionDeps(actionName string) ActionDeps`
+- [x] Write unit tests verifying all ecosystem actions have correct deps
+- [x] Write unit tests verifying compiled binary actions have no runtime deps
+- [x] Write unit tests verifying download/extract actions have no deps
 
 ## Testing Strategy
 
