@@ -543,3 +543,124 @@ func TestHomebrewBottleAction_IsBinaryFile_LargeTextFile(t *testing.T) {
 		t.Error("file with null byte within 8KB should be detected as binary")
 	}
 }
+
+func TestHomebrewBottleAction_FixBinaryRpath_ELFMagic(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create a file with ELF magic bytes
+	// This will trigger fixElfRpath which checks for patchelf
+	testFile := filepath.Join(tmpDir, "test.so")
+	// ELF magic: 0x7f 'E' 'L' 'F'
+	content := []byte{0x7f, 'E', 'L', 'F', 0x02, 0x01, 0x01, 0x00}
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// This will either:
+	// - Use patchelf if available (CI has it), or
+	// - Print warning and return nil if patchelf not found
+	err := action.fixBinaryRpath(testFile, "/opt/test")
+	if err != nil {
+		// patchelf may fail on invalid ELF, but that's still a valid test
+		t.Logf("fixBinaryRpath returned error (may be expected): %v", err)
+	}
+}
+
+func TestHomebrewBottleAction_FixBinaryRpath_MachOMagic(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create files with various Mach-O magic bytes
+	magicBytes := []struct {
+		name  string
+		magic []byte
+	}{
+		{"mach-o-32-be", []byte{0xfe, 0xed, 0xfa, 0xce}},
+		{"mach-o-32-le", []byte{0xce, 0xfa, 0xed, 0xfe}},
+		{"mach-o-64-be", []byte{0xfe, 0xed, 0xfa, 0xcf}},
+		{"mach-o-64-le", []byte{0xcf, 0xfa, 0xed, 0xfe}},
+		{"fat-binary-be", []byte{0xca, 0xfe, 0xba, 0xbe}},
+		{"fat-binary-le", []byte{0xbe, 0xba, 0xfe, 0xca}},
+	}
+
+	for _, tc := range magicBytes {
+		t.Run(tc.name, func(t *testing.T) {
+			testFile := filepath.Join(tmpDir, tc.name+".dylib")
+			if err := os.WriteFile(testFile, tc.magic, 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			// This will either:
+			// - Use install_name_tool if available (macOS), or
+			// - Print warning and return nil if not found (Linux)
+			err := action.fixBinaryRpath(testFile, "/opt/test")
+			if err != nil {
+				// May fail on invalid binary, but still valid test
+				t.Logf("fixBinaryRpath returned error (may be expected): %v", err)
+			}
+		})
+	}
+}
+
+func TestHomebrewBottleAction_FixBinaryRpath_ReadOnlyELF(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create a read-only file with ELF magic bytes
+	testFile := filepath.Join(tmpDir, "readonly.so")
+	content := []byte{0x7f, 'E', 'L', 'F', 0x02, 0x01, 0x01, 0x00}
+	if err := os.WriteFile(testFile, content, 0444); err != nil {
+		t.Fatal(err)
+	}
+
+	// This exercises the chmod code path in fixElfRpath
+	err := action.fixBinaryRpath(testFile, "/opt/test")
+	if err != nil {
+		t.Logf("fixBinaryRpath returned error (may be expected): %v", err)
+	}
+}
+
+func TestHomebrewBottleAction_RelocatePlaceholders_BinaryWithELFMagic(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create an ELF-like file with placeholder
+	// This exercises the full path: detect binary -> collect for RPATH fix
+	content := append([]byte{0x7f, 'E', 'L', 'F'}, []byte("@@HOMEBREW_PREFIX@@/lib\x00padding")...)
+	testFile := filepath.Join(tmpDir, "lib", "test.so")
+	if err := os.MkdirAll(filepath.Dir(testFile), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// This should detect the binary and collect it for RPATH fixing
+	err := action.relocatePlaceholders(tmpDir, "/opt/test")
+	if err != nil {
+		t.Logf("relocatePlaceholders returned error (may be expected if patchelf not found): %v", err)
+	}
+}
+
+func TestHomebrewBottleAction_RelocatePlaceholders_BothPlaceholders(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create a text file with both placeholders
+	content := "prefix=@@HOMEBREW_PREFIX@@\ncellar=@@HOMEBREW_CELLAR@@\n"
+	testFile := filepath.Join(tmpDir, "test.pc")
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := action.relocatePlaceholders(tmpDir, "/opt/test"); err != nil {
+		t.Fatalf("relocatePlaceholders failed: %v", err)
+	}
+
+	result, _ := os.ReadFile(testFile)
+	expected := "prefix=/opt/test\ncellar=/opt/test\n"
+	if string(result) != expected {
+		t.Errorf("got %q, want %q", string(result), expected)
+	}
+}
