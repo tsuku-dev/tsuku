@@ -428,8 +428,8 @@ func TestResolveDependencies_RecipeReplaceAndExtend(t *testing.T) {
 	// Recipe-level replace + extend
 	r := &recipe.Recipe{
 		Metadata: recipe.MetadataSection{
-			Dependencies:             []string{"nodejs@20"},       // Replace
-			ExtraRuntimeDependencies: []string{"bash"},            // Extend
+			Dependencies:             []string{"nodejs@20"}, // Replace
+			ExtraRuntimeDependencies: []string{"bash"},      // Extend
 		},
 		Steps: []recipe.Step{
 			{Action: "npm_install", Params: map[string]interface{}{}},
