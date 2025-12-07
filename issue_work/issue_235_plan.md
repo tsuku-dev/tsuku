@@ -20,12 +20,12 @@ Add a new file `resolver.go` in the actions package with a `ResolveDependencies`
 
 ## Implementation Steps
 
-- [ ] Create `ResolvedDeps` struct with InstallTime and Runtime maps
-- [ ] Implement `ResolveDependencies(recipe)` function collecting from action registry
-- [ ] Add step-level extra_dependencies handling
-- [ ] Add step-level extra_runtime_dependencies handling
-- [ ] Write unit tests for basic resolution
-- [ ] Write unit tests for step-level extensions
+- [x] Create `ResolvedDeps` struct with InstallTime and Runtime maps
+- [x] Implement `ResolveDependencies(recipe)` function collecting from action registry
+- [x] Add step-level extra_dependencies handling
+- [x] Add step-level extra_runtime_dependencies handling
+- [x] Write unit tests for basic resolution
+- [x] Write unit tests for step-level extensions
 
 ## Testing Strategy
 
@@ -43,11 +43,11 @@ Add a new file `resolver.go` in the actions package with a `ResolveDependencies`
 
 ## Success Criteria
 
-- [ ] `ResolveDependencies(recipe)` returns correct install-time deps from actions
-- [ ] `ResolveDependencies(recipe)` returns correct runtime deps from actions
-- [ ] Step-level extra_dependencies are merged into install deps
-- [ ] Step-level extra_runtime_dependencies are merged into runtime deps
-- [ ] All tests pass
+- [x] `ResolveDependencies(recipe)` returns correct install-time deps from actions
+- [x] `ResolveDependencies(recipe)` returns correct runtime deps from actions
+- [x] Step-level extra_dependencies are merged into install deps
+- [x] Step-level extra_runtime_dependencies are merged into runtime deps
+- [x] All tests pass
 
 ## Open Questions
 
