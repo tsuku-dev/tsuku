@@ -1,6 +1,6 @@
 # Design: Implicit Dependency Pattern
 
-**Status**: Proposed
+**Status**: Accepted
 **Created**: 2025-12-07
 
 ## Context and Problem Statement
