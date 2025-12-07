@@ -446,6 +446,20 @@ func (a *HomebrewBottleAction) fixElfRpath(binaryPath, installPath string) error
 		return nil
 	}
 
+	// Homebrew bottles often have read-only files; make writable before patching
+	info, err := os.Stat(binaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat binary: %w", err)
+	}
+	originalMode := info.Mode()
+	if originalMode&0200 == 0 {
+		if err := os.Chmod(binaryPath, originalMode|0200); err != nil {
+			return fmt.Errorf("failed to make binary writable: %w", err)
+		}
+		// Restore original mode after patching
+		defer os.Chmod(binaryPath, originalMode)
+	}
+
 	// Remove existing RPATH first (contains placeholders)
 	removeCmd := exec.Command(patchelf, "--remove-rpath", binaryPath)
 	if output, err := removeCmd.CombinedOutput(); err != nil {
@@ -491,6 +505,20 @@ func (a *HomebrewBottleAction) fixMachoRpath(binaryPath, installPath string) err
 	if err != nil {
 		fmt.Printf("   Warning: otool not found, skipping RPATH fix for %s\n", filepath.Base(binaryPath))
 		return nil
+	}
+
+	// Homebrew bottles often have read-only files; make writable before patching
+	info, err := os.Stat(binaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat binary: %w", err)
+	}
+	originalMode := info.Mode()
+	if originalMode&0200 == 0 {
+		if err := os.Chmod(binaryPath, originalMode|0200); err != nil {
+			return fmt.Errorf("failed to make binary writable: %w", err)
+		}
+		// Restore original mode after patching
+		defer os.Chmod(binaryPath, originalMode)
 	}
 
 	// Get existing rpaths that contain placeholders
