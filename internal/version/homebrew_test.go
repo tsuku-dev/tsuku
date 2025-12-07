@@ -411,3 +411,256 @@ func TestResolveHomebrew_NoStableVersion(t *testing.T) {
 		t.Fatal("expected error for formula without stable version")
 	}
 }
+
+func TestResolveHomebrew_UnexpectedStatusCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	_, err := resolver.ResolveHomebrew(context.Background(), "libyaml")
+	if err == nil {
+		t.Fatal("expected error for unexpected status code")
+	}
+
+	resolverErr, ok := err.(*ResolverError)
+	if !ok {
+		t.Fatalf("expected ResolverError, got %T", err)
+	}
+	if resolverErr.Type != ErrTypeNetwork {
+		t.Errorf("expected ErrTypeNetwork, got %v", resolverErr.Type)
+	}
+}
+
+func TestListHomebrewVersions_InvalidFormula(t *testing.T) {
+	resolver := &Resolver{
+		httpClient: &http.Client{},
+	}
+
+	_, err := resolver.ListHomebrewVersions(context.Background(), "../etc/passwd")
+	if err == nil {
+		t.Fatal("expected error for invalid formula")
+	}
+
+	resolverErr, ok := err.(*ResolverError)
+	if !ok {
+		t.Fatalf("expected ResolverError, got %T", err)
+	}
+	if resolverErr.Type != ErrTypeValidation {
+		t.Errorf("expected ErrTypeValidation, got %v", resolverErr.Type)
+	}
+}
+
+func TestListHomebrewVersions_NetworkError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("connection refused")
+	}))
+	server.Close() // Close immediately to simulate network error
+
+	resolver := &Resolver{
+		httpClient:          &http.Client{},
+		homebrewRegistryURL: server.URL,
+	}
+
+	_, err := resolver.ListHomebrewVersions(context.Background(), "libyaml")
+	if err == nil {
+		t.Fatal("expected network error")
+	}
+}
+
+func TestListHomebrewVersions_UnexpectedStatusCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	_, err := resolver.ListHomebrewVersions(context.Background(), "libyaml")
+	if err == nil {
+		t.Fatal("expected error for unexpected status code")
+	}
+
+	resolverErr, ok := err.(*ResolverError)
+	if !ok {
+		t.Fatalf("expected ResolverError, got %T", err)
+	}
+	if resolverErr.Type != ErrTypeNetwork {
+		t.Errorf("expected ErrTypeNetwork, got %v", resolverErr.Type)
+	}
+}
+
+func TestListHomebrewVersions_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{invalid json`))
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	_, err := resolver.ListHomebrewVersions(context.Background(), "libyaml")
+	if err == nil {
+		t.Fatal("expected parsing error")
+	}
+
+	resolverErr, ok := err.(*ResolverError)
+	if !ok {
+		t.Fatalf("expected ResolverError, got %T", err)
+	}
+	if resolverErr.Type != ErrTypeParsing {
+		t.Errorf("expected ErrTypeParsing, got %v", resolverErr.Type)
+	}
+}
+
+func TestListHomebrewVersions_NonSemverSort(t *testing.T) {
+	// Test sorting with non-semver versions (falls back to string comparison)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"name": "tool",
+			"versions": {
+				"stable": "latest"
+			},
+			"versioned_formulae": ["tool@beta", "tool@alpha"]
+		}`))
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	versions, err := resolver.ListHomebrewVersions(context.Background(), "tool")
+	if err != nil {
+		t.Fatalf("ListHomebrewVersions failed: %v", err)
+	}
+
+	// Non-semver versions should be sorted lexicographically descending
+	if len(versions) != 3 {
+		t.Errorf("expected 3 versions, got %d: %v", len(versions), versions)
+	}
+	// "latest" > "beta" > "alpha" in lexicographic order
+	expected := []string{"latest", "beta", "alpha"}
+	for i, v := range expected {
+		if i >= len(versions) {
+			t.Errorf("missing version at index %d", i)
+			continue
+		}
+		if versions[i] != v {
+			t.Errorf("expected version '%s' at index %d, got '%s'", v, i, versions[i])
+		}
+	}
+}
+
+func TestListHomebrewVersions_EmptyVersionFromFormula(t *testing.T) {
+	// Test that versioned formula with no version after @ is skipped
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"name": "tool",
+			"versions": {
+				"stable": "1.0.0"
+			},
+			"versioned_formulae": ["tool@", "tool@2.0"]
+		}`))
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	versions, err := resolver.ListHomebrewVersions(context.Background(), "tool")
+	if err != nil {
+		t.Fatalf("ListHomebrewVersions failed: %v", err)
+	}
+
+	// Should only have 2 versions (1.0.0 and 2.0), "tool@" should be skipped
+	if len(versions) != 2 {
+		t.Errorf("expected 2 versions, got %d: %v", len(versions), versions)
+	}
+}
+
+func TestListHomebrewVersions_NoStableVersion(t *testing.T) {
+	// Test formula with no stable version but versioned formulae
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"name": "tool",
+			"versions": {
+				"stable": ""
+			},
+			"versioned_formulae": ["tool@1.0", "tool@2.0"]
+		}`))
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	versions, err := resolver.ListHomebrewVersions(context.Background(), "tool")
+	if err != nil {
+		t.Fatalf("ListHomebrewVersions failed: %v", err)
+	}
+
+	// Should only have versioned formula versions
+	if len(versions) != 2 {
+		t.Errorf("expected 2 versions, got %d: %v", len(versions), versions)
+	}
+}
+
+func TestHomebrewProvider_ListVersions_Error(t *testing.T) {
+	// Test that ListVersions propagates errors correctly
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	provider := NewHomebrewProvider(resolver, "libyaml")
+
+	_, err := provider.ListVersions(context.Background())
+	if err == nil {
+		t.Fatal("expected error from ListVersions")
+	}
+}
+
+func TestHomebrewProvider_ResolveVersion_ListError(t *testing.T) {
+	// Test that ResolveVersion handles ListVersions errors
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	resolver := &Resolver{
+		httpClient:          server.Client(),
+		homebrewRegistryURL: server.URL,
+	}
+
+	provider := NewHomebrewProvider(resolver, "libyaml")
+
+	_, err := provider.ResolveVersion(context.Background(), "1.0.0")
+	if err == nil {
+		t.Fatal("expected error from ResolveVersion")
+	}
+}
