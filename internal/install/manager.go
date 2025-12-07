@@ -26,9 +26,10 @@ func New(cfg *config.Config) *Manager {
 
 // InstallOptions controls how a tool is installed
 type InstallOptions struct {
-	CreateSymlinks bool     // Whether to create symlinks in current/
-	IsHidden       bool     // Mark as hidden execution dependency
-	Binaries       []string // List of binary names this tool provides
+	CreateSymlinks      bool              // Whether to create symlinks in current/
+	IsHidden            bool              // Mark as hidden execution dependency
+	Binaries            []string          // List of binary names this tool provides
+	RuntimeDependencies map[string]string // Runtime deps: name -> version (for wrapper scripts)
 }
 
 // DefaultInstallOptions returns the default installation options
@@ -71,16 +72,30 @@ func (m *Manager) InstallWithOptions(name, version, workDir string, opts Install
 	// This ensures Python script shebangs point to the venv's python in the final path
 	_ = fixPipxShebangs(toolDir, m.config.ToolsDir) // Ignore errors - not all tools use pipx
 
-	// Create symlink in current/ (unless hidden)
+	// Create symlink or wrapper in current/ (unless hidden)
 	if opts.CreateSymlinks {
-		if err := m.createSymlinksForBinaries(name, version, opts.Binaries); err != nil {
-			return fmt.Errorf("failed to create symlinks: %w", err)
-		}
-		fmt.Printf("📍 Installed to: %s\n", toolDir)
-		if len(opts.Binaries) > 0 {
-			fmt.Printf("🔗 Symlinked %d binaries: %v\n", len(opts.Binaries), opts.Binaries)
+		if len(opts.RuntimeDependencies) > 0 {
+			// Tool has runtime deps - create wrapper scripts
+			if err := m.createWrappersForBinaries(name, version, opts.Binaries, opts.RuntimeDependencies); err != nil {
+				return fmt.Errorf("failed to create wrappers: %w", err)
+			}
+			fmt.Printf("📍 Installed to: %s\n", toolDir)
+			if len(opts.Binaries) > 0 {
+				fmt.Printf("🔗 Wrapped %d binaries: %v\n", len(opts.Binaries), opts.Binaries)
+			} else {
+				fmt.Printf("🔗 Wrapped: %s\n", m.config.CurrentSymlink(name))
+			}
 		} else {
-			fmt.Printf("🔗 Symlinked: %s -> %s\n", m.config.CurrentSymlink(name), filepath.Join(toolDir, "bin", name))
+			// No runtime deps - use symlinks (faster)
+			if err := m.createSymlinksForBinaries(name, version, opts.Binaries); err != nil {
+				return fmt.Errorf("failed to create symlinks: %w", err)
+			}
+			fmt.Printf("📍 Installed to: %s\n", toolDir)
+			if len(opts.Binaries) > 0 {
+				fmt.Printf("🔗 Symlinked %d binaries: %v\n", len(opts.Binaries), opts.Binaries)
+			} else {
+				fmt.Printf("🔗 Symlinked: %s -> %s\n", m.config.CurrentSymlink(name), filepath.Join(toolDir, "bin", name))
+			}
 		}
 	} else {
 		fmt.Printf("📍 Installed to: %s (hidden)\n", toolDir)
@@ -154,6 +169,82 @@ func (m *Manager) createSymlinksForBinaries(toolName, version string, binaries [
 	}
 
 	return nil
+}
+
+// createWrappersForBinaries creates wrapper scripts for all binaries provided by a tool.
+// Wrapper scripts prepend runtime dependency bin directories to PATH before exec'ing the real binary.
+func (m *Manager) createWrappersForBinaries(toolName, version string, binaries []string, runtimeDeps map[string]string) error {
+	if len(binaries) == 0 {
+		// Fallback: create wrapper for tool with same name as binary
+		return m.createBinaryWrapper(toolName, version, filepath.Join("bin", toolName), runtimeDeps)
+	}
+
+	for _, binary := range binaries {
+		if err := m.createBinaryWrapper(toolName, version, binary, runtimeDeps); err != nil {
+			return fmt.Errorf("failed to create wrapper for %s: %w", binary, err)
+		}
+	}
+
+	return nil
+}
+
+// createBinaryWrapper creates a wrapper script for a specific binary.
+// The wrapper prepends runtime dependency paths to PATH and exec's the real binary.
+func (m *Manager) createBinaryWrapper(toolName, version, binaryPath string, runtimeDeps map[string]string) error {
+	binaryName := filepath.Base(binaryPath)
+	wrapperPath := m.config.CurrentSymlink(binaryName)
+
+	// Build the target path (absolute)
+	targetPath := filepath.Join(m.config.ToolDir(toolName, version), binaryPath)
+
+	// Build PATH additions from runtime deps
+	var pathAdditions []string
+	for depName, depVersion := range runtimeDeps {
+		depBinDir := m.config.ToolBinDir(depName, depVersion)
+		pathAdditions = append(pathAdditions, depBinDir)
+	}
+
+	// Generate wrapper script content
+	content := generateWrapperScript(targetPath, pathAdditions)
+
+	// Remove existing file/symlink if it exists
+	if _, err := os.Lstat(wrapperPath); err == nil {
+		if err := os.Remove(wrapperPath); err != nil {
+			return fmt.Errorf("failed to remove old wrapper: %w", err)
+		}
+	}
+
+	// Write wrapper script
+	if err := os.WriteFile(wrapperPath, []byte(content), 0755); err != nil {
+		return fmt.Errorf("failed to write wrapper script: %w", err)
+	}
+
+	return nil
+}
+
+// generateWrapperScript creates the content of a wrapper script.
+// The script prepends dependency paths to PATH and exec's the target binary.
+func generateWrapperScript(targetPath string, pathAdditions []string) string {
+	var sb strings.Builder
+	sb.WriteString("#!/bin/sh\n")
+
+	// Only add PATH line if there are additions
+	if len(pathAdditions) > 0 {
+		sb.WriteString("PATH=\"")
+		for i, p := range pathAdditions {
+			if i > 0 {
+				sb.WriteString(":")
+			}
+			sb.WriteString(p)
+		}
+		sb.WriteString(":$PATH\"\n")
+	}
+
+	sb.WriteString("exec \"")
+	sb.WriteString(targetPath)
+	sb.WriteString("\" \"$@\"\n")
+
+	return sb.String()
 }
 
 // copyDir recursively copies a directory
