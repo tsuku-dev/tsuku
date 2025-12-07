@@ -296,47 +296,52 @@ Result: `install_deps=["go"]`, `runtime_deps=["go"]`
 
 ## Implementation Plan
 
-### Milestone Evaluation
+### Implementation Structure
 
-An initial analysis suggested 4 milestones (core resolution, overrides, runtime integration, cleanup). After further analysis, we're **consolidating to 2 milestones** because:
+This feature is delivered as a **single milestone** with multiple implementation phases. The phases are ordered for incremental development but all are required to deliver user value.
 
-1. **Core + overrides are tightly coupled**: Override mechanisms can't be tested without core resolution
-2. **Runtime + cleanup are naturally sequential**: Once wrappers work, bootstrap removal is straightforward
+#### Phase 1: Core Resolution
 
-### Recommended Milestone Structure
+Build the foundation for dependency resolution.
 
-#### Milestone 1: Dependency Resolution Foundation
-
-Combines core resolution + overrides because they're architecturally inseparable.
-
-**Scope:**
-- `ActionDeps` struct and registry
+- `ActionDeps` struct and `ActionDependencies` registry
 - Resolution algorithm with precedence rules
+- Transitive resolution with cycle detection (max depth 10)
+- Version constraint parsing
+
+#### Phase 2: Override Mechanisms
+
+Add escape hatches for edge cases.
+
 - Step-level `runtime_dependencies` override
-- Recipe-level version pinning
-- Transitive resolution with cycle detection
-- Validation and error messages
+- Recipe-level `dependencies` version pinning
+- Validation and helpful error messages
 
-**Acceptance:**
-- [ ] All ecosystem actions registered with correct deps
-- [ ] Override syntax works for step and recipe level
-- [ ] Transitive deps resolve correctly (pipx -> python-standalone)
-- [ ] Cycles detected with clear error
+#### Phase 3: Runtime Integration
 
-#### Milestone 2: Runtime Integration and Cleanup
+Wire dependencies into the runtime - this is where users see value.
 
-The user-visible milestone, including migration from legacy bootstrap code.
-
-**Scope:**
 - Wrapper script generation with runtime deps in PATH
-- State tracking of install/runtime deps
+- State tracking of install/runtime dependencies
 - `tsuku info` dependency tree display
-- Uninstall handles dependency graph
+- Uninstall warns about dependents
+
+#### Phase 4: Migration and Cleanup
+
+Remove legacy code and validate recipes.
+
 - Remove `EnsureNpm()`, `EnsurePipx()`, etc. from actions
 - Audit recipes for edge cases needing overrides
 - Update documentation
 
-**Acceptance:**
+### Acceptance Criteria
+
+All phases must be complete for the milestone to deliver value:
+
+- [ ] All ecosystem actions registered with correct deps
+- [ ] Override syntax works for step and recipe level
+- [ ] Transitive deps resolve correctly (pipx -> python-standalone)
+- [ ] Cycles detected with clear error
 - [ ] Wrappers prepend runtime dep paths
 - [ ] state.json records both dep types
 - [ ] `tsuku info <tool>` shows dependency tree
