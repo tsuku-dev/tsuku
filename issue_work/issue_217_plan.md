@@ -24,16 +24,16 @@ Create a new action that detects the binary format (ELF/Mach-O) and uses the app
 
 ## Implementation Steps
 
-- [ ] Create `set_rpath.go` with SetRpathAction struct and Name() method
-- [ ] Implement binary format detection (ELF vs Mach-O)
-- [ ] Implement Linux RPATH modification using patchelf
-- [ ] Implement macOS RPATH modification using install_name_tool
-- [ ] Implement macOS re-signing with codesign (ad-hoc)
-- [ ] Implement wrapper script fallback for when RPATH modification fails
-- [ ] Register action in action.go
-- [ ] Add unit tests for parameter validation
-- [ ] Add unit tests for binary format detection
-- [ ] Add platform-specific tests (mocked command execution)
+- [x] Create `set_rpath.go` with SetRpathAction struct and Name() method
+- [x] Implement binary format detection (ELF vs Mach-O)
+- [x] Implement Linux RPATH modification using patchelf
+- [x] Implement macOS RPATH modification using install_name_tool
+- [x] Implement macOS re-signing with codesign (ad-hoc)
+- [x] Implement wrapper script fallback for when RPATH modification fails
+- [x] Register action in action.go
+- [x] Add unit tests for parameter validation
+- [x] Add unit tests for binary format detection
+- [x] Add platform-specific tests (wrapper fallback tests)
 
 ## Testing Strategy
 
@@ -49,12 +49,12 @@ Create a new action that detects the binary format (ELF/Mach-O) and uses the app
 
 ## Success Criteria
 
-- [ ] Action modifies RPATH on Linux using patchelf
-- [ ] Action modifies RPATH on macOS using install_name_tool (with re-signing)
-- [ ] Existing RPATH stripped before setting new value
-- [ ] Uses `$ORIGIN/../lib` pattern (not bare `$ORIGIN`)
-- [ ] Wrapper script fallback when RPATH modification fails
-- [ ] Unit tests for both platforms
+- [x] Action modifies RPATH on Linux using patchelf
+- [x] Action modifies RPATH on macOS using install_name_tool (with re-signing)
+- [x] Existing RPATH stripped before setting new value
+- [x] Uses `$ORIGIN/../lib` pattern (not bare `$ORIGIN`)
+- [x] Wrapper script fallback when RPATH modification fails
+- [x] Unit tests for both platforms
 
 ## Open Questions
 
