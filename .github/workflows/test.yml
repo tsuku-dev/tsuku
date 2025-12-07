@@ -13,6 +13,8 @@ jobs:
   # Ensure no temporary work artifacts are committed
   check-artifacts:
     name: Check Artifacts
+    # Skip on scheduled runs (nightly recipe validation)
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
