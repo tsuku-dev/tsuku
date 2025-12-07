@@ -42,12 +42,12 @@ Create a separate file for the dependency registry to keep concerns separated. T
 
 ## Success Criteria
 
-- [ ] `ActionDeps` struct exists with `InstallTime` and `Runtime` fields
-- [ ] All 21 actions have entries in `ActionDependencies`
-- [ ] Ecosystem actions: install + runtime deps
-- [ ] Compiled binary actions: install only
-- [ ] Download/extract actions: no deps
-- [ ] All tests pass
+- [x] `ActionDeps` struct exists with `InstallTime` and `Runtime` fields
+- [x] All 21 actions have entries in `ActionDependencies`
+- [x] Ecosystem actions: install + runtime deps
+- [x] Compiled binary actions: install only
+- [x] Download/extract actions: no deps
+- [x] All tests pass
 
 ## Open Questions
 
