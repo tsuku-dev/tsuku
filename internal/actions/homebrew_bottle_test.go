@@ -2,8 +2,11 @@ package actions
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tsukumogami/tsuku/internal/recipe"
@@ -330,5 +333,213 @@ func TestGetCurrentPlatformTag(t *testing.T) {
 
 	if !validTags[tag] {
 		t.Errorf("GetCurrentPlatformTag() = %q, want one of %v", tag, validTags)
+	}
+}
+
+func TestHomebrewBottleAction_FixBinaryRpath_UnrecognizedFormat(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create a file with unrecognized magic bytes
+	testFile := filepath.Join(tmpDir, "test.bin")
+	content := []byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should return nil (skip silently) for unrecognized format
+	err := action.fixBinaryRpath(testFile, "/opt/test")
+	if err != nil {
+		t.Errorf("fixBinaryRpath should skip unrecognized format, got error: %v", err)
+	}
+}
+
+func TestHomebrewBottleAction_FixBinaryRpath_NonexistentFile(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Try to fix RPATH on non-existent file
+	err := action.fixBinaryRpath(filepath.Join(tmpDir, "nonexistent"), "/opt/test")
+	if err == nil {
+		t.Error("fixBinaryRpath should fail for nonexistent file")
+	}
+}
+
+func TestHomebrewBottleAction_FixBinaryRpath_EmptyFile(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create an empty file
+	testFile := filepath.Join(tmpDir, "empty.bin")
+	if err := os.WriteFile(testFile, []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should return error for empty file (EOF when reading magic)
+	err := action.fixBinaryRpath(testFile, "/opt/test")
+	if err == nil {
+		t.Error("fixBinaryRpath should fail for empty file")
+	}
+}
+
+func TestHomebrewBottleAction_RelocatePlaceholders_ReadOnlyTextFile(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create a read-only text file with placeholder
+	content := "prefix=@@HOMEBREW_PREFIX@@/lib\ncellar=@@HOMEBREW_CELLAR@@/opt\n"
+	testFile := filepath.Join(tmpDir, "test.pc")
+	if err := os.WriteFile(testFile, []byte(content), 0444); err != nil {
+		t.Fatal(err)
+	}
+
+	// Relocate should handle read-only files
+	installPath := "/opt/tsuku"
+	if err := action.relocatePlaceholders(tmpDir, installPath); err != nil {
+		t.Fatalf("relocatePlaceholders failed: %v", err)
+	}
+
+	// Verify both placeholders were replaced
+	result, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := "prefix=/opt/tsuku/lib\ncellar=/opt/tsuku/opt\n"
+	if string(result) != expected {
+		t.Errorf("got %q, want %q", string(result), expected)
+	}
+}
+
+func TestHomebrewBottleAction_RelocatePlaceholders_MultipleFiles(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create multiple files with placeholders
+	files := map[string]string{
+		"file1.txt": "path=@@HOMEBREW_PREFIX@@/bin",
+		"file2.txt": "cellar=@@HOMEBREW_CELLAR@@/lib",
+		"file3.txt": "no placeholder here",
+	}
+
+	for name, content := range files {
+		path := filepath.Join(tmpDir, name)
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	installPath := "/opt/test"
+	if err := action.relocatePlaceholders(tmpDir, installPath); err != nil {
+		t.Fatalf("relocatePlaceholders failed: %v", err)
+	}
+
+	// Verify file1 was modified
+	result1, _ := os.ReadFile(filepath.Join(tmpDir, "file1.txt"))
+	if string(result1) != "path=/opt/test/bin" {
+		t.Errorf("file1: got %q, want %q", string(result1), "path=/opt/test/bin")
+	}
+
+	// Verify file2 was modified
+	result2, _ := os.ReadFile(filepath.Join(tmpDir, "file2.txt"))
+	if string(result2) != "cellar=/opt/test/lib" {
+		t.Errorf("file2: got %q, want %q", string(result2), "cellar=/opt/test/lib")
+	}
+
+	// Verify file3 was NOT modified
+	result3, _ := os.ReadFile(filepath.Join(tmpDir, "file3.txt"))
+	if string(result3) != "no placeholder here" {
+		t.Errorf("file3: got %q, want unchanged", string(result3))
+	}
+}
+
+func TestHomebrewBottleAction_RelocatePlaceholders_NestedDirectories(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create nested directory structure
+	subDir := filepath.Join(tmpDir, "lib", "pkgconfig")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create file in nested directory
+	testFile := filepath.Join(subDir, "test.pc")
+	content := "prefix=@@HOMEBREW_PREFIX@@"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	installPath := "/opt/nested"
+	if err := action.relocatePlaceholders(tmpDir, installPath); err != nil {
+		t.Fatalf("relocatePlaceholders failed: %v", err)
+	}
+
+	result, err := os.ReadFile(testFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(result) != "prefix=/opt/nested" {
+		t.Errorf("got %q, want %q", string(result), "prefix=/opt/nested")
+	}
+}
+
+func TestHomebrewBottleAction_VerifySHA256_Correct(t *testing.T) {
+	action := &HomebrewBottleAction{}
+	tmpDir := t.TempDir()
+
+	// Create a test file with known content
+	content := []byte("test content")
+	testFile := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Compute the correct SHA256 of "test content"
+	hasher := sha256.New()
+	hasher.Write(content)
+	correctSHA := hex.EncodeToString(hasher.Sum(nil))
+
+	// Test with correct hash - should succeed
+	err := action.verifySHA256(testFile, correctSHA)
+	if err != nil {
+		t.Errorf("verifySHA256 should succeed with correct hash, got: %v", err)
+	}
+
+	// Test with wrong hash - should fail
+	wrongSHA := "0000000000000000000000000000000000000000000000000000000000000000"
+	err = action.verifySHA256(testFile, wrongSHA)
+	if err == nil {
+		t.Error("verifySHA256 should fail with wrong hash")
+	}
+	if err != nil && !strings.Contains(err.Error(), "SHA256 mismatch") {
+		t.Errorf("expected SHA256 mismatch error, got: %v", err)
+	}
+}
+
+func TestHomebrewBottleAction_IsBinaryFile_LargeTextFile(t *testing.T) {
+	action := &HomebrewBottleAction{}
+
+	// Create content larger than 8KB check window
+	content := make([]byte, 10000)
+	for i := range content {
+		content[i] = 'a' // All printable characters
+	}
+
+	if action.isBinaryFile(content) {
+		t.Error("large text file should not be detected as binary")
+	}
+
+	// Put null byte after 8KB - should still be detected as text
+	content[9000] = 0
+	if action.isBinaryFile(content) {
+		t.Error("file with null byte after 8KB should not be detected as binary")
+	}
+
+	// Put null byte within 8KB - should be detected as binary
+	content[100] = 0
+	if !action.isBinaryFile(content) {
+		t.Error("file with null byte within 8KB should be detected as binary")
 	}
 }
