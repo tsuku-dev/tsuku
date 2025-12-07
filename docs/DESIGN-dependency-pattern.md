@@ -156,9 +156,11 @@ var ActionDependencies = map[string]ActionDeps{
 }
 ```
 
-### Override Mechanisms
+### Override and Extension Mechanisms
 
-**Step-level override** (replaces action's runtime deps):
+Dependencies can be **replaced** (override implicit entirely) or **extended** (add to implicit).
+
+**Step-level replace** (replaces action's runtime deps):
 ```toml
 [[steps]]
 action = "npm_install"
@@ -166,10 +168,25 @@ package = "esbuild"
 runtime_dependencies = []  # esbuild is a compiled binary, no node needed
 ```
 
-**Recipe-level override** (version pinning):
+**Step-level extend** (adds to action's runtime deps):
+```toml
+[[steps]]
+action = "npm_install"
+package = "some-tool"
+extra_runtime_dependencies = ["bash"]  # needs bash + nodejs (implicit)
+```
+
+**Recipe-level replace** (version pinning):
 ```toml
 [metadata]
-dependencies = ["nodejs@20"]  # Pin to Node 20
+dependencies = ["nodejs@20"]  # Pin to Node 20, replaces implicit
+```
+
+**Recipe-level extend** (add without replacing):
+```toml
+[metadata]
+extra_dependencies = ["wget"]  # adds wget to implicit install deps
+extra_runtime_dependencies = ["bash"]  # adds bash to implicit runtime deps
 ```
 
 ### Dependency Resolution Algorithm
@@ -182,22 +199,41 @@ resolve_dependencies(recipe):
     for step in recipe.steps:
         action = ActionDependencies[step.action]
 
-        # Install-time: action implicit + step explicit
+        # Install-time: action implicit + step extra
         for dep in action.InstallTime:
             install_deps[dep] = "latest"
+        for dep in step.extra_dependencies:
+            install_deps[parse(dep).name] = parse(dep).version
 
-        # Runtime: step override OR action implicit
+        # Runtime: replace OR extend
         if step.runtime_dependencies is defined:
+            # Replace: use only what's declared
             for dep in step.runtime_dependencies:
-                runtime_deps[dep] = "latest"
+                runtime_deps[parse(dep).name] = parse(dep).version
         else:
+            # Implicit from action
             for dep in action.Runtime:
                 runtime_deps[dep] = "latest"
+            # Extend: add extra
+            for dep in step.extra_runtime_dependencies:
+                runtime_deps[parse(dep).name] = parse(dep).version
 
-    # Recipe-level overrides (version pinning)
-    for dep in recipe.metadata.dependencies:
-        name, version = parse(dep)
-        install_deps[name] = version
+    # Recipe-level replace (if set, overrides everything above)
+    if recipe.metadata.dependencies is defined:
+        install_deps = {}  # clear implicit
+        for dep in recipe.metadata.dependencies:
+            install_deps[parse(dep).name] = parse(dep).version
+
+    if recipe.metadata.runtime_dependencies is defined:
+        runtime_deps = {}  # clear implicit
+        for dep in recipe.metadata.runtime_dependencies:
+            runtime_deps[parse(dep).name] = parse(dep).version
+
+    # Recipe-level extend (adds to current set)
+    for dep in recipe.metadata.extra_dependencies:
+        install_deps[parse(dep).name] = parse(dep).version
+    for dep in recipe.metadata.extra_runtime_dependencies:
+        runtime_deps[parse(dep).name] = parse(dep).version
 
     # Resolve transitively (max depth 10)
     install_deps = resolve_transitive(install_deps)
