@@ -542,17 +542,6 @@ type Usage struct {
 }
 ```
 
-**Provider Factory** (`internal/llm/factory.go`):
-```go
-type Factory struct {
-    secrets  *secrets.Manager
-    tracker  *CostTracker
-}
-
-func (f *Factory) Get(name string) (Provider, error)
-func (f *Factory) Available() []string
-```
-
 **Claude Provider** (`internal/llm/claude.go`):
 - Implements Provider interface using Anthropic API
 - Tool use via `tools` parameter in messages API
@@ -588,18 +577,6 @@ Configuration resolution order:
 #### Infrastructure Services
 
 **Web Fetcher** (`internal/fetch/fetcher.go`):
-```go
-type Fetcher struct {
-    client      *http.Client
-    cache       *Cache
-    rateLimiter *rate.Limiter
-}
-
-func (f *Fetcher) Fetch(ctx context.Context, url string) ([]byte, error)
-func (f *Fetcher) FetchJSON(ctx context.Context, url string, v interface{}) error
-```
-
-Features:
 - Response caching with TTL (5 min default)
 - Rate limiting per domain
 - SSRF protection (private IP blocking)
@@ -607,15 +584,6 @@ Features:
 - Timeout enforcement
 
 **Secrets Manager** (`internal/secrets/manager.go`):
-```go
-type Manager struct {
-    envPrefix  string
-    configPath string
-}
-
-func (m *Manager) Get(key string) (string, error)
-func (m *Manager) GetRequired(key string) (string, error)
-```
 
 Resolution order:
 1. Environment variable (e.g., `ANTHROPIC_API_KEY`)
@@ -623,25 +591,9 @@ Resolution order:
 3. Error if required and not found
 
 **Cost Tracker** (`internal/llm/cost.go`):
-```go
-type CostTracker struct {
-    mu       sync.Mutex
-    requests []RequestCost
-}
-
-type RequestCost struct {
-    Provider     string
-    Model        string
-    InputTokens  int
-    OutputTokens int
-    Cost         float64
-    Timestamp    time.Time
-}
-
-func (t *CostTracker) Record(provider string, usage Usage)
-func (t *CostTracker) Summary() CostSummary
-func (t *CostTracker) Total() float64
-```
+- Track tokens in/out per request
+- Calculate cost based on provider pricing
+- Provide summary and total functions
 
 Pricing (configurable):
 - Claude Sonnet: $3/$15 per 1M tokens (input/output)
@@ -650,23 +602,6 @@ Pricing (configurable):
 #### Validation Pipeline
 
 **Container Validator** (`internal/validate/container.go`):
-```go
-type ContainerValidator struct {
-    dockerClient *client.Client
-    baseImage    string
-}
-
-type ValidationResult struct {
-    Success  bool
-    ExitCode int
-    Stdout   string
-    Stderr   string
-    Duration time.Duration
-    Error    error
-}
-
-func (v *ContainerValidator) Validate(ctx context.Context, recipe *recipe.Recipe) (*ValidationResult, error)
-```
 
 Validation steps:
 1. **Static validation** (always): Run recipe through existing validator + LLM-specific checks
@@ -695,65 +630,18 @@ Validation steps:
 ```
 
 **Error Parser** (`internal/validate/errors.go`):
-```go
-type ParsedError struct {
-    Type     ErrorType
-    Message  string
-    Location string  // e.g., "step 2: extract"
-    Hint     string  // Suggested fix
-}
 
-type ErrorType int
-
-const (
-    ErrDownloadFailed ErrorType = iota
-    ErrExtractionFailed
-    ErrBinaryNotFound
-    ErrVerificationFailed
-    ErrPermissionDenied
-    ErrDependencyMissing
-)
-
-func ParseValidationOutput(stdout, stderr string) []ParsedError
-```
+Parse validation output to identify error types (download failed, extraction failed, binary not found, verification failed, permission denied, dependency missing) with location and suggested fixes.
 
 #### Builder Framework
 
 **LLM Builder Base** (`internal/builders/llm_base.go`):
-```go
-type LLMBuilder struct {
-    provider    llm.Provider
-    validator   *validate.ContainerValidator
-    costTracker *llm.CostTracker
-    maxRetries  int
-}
-
-func (b *LLMBuilder) BuildWithRetry(
-    ctx context.Context,
-    generate func() (*recipe.Recipe, []string, error),
-) (*BuildResult, error)
-```
-
-The base handles:
 - Retry loop with exponential backoff
 - Error parsing and feedback formatting
 - Cost tracking across retries
 - Validation orchestration
 
 **GitHub Release Builder** (`internal/builders/github_release.go`):
-```go
-type GitHubReleaseBuilder struct {
-    *LLMBuilder
-    fetcher  *fetch.Fetcher
-    resolver *version.Resolver
-}
-
-func (b *GitHubReleaseBuilder) Name() string { return "github" }
-
-func (b *GitHubReleaseBuilder) CanBuild(ctx context.Context, pkg string) (bool, error)
-
-func (b *GitHubReleaseBuilder) Build(ctx context.Context, pkg, version string) (*BuildResult, error)
-```
 
 Build workflow:
 1. Parse package as `owner/repo` or GitHub URL
@@ -812,53 +700,17 @@ Build workflow:
 
 **Tool Definitions for LLM:**
 
-Tool parameters use typed structs for compile-time safety:
+Tool definitions use typed parameter structs (converted to JSON Schema at registration) for compile-time safety. The `match_assets` tool accepts:
+- `mappings`: Array of asset-to-platform mappings (asset filename, OS, arch, format)
+- `executable`: Name of the binary executable
+- `verify_command`: Command to verify installation
 
-```go
-// Typed parameter structs ensure compile-time validation
-type AssetMapping struct {
-    Asset  string `json:"asset"`                    // Asset filename
-    OS     string `json:"os" enum:"linux,darwin,windows"`
-    Arch   string `json:"arch" enum:"amd64,arm64,386"`
-    Format string `json:"format" enum:"tar.gz,zip,binary"`
-}
+**Error Feedback for Repair Loop:**
 
-type AssetMatchResult struct {
-    Mappings      []AssetMapping `json:"mappings"`
-    Executable    string         `json:"executable"`     // Name of the binary executable
-    VerifyCommand string         `json:"verify_command"` // Command to verify installation
-}
-
-// ToolDefinition converts typed struct to JSON Schema at registration time
-var AssetMatchingTool = llm.ToolDefinition{
-    Name:        "match_assets",
-    Description: "Match GitHub release assets to OS/architecture combinations",
-    Parameters:  llm.SchemaFromType(AssetMatchResult{}),
-}
-```
-
-**Error Feedback Format:**
-```go
-type RepairContext struct {
-    PreviousRecipe string   // TOML of failed recipe
-    Errors         []string // Parsed error messages
-    Attempt        int      // Current retry number
-}
-
-func FormatRepairPrompt(ctx RepairContext) string {
-    return fmt.Sprintf(`Your previous recipe failed validation.
-
-Previous recipe:
-%s
-
-Errors:
-%s
-
-Please fix the issues and generate a corrected recipe.`,
-        ctx.PreviousRecipe,
-        strings.Join(ctx.Errors, "\n"))
-}
-```
+When validation fails, the repair prompt includes:
+- The previous recipe (TOML)
+- Parsed error messages
+- Current attempt number
 
 ## Implementation Approach
 
@@ -897,18 +749,8 @@ The implementation follows **vertical slices** that deliver end-to-end value at 
 - Startup cleanup for orphaned containers/temp directories
 
 **Container Runtime Abstraction:**
-```go
-type ContainerRuntime interface {
-    CreateContainer(ctx context.Context, config *ContainerConfig) (string, error)
-    StartContainer(ctx context.Context, containerID string) error
-    WaitContainer(ctx context.Context, containerID string) (int, error)
-    RemoveContainer(ctx context.Context, containerID string) error
-    GetLogs(ctx context.Context, containerID string) (string, string, error)
-}
 
-// Auto-detection: Try Podman first (rootless-friendly), fall back to Docker
-func NewContainerRuntime(ctx context.Context) (ContainerRuntime, error)
-```
+A unified interface supporting both Docker and Podman with auto-detection (prefer Podman for rootless-friendly environments, fall back to Docker).
 
 **Validation:** Validate existing registry recipes in containers before adding LLM complexity.
 
@@ -929,44 +771,16 @@ func NewContainerRuntime(ctx context.Context) (ContainerRuntime, error)
 - Telemetry events for success rates
 
 **Circuit Breaker Pattern:**
-```go
-type CircuitBreaker struct {
-    failures     int
-    lastFailure  time.Time
-    state        State // Closed, Open, HalfOpen
-    threshold    int   // failures before opening (default: 3)
-    timeout      time.Duration // time before half-open (default: 60s)
-}
-```
 
-Per-provider circuit breakers ensure one provider's outage doesn't block the other.
+Per-provider circuit breakers (3 failures to open, 60s timeout to half-open) ensure one provider's outage doesn't block the other.
 
 **Error Sanitization (MVP):**
-```go
-func SanitizeErrorOutput(output string) string {
-    // Truncate to reasonable length
-    if len(output) > 2000 {
-        output = output[:2000] + "\n[truncated]"
-    }
 
-    // Redact sensitive patterns
-    patterns := []struct {
-        regex   *regexp.Regexp
-        replace string
-    }{
-        {regexp.MustCompile(`/home/[^/\s]+`), "[HOME]"},
-        {regexp.MustCompile(`/Users/[^/\s]+`), "[HOME]"},
-        {regexp.MustCompile(`\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b`), "[IP]"},
-        {regexp.MustCompile(`(api[_-]?key|token|secret|password)=\S+`), "$1=[REDACTED]"},
-    }
-
-    for _, p := range patterns {
-        output = p.regex.ReplaceAllString(output, p.replace)
-    }
-
-    return output
-}
-```
+Before sending error output to LLM for repair:
+- Truncate to 2000 characters
+- Redact home directory paths (`/home/...`, `/Users/...`)
+- Redact IP addresses
+- Redact credential patterns (`api_key=...`, `token=...`, etc.)
 
 **Telemetry Events:**
 - `llm_generation_started` - provider, tool name
@@ -1059,22 +873,7 @@ LLM-dependent code uses a **record/replay** pattern:
 3. **CI:** Replay recorded responses to avoid API costs and ensure determinism
 4. **Maintenance:** Re-record periodically to catch API changes
 
-```go
-// Test mode detection
-func (c *Client) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
-    if replayPath := os.Getenv("TSUKU_LLM_REPLAY_DIR"); replayPath != "" {
-        return c.replayFromFixture(replayPath, req)
-    }
-
-    resp, err := c.doAPICall(ctx, req)
-
-    if recordPath := os.Getenv("TSUKU_LLM_RECORD_DIR"); recordPath != "" {
-        c.recordFixture(recordPath, req, resp)
-    }
-
-    return resp, err
-}
-```
+Environment variables control mode: `TSUKU_LLM_REPLAY_DIR` for replay, `TSUKU_LLM_RECORD_DIR` for recording.
 
 ### Dependency Graph
 
