@@ -579,3 +579,216 @@ func TestCreateBinaryWrapper_WriteError(t *testing.T) {
 		t.Errorf("error should mention write failure, got: %v", err)
 	}
 }
+
+func TestInstallWithOptions_WithRuntimeDeps(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create a work directory simulating executor output
+	workDir, workCleanup := testutil.TempDir(t)
+	defer workCleanup()
+
+	// Create .install/bin structure in work dir
+	installBinDir := filepath.Join(workDir, ".install", "bin")
+	if err := os.MkdirAll(installBinDir, 0755); err != nil {
+		t.Fatalf("failed to create install bin dir: %v", err)
+	}
+
+	// Create a fake binary
+	binaryPath := filepath.Join(installBinDir, "mytool")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	opts := InstallOptions{
+		CreateSymlinks:      true,
+		IsHidden:            false,
+		Binaries:            []string{"bin/mytool"},
+		RuntimeDependencies: map[string]string{"nodejs": "20.10.0"},
+	}
+
+	err := mgr.InstallWithOptions("mytool", "1.0.0", workDir, opts)
+	if err != nil {
+		t.Fatalf("InstallWithOptions() error = %v", err)
+	}
+
+	// Verify wrapper was created (not symlink)
+	wrapperPath := cfg.CurrentSymlink("mytool")
+	content, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("failed to read wrapper: %v", err)
+	}
+
+	// Should be a wrapper script, not a symlink
+	if !strings.HasPrefix(string(content), "#!/bin/sh") {
+		t.Errorf("expected wrapper script, got: %s", content)
+	}
+	if !strings.Contains(string(content), "PATH=") {
+		t.Errorf("wrapper should contain PATH modification")
+	}
+	if !strings.Contains(string(content), "nodejs-20.10.0") {
+		t.Errorf("wrapper should contain nodejs dependency path")
+	}
+
+	// Verify state was updated
+	state, err := mgr.GetState().Load()
+	if err != nil {
+		t.Fatalf("failed to load state: %v", err)
+	}
+	toolState, ok := state.Installed["mytool"]
+	if !ok {
+		t.Error("tool should be in state")
+	}
+	if toolState.Version != "1.0.0" {
+		t.Errorf("version = %s, want 1.0.0", toolState.Version)
+	}
+}
+
+func TestInstallWithOptions_NoRuntimeDeps(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create a work directory simulating executor output
+	workDir, workCleanup := testutil.TempDir(t)
+	defer workCleanup()
+
+	// Create .install/bin structure in work dir
+	installBinDir := filepath.Join(workDir, ".install", "bin")
+	if err := os.MkdirAll(installBinDir, 0755); err != nil {
+		t.Fatalf("failed to create install bin dir: %v", err)
+	}
+
+	// Create a fake binary
+	binaryPath := filepath.Join(installBinDir, "simpletool")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	opts := InstallOptions{
+		CreateSymlinks: true,
+		IsHidden:       false,
+		Binaries:       []string{"bin/simpletool"},
+		// No RuntimeDependencies - should use symlinks
+	}
+
+	err := mgr.InstallWithOptions("simpletool", "1.0.0", workDir, opts)
+	if err != nil {
+		t.Fatalf("InstallWithOptions() error = %v", err)
+	}
+
+	// Verify symlink was created (not wrapper)
+	symlinkPath := cfg.CurrentSymlink("simpletool")
+	info, err := os.Lstat(symlinkPath)
+	if err != nil {
+		t.Fatalf("failed to stat symlink: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Error("expected symlink, got regular file")
+	}
+}
+
+func TestInstallWithOptions_MultipleBinariesWithDeps(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create a work directory
+	workDir, workCleanup := testutil.TempDir(t)
+	defer workCleanup()
+
+	// Create .install/bin structure
+	installBinDir := filepath.Join(workDir, ".install", "bin")
+	if err := os.MkdirAll(installBinDir, 0755); err != nil {
+		t.Fatalf("failed to create install bin dir: %v", err)
+	}
+
+	// Create multiple binaries
+	for _, name := range []string{"tool1", "tool2"} {
+		binaryPath := filepath.Join(installBinDir, name)
+		if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho "+name), 0755); err != nil {
+			t.Fatalf("failed to create binary %s: %v", name, err)
+		}
+	}
+
+	opts := InstallOptions{
+		CreateSymlinks:      true,
+		IsHidden:            false,
+		Binaries:            []string{"bin/tool1", "bin/tool2"},
+		RuntimeDependencies: map[string]string{"python": "3.11.0"},
+	}
+
+	err := mgr.InstallWithOptions("multitool", "1.0.0", workDir, opts)
+	if err != nil {
+		t.Fatalf("InstallWithOptions() error = %v", err)
+	}
+
+	// Verify both wrappers were created
+	for _, name := range []string{"tool1", "tool2"} {
+		wrapperPath := cfg.CurrentSymlink(name)
+		content, err := os.ReadFile(wrapperPath)
+		if err != nil {
+			t.Fatalf("failed to read wrapper %s: %v", name, err)
+		}
+		if !strings.HasPrefix(string(content), "#!/bin/sh") {
+			t.Errorf("expected wrapper script for %s", name)
+		}
+	}
+}
+
+func TestInstallWithOptions_HiddenTool(t *testing.T) {
+	cfg, cleanup := testutil.NewTestConfig(t)
+	defer cleanup()
+
+	mgr := New(cfg)
+
+	// Create a work directory
+	workDir, workCleanup := testutil.TempDir(t)
+	defer workCleanup()
+
+	// Create .install/bin structure
+	installBinDir := filepath.Join(workDir, ".install", "bin")
+	if err := os.MkdirAll(installBinDir, 0755); err != nil {
+		t.Fatalf("failed to create install bin dir: %v", err)
+	}
+
+	// Create binary
+	binaryPath := filepath.Join(installBinDir, "hiddentool")
+	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho test"), 0755); err != nil {
+		t.Fatalf("failed to create binary: %v", err)
+	}
+
+	opts := InstallOptions{
+		CreateSymlinks: false, // Hidden tool - no symlinks
+		IsHidden:       true,
+		Binaries:       []string{"bin/hiddentool"},
+	}
+
+	err := mgr.InstallWithOptions("hiddentool", "1.0.0", workDir, opts)
+	if err != nil {
+		t.Fatalf("InstallWithOptions() error = %v", err)
+	}
+
+	// Verify no symlink/wrapper was created in current/
+	symlinkPath := cfg.CurrentSymlink("hiddentool")
+	if _, err := os.Stat(symlinkPath); !os.IsNotExist(err) {
+		t.Error("hidden tool should not have symlink in current/")
+	}
+
+	// Verify state marks it as hidden
+	state, err := mgr.GetState().Load()
+	if err != nil {
+		t.Fatalf("failed to load state: %v", err)
+	}
+	toolState := state.Installed["hiddentool"]
+	if !toolState.IsHidden {
+		t.Error("tool should be marked as hidden")
+	}
+	if !toolState.IsExecutionDependency {
+		t.Error("tool should be marked as execution dependency")
+	}
+}
