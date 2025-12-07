@@ -456,8 +456,8 @@ func (a *HomebrewBottleAction) fixElfRpath(binaryPath, installPath string) error
 		if err := os.Chmod(binaryPath, originalMode|0200); err != nil {
 			return fmt.Errorf("failed to make binary writable: %w", err)
 		}
-		// Restore original mode after patching
-		defer os.Chmod(binaryPath, originalMode)
+		// Restore original mode after patching (best-effort cleanup)
+		defer func() { _ = os.Chmod(binaryPath, originalMode) }()
 	}
 
 	// Remove existing RPATH first (contains placeholders)
@@ -517,8 +517,8 @@ func (a *HomebrewBottleAction) fixMachoRpath(binaryPath, installPath string) err
 		if err := os.Chmod(binaryPath, originalMode|0200); err != nil {
 			return fmt.Errorf("failed to make binary writable: %w", err)
 		}
-		// Restore original mode after patching
-		defer os.Chmod(binaryPath, originalMode)
+		// Restore original mode after patching (best-effort cleanup)
+		defer func() { _ = os.Chmod(binaryPath, originalMode) }()
 	}
 
 	// Get existing rpaths that contain placeholders
