@@ -272,24 +272,31 @@ func TestLinkDependenciesAction_Execute_MissingLibraryDir(t *testing.T) {
 func TestLinkDependenciesAction_Execute_MissingParameters(t *testing.T) {
 	action := &LinkDependenciesAction{}
 	ctx := &ExecutionContext{
-		Context: context.Background(),
-		Recipe:  &recipe.Recipe{},
+		Context:  context.Background(),
+		Recipe:   &recipe.Recipe{},
+		ToolsDir: "/nonexistent/tools", // No libs dir, so version discovery will fail
 	}
 
 	tests := []struct {
-		name   string
-		params map[string]interface{}
+		name        string
+		params      map[string]interface{}
+		expectError bool
 	}{
-		{"missing library", map[string]interface{}{"version": "0.2.5"}},
-		{"missing version", map[string]interface{}{"library": "libyaml"}},
-		{"empty params", map[string]interface{}{}},
+		{"missing library", map[string]interface{}{"version": "0.2.5"}, true},
+		// Version is now optional - when missing, it tries to discover from libs dir
+		// With a nonexistent ToolsDir, discovery will fail, so we still expect an error
+		{"missing version (discovery fails)", map[string]interface{}{"library": "libyaml"}, true},
+		{"empty params", map[string]interface{}{}, true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := action.Execute(ctx, tc.params)
-			if err == nil {
+			if tc.expectError && err == nil {
 				t.Errorf("expected error for %s", tc.name)
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("unexpected error for %s: %v", tc.name, err)
 			}
 		})
 	}

@@ -166,13 +166,12 @@ func TestHomebrewBottleAction_RelocatePlaceholders_BinaryFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create a binary file with placeholder (contains null byte)
+	// This simulates a non-ELF binary file (no magic bytes)
 	content := []byte("path=@@HOMEBREW_PREFIX@@\x00more data")
 	testFile := filepath.Join(tmpDir, "test.bin")
 	if err := os.WriteFile(testFile, content, 0644); err != nil {
 		t.Fatal(err)
 	}
-
-	originalLen := len(content)
 
 	// Relocate with short path
 	installPath := "/opt/tsuku"
@@ -180,21 +179,18 @@ func TestHomebrewBottleAction_RelocatePlaceholders_BinaryFile(t *testing.T) {
 		t.Fatalf("relocatePlaceholders failed: %v", err)
 	}
 
-	// Verify replacement preserved length (null-padded)
+	// Binary files with placeholders are now handled via patchelf/install_name_tool
+	// Since this is not a real ELF/Mach-O file, the fixBinaryRpath function
+	// will silently skip it (no recognized magic bytes)
+	// So the file should remain unchanged
 	result, err := os.ReadFile(testFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(result) != originalLen {
-		t.Errorf("file length changed: got %d, want %d", len(result), originalLen)
-	}
-
-	// Check replacement with null padding
-	// "@@HOMEBREW_PREFIX@@" (19 chars) -> "/opt/tsuku" (10 chars) + 9 nulls
-	expectedPrefix := "path=/opt/tsuku\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00more data"
-	if string(result) != expectedPrefix {
-		t.Errorf("got %q, want %q", string(result), expectedPrefix)
+	// File should be unchanged since it's not a recognized binary format
+	if string(result) != string(content) {
+		t.Errorf("non-ELF binary file was modified: got %q, want %q", string(result), string(content))
 	}
 }
 
