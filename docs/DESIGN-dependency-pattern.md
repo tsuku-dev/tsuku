@@ -298,11 +298,10 @@ Result: `install_deps=["go"]`, `runtime_deps=["go"]`
 
 ### Milestone Evaluation
 
-An initial analysis suggested 4 milestones (core resolution, overrides, runtime integration, cleanup). After further analysis, I recommend **consolidating to 2-3 milestones** because:
+An initial analysis suggested 4 milestones (core resolution, overrides, runtime integration, cleanup). After further analysis, we're **consolidating to 2 milestones** because:
 
 1. **Core + overrides are tightly coupled**: Override mechanisms can't be tested without core resolution
-2. **Runtime integration is the key deliverable**: Users won't see value until wrappers work
-3. **Cleanup can be incremental**: Bootstrap removal can happen per-action
+2. **Runtime + cleanup are naturally sequential**: Once wrappers work, bootstrap removal is straightforward
 
 ### Recommended Milestone Structure
 
@@ -324,39 +323,27 @@ Combines core resolution + overrides because they're architecturally inseparable
 - [ ] Transitive deps resolve correctly (pipx -> python-standalone)
 - [ ] Cycles detected with clear error
 
-#### Milestone 2: Runtime Integration
+#### Milestone 2: Runtime Integration and Cleanup
 
-The user-visible milestone.
+The user-visible milestone, including migration from legacy bootstrap code.
 
 **Scope:**
 - Wrapper script generation with runtime deps in PATH
 - State tracking of install/runtime deps
 - `tsuku info` dependency tree display
 - Uninstall handles dependency graph
+- Remove `EnsureNpm()`, `EnsurePipx()`, etc. from actions
+- Audit recipes for edge cases needing overrides
+- Update documentation
 
 **Acceptance:**
 - [ ] Wrappers prepend runtime dep paths
 - [ ] state.json records both dep types
 - [ ] `tsuku info <tool>` shows dependency tree
 - [ ] Removing tool warns about dependents
-
-#### Milestone 3: Migration and Cleanup
-
-Can be done incrementally after M2.
-
-**Scope:**
-- Remove `EnsureNpm()`, `EnsurePipx()`, etc. from actions
-- Audit recipes for edge cases needing overrides
-- Update documentation
-
-**Acceptance:**
 - [ ] No internal bootstrap functions remain
 - [ ] All recipes validated with new system
 - [ ] Edge cases have correct overrides
-
-### Alternative: 2-Milestone Approach
-
-If faster delivery is preferred, M2 and M3 could merge since cleanup is low-risk after runtime works.
 
 ## References
 
