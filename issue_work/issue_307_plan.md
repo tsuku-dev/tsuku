@@ -25,12 +25,12 @@ None - all new code
 - `internal/validate/cleanup_test.go` - Unit tests
 
 ## Implementation Steps
-- [ ] Create `Cleaner` struct with dependencies (RuntimeDetector, LockManager)
-- [ ] Implement container cleanup that lists and removes orphaned containers
-- [ ] Implement temp directory cleanup that removes old `tsuku-validate-*` directories
-- [ ] Add `Cleanup()` method that coordinates both cleanups
-- [ ] Write unit tests with mocked runtime and filesystem
-- [ ] Run linting and tests
+- [x] Create `Cleaner` struct with dependencies (RuntimeDetector, LockManager)
+- [x] Implement container cleanup that lists and removes orphaned containers
+- [x] Implement temp directory cleanup that removes old `tsuku-validate-*` directories
+- [x] Add `Cleanup()` method that coordinates both cleanups
+- [x] Write unit tests with mocked runtime and filesystem
+- [x] Run linting and tests
 
 ## Testing Strategy
 - Unit tests: Mock RuntimeDetector and filesystem operations
@@ -50,11 +50,11 @@ None - all new code
   - **Mitigation**: Execute `podman/docker ps -a --filter "label=tsuku-validate"` via exec
 
 ## Success Criteria
-- [ ] Lists containers with `tsuku-validate` label
-- [ ] Removes exited/dead containers respecting locks
-- [ ] Removes temp directories older than 1 hour
-- [ ] Logs cleanup actions at debug level
-- [ ] Does not block startup on cleanup failures
+- [x] Lists containers with `tsuku-validate` label
+- [x] Removes exited/dead containers respecting locks
+- [x] Removes temp directories older than 1 hour
+- [x] Logs cleanup actions at debug level
+- [x] Does not block startup on cleanup failures
 
 ## Open Questions
 None - design is clear from the design document
