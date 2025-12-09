@@ -329,7 +329,9 @@ func TestCachedVersionLister_HandleCorruptCache(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(cacheDir, "*.json"))
 	if len(files) > 0 {
 		// Corrupt the cache file
-		os.WriteFile(files[0], []byte("not valid json"), 0644)
+		if err := os.WriteFile(files[0], []byte("not valid json"), 0644); err != nil {
+			t.Fatalf("failed to corrupt cache file: %v", err)
+		}
 	}
 
 	// Should handle corrupt cache gracefully
