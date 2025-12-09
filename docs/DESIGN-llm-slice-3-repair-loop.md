@@ -1,6 +1,6 @@
 # Design Document: LLM Slice 3 - Repair Loop + Second Provider
 
-**Status**: Approved
+**Status**: Planned
 
 **Parent Design**: [DESIGN-llm-builder-infrastructure.md](DESIGN-llm-builder-infrastructure.md)
 
@@ -972,3 +972,25 @@ Record/replay pattern from parent design:
 2. **Parity testing**: Integration tests verify both providers produce equivalent results via same loop
 3. **Fresh start acceptable**: Provider switch with full context still works (just costs more)
 4. **Minimal dependency**: Only SDK needed, no additional abstractions
+
+## Implementation Issues
+
+### Milestone: LLM Builder Infrastructure
+
+**Wave 1 (no dependencies):**
+- [#323](https://github.com/tsukumogami/tsuku/issues/323): feat(llm): define provider interface and types
+- [#324](https://github.com/tsukumogami/tsuku/issues/324): feat(llm): implement circuit breaker
+- [#325](https://github.com/tsukumogami/tsuku/issues/325): feat(validate): implement error sanitizer
+- [#326](https://github.com/tsukumogami/tsuku/issues/326): feat(validate): implement error parser
+
+**Wave 2 (after interface):**
+- [#327](https://github.com/tsukumogami/tsuku/issues/327): refactor(llm): extract Claude provider from client.go
+- [#328](https://github.com/tsukumogami/tsuku/issues/328): feat(llm): implement Gemini provider
+- [#329](https://github.com/tsukumogami/tsuku/issues/329): feat(llm): implement provider factory with failover
+
+**Wave 3 (core feature):**
+- [#330](https://github.com/tsukumogami/tsuku/issues/330): feat(llm): add repair loop to GitHub Release Builder
+
+**Wave 4 (finalization):**
+- [#331](https://github.com/tsukumogami/tsuku/issues/331): feat(telemetry): add LLM generation events
+- [#332](https://github.com/tsukumogami/tsuku/issues/332): test(llm): add integration tests for provider parity and repair loop
