@@ -34,13 +34,13 @@ Since other code (hidden.go, manager.go, remove.go) still uses `ToolState.Versio
 5. **Final cleanup** - Remove deprecated `Version` field once all code migrated
 
 ## Implementation Steps
-- [ ] Add `VersionState` struct with `Requested`, `Binaries`, `InstalledAt` fields
-- [ ] Modify `ToolState` to add `ActiveVersion` and `Versions` fields (keep `Version` as deprecated)
-- [ ] Add `ValidateVersionString()` function to reject path traversal characters
-- [ ] Modify `Load()` to detect old format and migrate (set `ActiveVersion` from `Version`)
-- [ ] Add unit tests for migration (old format → new format)
-- [ ] Add unit tests for version string validation
-- [ ] Update existing tests to use new fields where appropriate
+- [x] Add `VersionState` struct with `Requested`, `Binaries`, `InstalledAt` fields
+- [x] Modify `ToolState` to add `ActiveVersion` and `Versions` fields (keep `Version` as deprecated)
+- [x] Add `ValidateVersionString()` function to reject path traversal characters
+- [x] Modify `Load()` to detect old format and migrate (set `ActiveVersion` from `Version`)
+- [x] Add unit tests for migration (old format → new format)
+- [x] Add unit tests for version string validation
+- [x] Update existing tests to use new fields where appropriate
 
 Mark each step [x] after it is implemented and committed. This enables clear resume detection.
 
@@ -54,9 +54,9 @@ Mark each step [x] after it is implemented and committed. This enables clear res
 - **Data loss on migration**: Migration preserves all data, just restructures it
 
 ## Success Criteria
-- [ ] `VersionState` struct exists with correct JSON tags
-- [ ] `ToolState` has `ActiveVersion` and `Versions` fields
-- [ ] Old state.json files migrate automatically on Load()
-- [ ] Version strings with `..`, `/`, `\` are rejected
-- [ ] All existing tests pass
-- [ ] New tests cover migration and validation
+- [x] `VersionState` struct exists with correct JSON tags
+- [x] `ToolState` has `ActiveVersion` and `Versions` fields
+- [x] Old state.json files migrate automatically on Load()
+- [x] Version strings with `..`, `/`, `\` are rejected
+- [x] All existing tests pass
+- [x] New tests cover migration and validation
