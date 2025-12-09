@@ -1,6 +1,6 @@
 # Design: Recipe Detail Pages with Dependency Visualization
 
-**Status**: Proposed
+**Status**: Accepted
 
 ## Context and Problem Statement
 
