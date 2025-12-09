@@ -18,15 +18,15 @@ Implement a clean interface-based design where:
 - `internal/validate/runtime_test.go` - Unit tests with mocked runtimes
 
 ## Implementation Steps
-- [ ] Create `internal/validate/` package with `runtime.go`
-- [ ] Define `Runtime` interface with `Name()`, `IsRootless()`, `Run()` methods
-- [ ] Define `RunOptions` and `RunResult` types for container execution
-- [ ] Implement `RuntimeDetector` struct with detection logic
-- [ ] Implement Podman detection (binary check + rootless verification)
-- [ ] Implement Docker detection (rootless mode vs group membership)
-- [ ] Add `ErrNoRuntime` sentinel error
-- [ ] Write unit tests for detection logic
-- [ ] Verify tests pass
+- [x] Create `internal/validate/` package with `runtime.go`
+- [x] Define `Runtime` interface with `Name()`, `IsRootless()`, `Run()` methods
+- [x] Define `RunOptions` and `RunResult` types for container execution
+- [x] Implement `RuntimeDetector` struct with detection logic
+- [x] Implement Podman detection (binary check + rootless verification)
+- [x] Implement Docker detection (rootless mode vs group membership)
+- [x] Add `ErrNoRuntime` sentinel error
+- [x] Write unit tests for detection logic
+- [x] Verify tests pass
 
 ## Testing Strategy
 - Unit tests: Mock exec.Command calls to simulate podman/docker availability
