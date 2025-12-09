@@ -23,13 +23,13 @@ None - all functionality goes in existing files.
 
 ## Implementation Steps
 
-- [ ] Add parseFromFlag function to split `builder:sourceArg` format
-- [ ] Register GitHubReleaseBuilder in the builder registry
-- [ ] Update runCreate to handle both formats and pass SourceArg when present
-- [ ] Skip toolchain check for github builder (no toolchain required)
-- [ ] Skip CanBuild check for github builder (requires SourceArg instead of package name)
-- [ ] Update help text and examples to show new syntax
-- [ ] Add unit tests for parseFromFlag function
+- [x] Add parseFromFlag function to split `builder:sourceArg` format
+- [x] Register GitHubReleaseBuilder in the builder registry
+- [x] Update runCreate to handle both formats and pass SourceArg when present
+- [x] Skip toolchain check for github builder (no toolchain required)
+- [x] Skip CanBuild check for github builder (requires SourceArg instead of package name)
+- [x] Update help text and examples to show new syntax
+- [x] Add unit tests for parseFromFlag function
 - [ ] Add integration test for create command with github builder
 
 ## Testing Strategy
