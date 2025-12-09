@@ -25,10 +25,10 @@ None
 
 ## Implementation Steps
 
-- [ ] Update `deploy-website.yml` to generate `recipes.json` before deployment
-- [ ] Update `website/recipes/index.html` to use `/recipes.json` instead of external URL
-- [ ] Update path triggers to include recipe TOML files
-- [ ] Deprecate `deploy-recipes.yml` (add note that registry.tsuku.dev is deprecated)
+- [x] Update `deploy-website.yml` to generate `recipes.json` before deployment
+- [x] Update `website/recipes/index.html` to use `/recipes.json` instead of external URL
+- [x] Update path triggers to include recipe TOML files
+- [x] Deprecate `deploy-recipes.yml` (add note that registry.tsuku.dev is deprecated)
 - [ ] Update design doc references (optional, can be separate PR)
 
 ## Testing Strategy
