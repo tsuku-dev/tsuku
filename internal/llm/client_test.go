@@ -218,6 +218,193 @@ func containsSubstring(s, substr string) bool {
 	return false
 }
 
+func TestFetchFile_ServerError(t *testing.T) {
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
+
+	// Create a test server that returns 500
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	customClient := &http.Client{
+		Transport: &testTransport{server: server},
+	}
+	client, err := NewClientWithHTTPClient(customClient)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_, err = client.fetchFile(context.Background(), "owner/repo", "v1.0.0", "file.md")
+	if err == nil {
+		t.Error("expected error for HTTP 500")
+	}
+
+	errMsg := err.Error()
+	if !containsSubstring(errMsg, "500") {
+		t.Errorf("expected error message to contain status code, got: %s", errMsg)
+	}
+}
+
+func TestFetchFile_EmptyContentType(t *testing.T) {
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
+
+	// Create a test server that returns no content type (should be allowed)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No Content-Type header set
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("content without content-type"))
+	}))
+	defer server.Close()
+
+	customClient := &http.Client{
+		Transport: &testTransport{server: server},
+	}
+	client, err := NewClientWithHTTPClient(customClient)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, err := client.fetchFile(context.Background(), "owner/repo", "v1.0.0", "file.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if content != "content without content-type" {
+		t.Errorf("expected content, got %q", content)
+	}
+}
+
+func TestFetchFile_URLConstruction(t *testing.T) {
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
+
+	tests := []struct {
+		name         string
+		repo         string
+		tag          string
+		path         string
+		expectedPath string
+	}{
+		{
+			name:         "simple path",
+			repo:         "owner/repo",
+			tag:          "v1.0.0",
+			path:         "README.md",
+			expectedPath: "/owner/repo/v1.0.0/README.md",
+		},
+		{
+			name:         "nested path",
+			repo:         "owner/repo",
+			tag:          "v2.0.0",
+			path:         "docs/install.md",
+			expectedPath: "/owner/repo/v2.0.0/docs/install.md",
+		},
+		{
+			name:         "deep nested path",
+			repo:         "org/project",
+			tag:          "release-1.0",
+			path:         "docs/guides/getting-started.md",
+			expectedPath: "/org/project/release-1.0/docs/guides/getting-started.md",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var capturedPath string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedPath = r.URL.Path
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte("ok"))
+			}))
+			defer server.Close()
+
+			customClient := &http.Client{
+				Transport: &testTransport{server: server},
+			}
+			client, err := NewClientWithHTTPClient(customClient)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			_, err = client.fetchFile(context.Background(), tt.repo, tt.tag, tt.path)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if capturedPath != tt.expectedPath {
+				t.Errorf("expected path %q, got %q", tt.expectedPath, capturedPath)
+			}
+		})
+	}
+}
+
+func TestFetchFile_ContextCancellation(t *testing.T) {
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
+
+	// Create a test server that blocks until context is canceled
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	customClient := &http.Client{
+		Transport: &testTransport{server: server},
+	}
+	client, err := NewClientWithHTTPClient(customClient)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel immediately
+	cancel()
+
+	_, err = client.fetchFile(ctx, "owner/repo", "v1.0.0", "file.md")
+	if err == nil {
+		t.Error("expected error for canceled context")
+	}
+}
+
+func TestFetchFile_LargeFile(t *testing.T) {
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
+
+	// Create content close to but under the 1MB limit
+	largeContent := make([]byte, 500*1024) // 500KB
+	for i := range largeContent {
+		largeContent[i] = byte('a' + (i % 26))
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(largeContent)
+	}))
+	defer server.Close()
+
+	customClient := &http.Client{
+		Transport: &testTransport{server: server},
+	}
+	client, err := NewClientWithHTTPClient(customClient)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, err := client.fetchFile(context.Background(), "owner/repo", "v1.0.0", "large.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(content) != len(largeContent) {
+		t.Errorf("expected content length %d, got %d", len(largeContent), len(content))
+	}
+}
+
 func TestBuildSystemPrompt(t *testing.T) {
 	prompt := buildSystemPrompt()
 	if prompt == "" {
