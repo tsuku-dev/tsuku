@@ -23,15 +23,15 @@ The design doc specifies that `fetch_file` should accept a path relative to the 
 - None
 
 ## Implementation Steps
-- [ ] 1. Add context struct to store repo/tag during generation, modify GenerateRecipe to track active release tag
-- [ ] 2. Update FetchFileInput schema from `url` to `path`
-- [ ] 3. Update tool schema description to match design doc
-- [ ] 4. Refactor fetchFile method signature and implementation
-- [ ] 5. Add content-type validation (text/* only, reject binaries)
-- [ ] 6. Update executeToolUse to pass context to fetchFile
-- [ ] 7. Update existing tests for the new signature
-- [ ] 8. Add unit test for fetch_file with mock HTTP server
-- [ ] 9. Add test for 404 handling with helpful error message
+- [x] 1. Add context struct to store repo/tag during generation, modify GenerateRecipe to track active release tag
+- [x] 2. Update FetchFileInput schema from `url` to `path`
+- [x] 3. Update tool schema description to match design doc
+- [x] 4. Refactor fetchFile method signature and implementation
+- [x] 5. Add content-type validation (text/* only, reject binaries)
+- [x] 6. Update executeToolUse to pass context to fetchFile
+- [x] 7. Update existing tests for the new signature
+- [x] 8. Add unit test for fetch_file with mock HTTP server
+- [x] 9. Add test for 404 handling with helpful error message
 
 ## Testing Strategy
 - Unit tests: Mock HTTP server returning file content, 404 errors, and binary content types
