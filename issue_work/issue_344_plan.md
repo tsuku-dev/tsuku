@@ -23,10 +23,10 @@ None
 
 ## Implementation Steps
 
-- [ ] Add mobile styles for `.recipe-detail` (smaller h1, reduced padding)
-- [ ] Add mobile styles for `.dependencies-section` (full width, reduced padding)
-- [ ] Add mobile styles for `.install-section` (stack layout for install box)
-- [ ] Verify all acceptance criteria are met
+- [x] Add mobile styles for `.recipe-detail` (smaller h1, reduced padding)
+- [x] Add mobile styles for `.dependencies-section` (full width, reduced padding)
+- [x] Add mobile styles for `.install-section` (reuses existing `.install-box` mobile styles)
+- [x] Verify all acceptance criteria are met
 
 ## Testing Strategy
 
@@ -41,11 +41,11 @@ None
 
 ## Success Criteria
 
-- [ ] `.recipe-detail` component styled consistently with grid (already done)
-- [ ] Dependency lists styled with grouped sections (already done)
-- [ ] Install command block styled with copy button (already done)
-- [ ] Responsive layout works at mobile breakpoints
-- [ ] Dark theme colors match existing site (already done)
+- [x] `.recipe-detail` component styled consistently with grid (already done)
+- [x] Dependency lists styled with grouped sections (already done)
+- [x] Install command block styled with copy button (already done)
+- [x] Responsive layout works at mobile breakpoints
+- [x] Dark theme colors match existing site (already done)
 
 ## Open Questions
 
