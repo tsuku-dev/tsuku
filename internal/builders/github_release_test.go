@@ -122,17 +122,27 @@ func TestDeriveAssetPattern(t *testing.T) {
 	}
 }
 
-func TestGitHubReleaseBuilder_Name(t *testing.T) {
-	// Set up mock LLM client environment
-	originalKey := os.Getenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", originalKey)
+// setTestAPIKey sets the ANTHROPIC_API_KEY for testing and returns a cleanup function.
+func setTestAPIKey(t *testing.T, key string) func() {
+	t.Helper()
+	original := os.Getenv("ANTHROPIC_API_KEY")
+	if key == "" {
+		_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	} else {
+		_ = os.Setenv("ANTHROPIC_API_KEY", key)
+	}
+	return func() {
+		if original != "" {
+			_ = os.Setenv("ANTHROPIC_API_KEY", original)
 		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
+			_ = os.Unsetenv("ANTHROPIC_API_KEY")
 		}
-	}()
+	}
+}
+
+func TestGitHubReleaseBuilder_Name(t *testing.T) {
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
 
 	b, err := NewGitHubReleaseBuilder(nil, nil)
 	if err != nil {
@@ -145,16 +155,8 @@ func TestGitHubReleaseBuilder_Name(t *testing.T) {
 }
 
 func TestGitHubReleaseBuilder_CanBuild(t *testing.T) {
-	// Set up mock LLM client environment
-	originalKey := os.Getenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", originalKey)
-		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
-		}
-	}()
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
 
 	b, err := NewGitHubReleaseBuilder(nil, nil)
 	if err != nil {
@@ -172,16 +174,8 @@ func TestGitHubReleaseBuilder_CanBuild(t *testing.T) {
 }
 
 func TestGitHubReleaseBuilder_FetchReleases(t *testing.T) {
-	// Set up mock LLM client environment
-	originalKey := os.Getenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", originalKey)
-		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
-		}
-	}()
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
 
 	// Create mock GitHub API server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +197,7 @@ func TestGitHubReleaseBuilder_FetchReleases(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(releases)
+			_ = json.NewEncoder(w).Encode(releases)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -234,16 +228,8 @@ func TestGitHubReleaseBuilder_FetchReleases(t *testing.T) {
 }
 
 func TestGitHubReleaseBuilder_FetchReleases_NotFound(t *testing.T) {
-	// Set up mock LLM client environment
-	originalKey := os.Getenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", originalKey)
-		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
-		}
-	}()
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -262,16 +248,8 @@ func TestGitHubReleaseBuilder_FetchReleases_NotFound(t *testing.T) {
 }
 
 func TestGitHubReleaseBuilder_FetchRepoMeta(t *testing.T) {
-	// Set up mock LLM client environment
-	originalKey := os.Getenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", originalKey)
-		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
-		}
-	}()
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/repos/cli/cli" {
@@ -281,7 +259,7 @@ func TestGitHubReleaseBuilder_FetchRepoMeta(t *testing.T) {
 				HTMLURL:     "https://github.com/cli/cli",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(repo)
+			_ = json.NewEncoder(w).Encode(repo)
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -308,16 +286,8 @@ func TestGitHubReleaseBuilder_FetchRepoMeta(t *testing.T) {
 }
 
 func TestGitHubReleaseBuilder_FetchRepoMeta_FallbackHomepage(t *testing.T) {
-	// Set up mock LLM client environment
-	originalKey := os.Getenv("ANTHROPIC_API_KEY")
-	os.Setenv("ANTHROPIC_API_KEY", "test-key")
-	defer func() {
-		if originalKey != "" {
-			os.Setenv("ANTHROPIC_API_KEY", originalKey)
-		} else {
-			os.Unsetenv("ANTHROPIC_API_KEY")
-		}
-	}()
+	cleanup := setTestAPIKey(t, "test-key")
+	defer cleanup()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		repo := githubRepo{
@@ -326,7 +296,7 @@ func TestGitHubReleaseBuilder_FetchRepoMeta_FallbackHomepage(t *testing.T) {
 			HTMLURL:     "https://github.com/owner/repo",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(repo)
+		_ = json.NewEncoder(w).Encode(repo)
 	}))
 	defer server.Close()
 
