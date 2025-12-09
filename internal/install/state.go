@@ -97,7 +97,7 @@ func (sm *StateManager) loadWithLock() (*State, error) {
 	if err := lock.LockShared(); err != nil {
 		return nil, fmt.Errorf("failed to acquire read lock: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -144,7 +144,7 @@ func (sm *StateManager) saveWithLock(state *State) error {
 	if err := lock.LockExclusive(); err != nil {
 		return fmt.Errorf("failed to acquire write lock: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	// Atomic write: write to temp file, then rename
 	path := sm.statePath()
@@ -234,7 +234,7 @@ func (sm *StateManager) UpdateTool(name string, update func(*ToolState)) error {
 	if err := lock.LockExclusive(); err != nil {
 		return fmt.Errorf("failed to acquire lock for update: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	// Load state (without acquiring lock again)
 	state, err := sm.loadWithoutLock()
@@ -266,7 +266,7 @@ func (sm *StateManager) RemoveTool(name string) error {
 	if err := lock.LockExclusive(); err != nil {
 		return fmt.Errorf("failed to acquire lock for removal: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	state, err := sm.loadWithoutLock()
 	if err != nil {
@@ -314,7 +314,7 @@ func (sm *StateManager) UpdateLibrary(name, version string, update func(*Library
 	if err := lock.LockExclusive(); err != nil {
 		return fmt.Errorf("failed to acquire lock for library update: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	state, err := sm.loadWithoutLock()
 	if err != nil {
@@ -373,7 +373,7 @@ func (sm *StateManager) RemoveLibraryVersion(libName, libVersion string) error {
 	if err := lock.LockExclusive(); err != nil {
 		return fmt.Errorf("failed to acquire lock for library removal: %w", err)
 	}
-	defer lock.Unlock()
+	defer func() { _ = lock.Unlock() }()
 
 	state, err := sm.loadWithoutLock()
 	if err != nil {
