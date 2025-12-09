@@ -19,7 +19,7 @@ func TestGeminiProviderName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGeminiProvider failed: %v", err)
 	}
-	defer provider.Close()
+	defer func() { _ = provider.Close() }()
 
 	if got := provider.Name(); got != "gemini" {
 		t.Errorf("Name() = %q, want %q", got, "gemini")
@@ -27,15 +27,20 @@ func TestGeminiProviderName(t *testing.T) {
 }
 
 func TestNewGeminiProviderMissingAPIKey(t *testing.T) {
-	// Save and clear the API key
-	originalKey := os.Getenv("GOOGLE_API_KEY")
-	os.Unsetenv("GOOGLE_API_KEY")
-	defer os.Setenv("GOOGLE_API_KEY", originalKey)
+	// Save and clear both API keys
+	originalGoogleKey := os.Getenv("GOOGLE_API_KEY")
+	originalGeminiKey := os.Getenv("GEMINI_API_KEY")
+	_ = os.Unsetenv("GOOGLE_API_KEY")
+	_ = os.Unsetenv("GEMINI_API_KEY")
+	defer func() {
+		_ = os.Setenv("GOOGLE_API_KEY", originalGoogleKey)
+		_ = os.Setenv("GEMINI_API_KEY", originalGeminiKey)
+	}()
 
 	ctx := context.Background()
 	_, err := NewGeminiProvider(ctx)
 	if err == nil {
-		t.Error("NewGeminiProvider should fail when GOOGLE_API_KEY is not set")
+		t.Error("NewGeminiProvider should fail when neither GOOGLE_API_KEY nor GEMINI_API_KEY is set")
 	}
 }
 
@@ -184,7 +189,7 @@ func TestGeminiProviderComplete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGeminiProvider failed: %v", err)
 	}
-	defer provider.Close()
+	defer func() { _ = provider.Close() }()
 
 	req := &CompletionRequest{
 		SystemPrompt: "You are a helpful assistant. Respond briefly.",
@@ -219,7 +224,7 @@ func TestGeminiProviderCompleteWithTools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGeminiProvider failed: %v", err)
 	}
-	defer provider.Close()
+	defer func() { _ = provider.Close() }()
 
 	req := &CompletionRequest{
 		SystemPrompt: "You must use the get_weather tool to answer questions about weather. Do not answer without calling the tool first.",
