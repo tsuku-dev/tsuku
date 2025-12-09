@@ -22,15 +22,15 @@ Use Go's `syscall.Flock` for advisory file locking on a dedicated lock file (`st
 - `internal/install/filelock_windows.go` - Windows LockFileEx implementation
 
 ## Implementation Steps
-- [ ] Add FileLock type with Lock/Unlock methods in `filelock.go`
-- [ ] Implement Unix flock in `filelock_unix.go` (build tag: `//go:build !windows`)
-- [ ] Implement Windows LockFileEx in `filelock_windows.go` (build tag: `//go:build windows`)
-- [ ] Add `lockPath()` method to StateManager returning `state.json.lock`
-- [ ] Modify `Load()` to acquire shared lock, release after read
-- [ ] Modify `Save()` to acquire exclusive lock, write atomically, release lock
-- [ ] Modify read-modify-write methods (UpdateTool, etc.) to hold exclusive lock for entire operation
-- [ ] Add unit tests for concurrent access
-- [ ] Add unit tests for atomic write (crash safety)
+- [x] Add FileLock type with Lock/Unlock methods in `filelock.go`
+- [x] Implement Unix flock in `filelock_unix.go` (build tag: `//go:build !windows`)
+- [x] Implement Windows LockFileEx in `filelock_windows.go` (build tag: `//go:build windows`)
+- [x] Add `lockPath()` method to StateManager returning `state.json.lock`
+- [x] Modify `Load()` to acquire shared lock, release after read
+- [x] Modify `Save()` to acquire exclusive lock, write atomically, release lock
+- [x] Modify read-modify-write methods (UpdateTool, etc.) to hold exclusive lock for entire operation
+- [x] Add unit tests for concurrent access
+- [x] Add unit tests for atomic write (crash safety)
 
 Mark each step [x] after it is implemented and committed. This enables clear resume detection.
 
@@ -45,8 +45,8 @@ Mark each step [x] after it is implemented and committed. This enables clear res
 - **Deadlock**: Keep locks short-lived, no nested locking
 
 ## Success Criteria
-- [ ] File locking implemented with flock(2) on Unix
-- [ ] Atomic write pattern (temp file + rename)
-- [ ] Concurrent access tests pass
-- [ ] Build passes on Linux (Windows support as best-effort)
-- [ ] No deadlocks in normal operation
+- [x] File locking implemented with flock(2) on Unix
+- [x] Atomic write pattern (temp file + rename)
+- [x] Concurrent access tests pass
+- [x] Build passes on Linux (Windows support as best-effort)
+- [x] No deadlocks in normal operation
