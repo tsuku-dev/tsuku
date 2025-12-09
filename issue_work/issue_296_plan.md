@@ -36,12 +36,12 @@ os.Rename(tmpPath, symlinkPath)  // Atomic replacement
 
 ## Implementation Steps
 
-- [ ] Create `internal/install/symlink.go` with:
+- [x] Create `internal/install/symlink.go` with:
   - `AtomicSymlink(target, linkPath string) error` - creates symlink atomically
   - `ValidateSymlinkTarget(target, tsukuHome string) error` - validates target is within `$TSUKU_HOME/tools/`
-- [ ] Add unit tests in `internal/install/symlink_test.go`
-- [ ] Update `createBinarySymlink` in `manager.go` to use `AtomicSymlink`
-- [ ] Verify existing tests still pass
+- [x] Add unit tests in `internal/install/symlink_test.go`
+- [x] Update `createBinarySymlink` in `manager.go` to use `AtomicSymlink`
+- [x] Verify existing tests still pass
 
 ## Testing Strategy
 
@@ -57,8 +57,8 @@ os.Rename(tmpPath, symlinkPath)  // Atomic replacement
 
 ## Success Criteria
 
-- [ ] `AtomicSymlink` function implemented
-- [ ] Target validation prevents path traversal
-- [ ] Unit tests pass
-- [ ] Existing manager tests pass
-- [ ] Build passes
+- [x] `AtomicSymlink` function implemented
+- [x] Target validation prevents path traversal
+- [x] Unit tests pass
+- [x] Existing manager tests pass
+- [x] Build passes
