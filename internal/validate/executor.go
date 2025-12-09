@@ -133,7 +133,7 @@ func (e *Executor) Validate(ctx context.Context, r *recipe.Recipe, assetURL stri
 				Error:  fmt.Errorf("failed to download asset: %w", err),
 			}, nil
 		}
-		defer downloadResult.Cleanup()
+		defer func() { _ = downloadResult.Cleanup() }()
 		assetPath = filepath.Dir(downloadResult.AssetPath)
 		e.logger.Debug("Downloaded asset", "path", downloadResult.AssetPath, "checksum", downloadResult.Checksum)
 	}
@@ -270,6 +270,6 @@ func (e *Executor) GetAssetChecksum(ctx context.Context, url string) (string, er
 	if err != nil {
 		return "", err
 	}
-	defer result.Cleanup()
+	defer func() { _ = result.Cleanup() }()
 	return result.Checksum, nil
 }

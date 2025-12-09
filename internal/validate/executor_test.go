@@ -30,36 +30,6 @@ func (m *mockRuntime) Run(ctx context.Context, opts RunOptions) (*RunResult, err
 	return &RunResult{ExitCode: 0}, nil
 }
 
-// mockDetector is a RuntimeDetector that returns a pre-configured runtime.
-type mockDetector struct {
-	runtime Runtime
-	err     error
-}
-
-func newMockDetector(runtime Runtime, err error) *RuntimeDetector {
-	d := NewRuntimeDetector()
-	// Override the detection functions to return our mock
-	if runtime != nil {
-		d.lookPath = func(name string) (string, error) {
-			if name == runtime.Name() {
-				return "/usr/bin/" + name, nil
-			}
-			return "", errors.New("not found")
-		}
-		d.cmdRun = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-			if runtime.IsRootless() {
-				return []byte("rootless"), nil
-			}
-			return []byte(""), nil
-		}
-	} else {
-		d.lookPath = func(string) (string, error) {
-			return "", errors.New("not found")
-		}
-	}
-	return d
-}
-
 // testLogger captures log messages for testing.
 type testLogger struct {
 	warnings []string
