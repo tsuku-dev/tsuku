@@ -89,6 +89,29 @@ These must be sanitized before sending to LLM for repair.
 
 ## External Research
 
+### Provider Abstraction Patterns
+
+Research into 9 tools/frameworks informed the provider abstraction decision:
+
+- **LLM Frameworks**: LangChain, Semantic Kernel, LlamaIndex
+- **Go Ecosystem**: langchaingo, go-openai patterns
+- **SDK Comparison**: Anthropic vs Google GenAI SDKs
+- **Coding Agents**: Aider, Open Interpreter, goose, Continue
+
+Full research documents available in [`docs/research/`](research/).
+
+**Key Finding**: Strong consensus that conversation loops belong in the **orchestration layer** (builder), not in provider implementations.
+
+| Tool | Loop Location |
+|------|---------------|
+| LangChain | `AgentExecutor` (application code) |
+| Aider | `base_coder.py` (shared client layer) |
+| goose | `crates/goose/src/agents/` (orchestration) |
+| Continue | `core/llm/streamChat.ts` (core layer) |
+| Go libraries | Application/builder code |
+
+**Pattern**: Provider implementations handle single request/response. The multi-turn loop lives in business logic. This aligns with Option 1A but clarifies that "thin interface" means single-turn API, with the loop in `GitHubReleaseBuilder`.
+
 ### Gemini Function Calling
 
 From [Google AI Function Calling documentation](https://ai.google.dev/gemini-api/docs/function-calling):
@@ -146,26 +169,27 @@ Truncation is also important:
 
 How should the provider abstraction be structured?
 
-#### Option 1A: Thin Interface with Provider-Specific Clients
+#### Option 1A: Thin Interface with Loop in Builder
 
 ```go
 type Provider interface {
     Name() string
-    GenerateRecipe(ctx context.Context, req *GenerateRequest) (*AssetPattern, *Usage, error)
+    Complete(ctx context.Context, messages []Message, tools []ToolDef) (*Response, error)
 }
 ```
 
-Each provider implements the full multi-turn conversation internally.
+Provider handles single request/response. Multi-turn loop lives in `GitHubReleaseBuilder`.
 
 **Pros:**
-- Providers can optimize for their specific API patterns
-- Full control over conversation flow per provider
-- Existing client.go becomes claude.go with minimal changes
+- Single-turn providers are simple to implement and test
+- Multi-turn logic written once in builder
+- Each provider uses native SDK patterns
+- Easy to mock for unit tests (just mock `Complete()`)
+- Validated by industry research (see External Research section)
 
 **Cons:**
-- Multi-turn logic duplicated across providers
-- Harder to ensure consistent behavior
-- Testing requires full provider implementations
+- Must define common Message/Response types
+- Tool definitions need conversion per provider at call boundary
 
 #### Option 1B: Layered Interface with Shared Conversation Logic
 
@@ -314,15 +338,15 @@ Parse validation errors into categories, add specific guidance based on error ty
 
 ## Decision Outcome
 
-**Chosen: 1A (Thin Interface) + 2A (Per-Provider Breakers) + 3B (Continue Conversation)**
+**Chosen: 1A (Thin Interface with Loop in Builder) + 2A (Per-Provider Breakers) + 3B (Continue Conversation)**
 
 ### Summary
 
-Providers implement full recipe generation internally, enabling provider-specific optimizations while maintaining a clean interface. Per-provider circuit breakers ensure independent failure domains. Repair loops continue the existing conversation with error feedback, keeping token costs lower and maintaining LLM context.
+Providers implement single-turn request/response only. The multi-turn conversation loop lives in `GitHubReleaseBuilder`, written once and shared across providers. Per-provider circuit breakers ensure independent failure domains. Repair loops continue the existing conversation with error feedback, keeping token costs lower and maintaining LLM context.
 
 ### Rationale
 
-1. **Thin Interface (1A)**: The existing client.go already implements the full multi-turn flow well. Converting it to a provider interface requires minimal changes. Each provider can optimize its conversation handling without forcing a lowest-common-denominator approach.
+1. **Thin Interface (1A)**: Research across 9 tools/frameworks shows consensus that conversation loops belong in the orchestration layer, not provider implementations. Providers should handle single-turn only, making them simple to implement, test, and maintain. The loop in `GitHubReleaseBuilder` can optimize for the specific recipe generation use case.
 
 2. **Per-Provider Breakers (2A)**: The whole point of having two providers is resilience. Coupling their failure states defeats that purpose. Per-provider breakers let Claude outages gracefully failover to Gemini.
 
@@ -330,7 +354,7 @@ Providers implement full recipe generation internally, enabling provider-specifi
 
 ### Trade-offs Accepted
 
-1. **Duplicated conversation logic**: Each provider implements multi-turn. Mitigation: Share tool definitions and result parsing where possible.
+1. **Common message types**: Must define `Message` and `Response` types that work for both providers. Mitigation: Types are simple (role, content, tool calls) and well-established.
 
 2. **Provider switch loses context**: Switching providers mid-repair starts fresh. Mitigation: Include original error context in new conversation.
 
@@ -385,44 +409,68 @@ GitHubReleaseBuilder.Build()
 #### 1. Provider Interface (`internal/llm/provider.go`)
 
 ```go
-// Provider defines the interface for LLM recipe generation.
+// Provider defines the interface for single-turn LLM completion.
+// Multi-turn conversation loops live in GitHubReleaseBuilder, not here.
 type Provider interface {
     // Name returns the provider identifier (e.g., "claude", "gemini").
     Name() string
 
-    // GenerateRecipe runs a multi-turn conversation to generate an asset pattern.
-    // It handles tool use internally and returns when extract_pattern is called.
-    GenerateRecipe(ctx context.Context, req *GenerateRequest) (*AssetPattern, *Usage, error)
-
-    // ContinueWithError continues an existing conversation with error feedback.
-    // Used for repair loops after validation failure.
-    ContinueWithError(ctx context.Context, conv *Conversation, errMsg string) (*AssetPattern, *Usage, error)
+    // Complete sends messages to the LLM and returns a single response.
+    // Tool calls in the response must be handled by the caller (builder).
+    Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error)
 }
 
-// Conversation holds state for multi-turn interactions.
-// Provider implementations manage their internal message history.
-type Conversation struct {
-    ProviderName string
-    ID           string      // Opaque identifier for the conversation
-    Messages     interface{} // Provider-specific message history
-    Usage        Usage       // Accumulated token usage
+// CompletionRequest contains input for a single LLM turn.
+type CompletionRequest struct {
+    SystemPrompt string
+    Messages     []Message
+    Tools        []ToolDef
+    MaxTokens    int
 }
 
-// GenerateRequest contains input for recipe generation.
-type GenerateRequest struct {
-    Repo        string
-    Releases    []Release
+// Message represents a conversation message.
+type Message struct {
+    Role       Role        // user, assistant
+    Content    string      // Text content
+    ToolCalls  []ToolCall  // Tool calls (assistant only)
+    ToolResult *ToolResult // Tool result (user only)
+}
+
+type Role string
+
+const (
+    RoleUser      Role = "user"
+    RoleAssistant Role = "assistant"
+)
+
+// ToolCall represents an LLM request to call a tool.
+type ToolCall struct {
+    ID        string         // Unique identifier for correlation
+    Name      string         // Tool name
+    Arguments map[string]any // Parsed arguments
+}
+
+// ToolResult contains the output from executing a tool.
+type ToolResult struct {
+    CallID  string // Correlates to ToolCall.ID
+    Content string // Tool execution output
+    IsError bool   // True if tool execution failed
+}
+
+// CompletionResponse contains the LLM's response for a single turn.
+type CompletionResponse struct {
+    Content    string      // Text response (may be empty if tool calls)
+    ToolCalls  []ToolCall  // Requested tool calls
+    StopReason string      // "end_turn", "tool_use", "max_tokens"
+    Usage      Usage       // Token counts for this turn
+}
+
+// ToolDef defines a tool the LLM can call.
+// Providers convert to native format (Claude tool_use, Gemini functionCall).
+type ToolDef struct {
+    Name        string
     Description string
-    README      string
-}
-
-// AssetPattern is the structured output from extract_pattern tool.
-type AssetPattern struct {
-    Mappings       []PlatformMapping
-    Executable     string
-    VerifyCommand  string
-    StripPrefix    string
-    InstallSubpath string
+    Parameters  map[string]any // JSON Schema
 }
 ```
 
@@ -505,14 +553,13 @@ func (cb *CircuitBreaker) State() State
 
 #### 4. Claude Provider (`internal/llm/claude.go`)
 
-Refactored from current `client.go`:
+Simplified single-turn implementation:
 
 ```go
 // ClaudeProvider implements Provider using the Anthropic API.
 type ClaudeProvider struct {
-    client     *anthropic.Client
-    model      anthropic.Model
-    httpClient *http.Client // For fetch_file, inspect_archive
+    client *anthropic.Client
+    model  anthropic.Model
 }
 
 // NewClaudeProvider creates a provider using ANTHROPIC_API_KEY.
@@ -520,23 +567,41 @@ func NewClaudeProvider() (*ClaudeProvider, error)
 
 func (p *ClaudeProvider) Name() string { return "claude" }
 
-func (p *ClaudeProvider) GenerateRecipe(ctx context.Context, req *GenerateRequest) (*AssetPattern, *Usage, error)
+func (p *ClaudeProvider) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
+    // Convert ToolDef to anthropic.ToolParam
+    tools := p.convertTools(req.Tools)
 
-func (p *ClaudeProvider) ContinueWithError(ctx context.Context, conv *Conversation, errMsg string) (*AssetPattern, *Usage, error)
+    // Convert Message to anthropic.MessageParam
+    messages := p.convertMessages(req.Messages)
+
+    // Make single API call
+    resp, err := p.client.Messages.New(ctx, anthropic.MessageNewParams{
+        Model:     p.model,
+        System:    anthropic.F([]anthropic.TextBlockParam{{Text: anthropic.F(req.SystemPrompt)}}),
+        Messages:  anthropic.F(messages),
+        Tools:     anthropic.F(tools),
+        MaxTokens: anthropic.F(int64(req.MaxTokens)),
+    })
+
+    // Convert response to CompletionResponse
+    return p.convertResponse(resp), err
+}
 ```
 
-The implementation moves existing multi-turn logic from `client.go`, adding:
-- Conversation state management for repair loops
-- Method to continue with error feedback
+Key responsibilities:
+- Convert common types to Anthropic SDK types
+- Make single API call
+- Convert response back to common types
 
 #### 5. Gemini Provider (`internal/llm/gemini.go`)
+
+Simplified single-turn implementation:
 
 ```go
 // GeminiProvider implements Provider using the Google AI API.
 type GeminiProvider struct {
-    client     *genai.Client
-    model      *genai.GenerativeModel
-    httpClient *http.Client
+    client *genai.Client
+    model  string
 }
 
 // NewGeminiProvider creates a provider using GOOGLE_API_KEY.
@@ -544,15 +609,30 @@ func NewGeminiProvider() (*GeminiProvider, error)
 
 func (p *GeminiProvider) Name() string { return "gemini" }
 
-func (p *GeminiProvider) GenerateRecipe(ctx context.Context, req *GenerateRequest) (*AssetPattern, *Usage, error)
+func (p *GeminiProvider) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
+    // Convert ToolDef to genai.FunctionDeclaration
+    tools := p.convertTools(req.Tools)
 
-func (p *GeminiProvider) ContinueWithError(ctx context.Context, conv *Conversation, errMsg string) (*AssetPattern, *Usage, error)
+    // Convert Message to genai.Content
+    contents := p.convertMessages(req.Messages)
+
+    // Configure model with system prompt and tools
+    model := p.client.GenerativeModel(p.model)
+    model.SystemInstruction = &genai.Content{Parts: []genai.Part{genai.Text(req.SystemPrompt)}}
+    model.Tools = []*genai.Tool{{FunctionDeclarations: tools}}
+
+    // Make single API call
+    resp, err := model.GenerateContent(ctx, contents...)
+
+    // Convert response to CompletionResponse
+    return p.convertResponse(resp), err
+}
 ```
 
 Key implementation notes:
 - Model: `gemini-2.0-flash` (cost-effective, supports function calling)
 - Convert tool definitions to Gemini function declarations
-- Map `functionCall` responses to tool use pattern
+- Map `functionCall` responses to common ToolCall type
 - Track token usage from response metadata
 
 #### 6. Error Sanitization (`internal/validate/sanitize.go`)
@@ -629,9 +709,19 @@ Example parsing:
 2. factory.GetProvider(ctx)
    → Claude breaker closed, return ClaudeProvider
 
-3. provider.GenerateRecipe(ctx, genReq)
-   → Multi-turn conversation
-   → Return AssetPattern, Conversation, Usage
+3. builder.runConversationLoop(ctx, provider)  // Loop in builder
+   │
+   ├─ turn 1: provider.Complete(ctx, req)
+   │  → LLM returns tool call (fetch_file)
+   │  → builder executes tool, appends result
+   │
+   ├─ turn 2: provider.Complete(ctx, req)
+   │  → LLM returns tool call (inspect_archive)
+   │  → builder executes tool, appends result
+   │
+   └─ turn 3: provider.Complete(ctx, req)
+      → LLM returns extract_pattern result
+      → builder parses AssetPattern
 
 4. executor.Validate(ctx, recipe, assetURL)
    → Container runs recipe
@@ -652,16 +742,22 @@ Example parsing:
    sanitizer.Sanitize(result.Stderr + result.Stdout)
    parseError := ParseValidationError(...)
 
-4. Repair attempt 1
-   provider.ContinueWithError(ctx, conv, errMsg)
-   → LLM receives: "Validation failed: [sanitized error]. Please fix..."
-   → Return new AssetPattern
+4. Repair attempt 1 (continue conversation in builder)
+   builder.appendErrorMessage(messages, errMsg)
+   │
+   └─ turn N: provider.Complete(ctx, req)  // Same provider, same interface
+      → LLM receives: "Validation failed: [sanitized error]. Please fix..."
+      → builder continues loop until extract_pattern
+      → Return new AssetPattern
 
 5. executor.Validate(ctx, newRecipe, assetURL)
    → Return ValidationResult{Passed: true}
 
 6. Return BuildResult with repaired recipe
 ```
+
+Note: The provider doesn't know about repairs - it just sees another Complete() call.
+The builder owns the message history and adds error context as a user message.
 
 #### Provider Failover
 
@@ -874,14 +970,14 @@ Record/replay pattern from parent design:
 
 ### Negative
 
-1. **Complexity**: Two providers means two codepaths to maintain
+1. **Two provider implementations**: Must maintain Claude and Gemini adapters
 2. **Testing burden**: Must verify parity across providers
 3. **Conversation state**: Provider switching loses context
 4. **Dependency**: Adds google/generative-ai-go dependency
 
 ### Mitigations
 
-1. **Parity testing**: Integration tests verify both providers produce equivalent results
-2. **Shared code**: Tool definitions, error parsing shared across providers
+1. **Simplified providers**: Single-turn interface means providers are ~50 lines each (just type conversion)
+2. **Parity testing**: Integration tests verify both providers produce equivalent results via same loop
 3. **Fresh start acceptable**: Provider switch with full context still works (just costs more)
 4. **Minimal dependency**: Only SDK needed, no additional abstractions
