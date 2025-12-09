@@ -24,14 +24,14 @@ None - all new code
 - `internal/validate/executor_test.go` - Unit tests
 
 ## Implementation Steps
-- [ ] Create `Executor` struct with dependencies (RuntimeDetector, PreDownloader)
-- [ ] Create `ValidationResult` type (pass/fail, stdout, stderr, exit code)
-- [ ] Create `ExecutorLogger` interface for warnings
-- [ ] Implement `Validate()` method that orchestrates: detect runtime, download assets, run container, check verification
-- [ ] Add docker group security warning when `runtime.Name() == "docker" && !runtime.IsRootless()`
-- [ ] Handle case when no runtime is available (skip with warning)
-- [ ] Write unit tests with mocked components
-- [ ] Run linting and tests
+- [x] Create `Executor` struct with dependencies (RuntimeDetector, PreDownloader)
+- [x] Create `ValidationResult` type (pass/fail, stdout, stderr, exit code)
+- [x] Create `ExecutorLogger` interface for warnings
+- [x] Implement `Validate()` method that orchestrates: detect runtime, download assets, run container, check verification
+- [x] Add docker group security warning when `runtime.Name() == "docker" && !runtime.IsRootless()`
+- [x] Handle case when no runtime is available (skip with warning)
+- [x] Write unit tests with mocked components
+- [x] Run linting and tests
 
 ## Testing Strategy
 - Unit tests: Mock RuntimeDetector, PreDownloader, and Runtime
@@ -50,13 +50,13 @@ None - all new code
   - **Mitigation**: Use alpine:latest as base, document requirements
 
 ## Success Criteria
-- [ ] `Executor.Validate()` runs recipe steps in container
-- [ ] Pre-downloaded assets mounted read-only at `/assets`
-- [ ] Workspace mounted for installation
-- [ ] Runs verification command and checks output
-- [ ] Returns `ValidationResult` (pass/fail + output)
-- [ ] Skips with warning when no runtime available
-- [ ] Warns when using Docker with group membership (non-rootless)
+- [x] `Executor.Validate()` runs recipe steps in container
+- [x] Pre-downloaded assets mounted read-only at `/assets`
+- [x] Workspace mounted for installation
+- [x] Runs verification command and checks output
+- [x] Returns `ValidationResult` (pass/fail + output)
+- [x] Skips with warning when no runtime available
+- [x] Warns when using Docker with group membership (non-rootless)
 
 ## Open Questions
 None - design is clear from the design document
