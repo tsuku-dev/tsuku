@@ -91,26 +91,17 @@ These must be sanitized before sending to LLM for repair.
 
 ### Provider Abstraction Patterns
 
-Research into 9 tools/frameworks informed the provider abstraction decision:
+Research into LLM frameworks (LangChain, Semantic Kernel, LlamaIndex), Go libraries (langchaingo, go-openai), and multi-provider coding agents (Aider, Open Interpreter, goose, Continue) shows strong consensus:
 
-- **LLM Frameworks**: LangChain, Semantic Kernel, LlamaIndex
-- **Go Ecosystem**: langchaingo, go-openai patterns
-- **SDK Comparison**: Anthropic vs Google GenAI SDKs
-- **Coding Agents**: Aider, Open Interpreter, goose, Continue
+**Conversation loops belong in the orchestration layer, not provider implementations.**
 
-Full research documents available in [`docs/research/`](research/).
+Across all surveyed tools, providers handle single request/response while the multi-turn loop lives in application/business logic code. This pattern keeps providers simple (~50 lines for type conversion) and makes the loop testable and customizable per use case.
 
-**Key Finding**: Strong consensus that conversation loops belong in the **orchestration layer** (builder), not in provider implementations.
+**Anthropic vs Google SDK differences** also favor thin abstraction:
+- Anthropic: Stateless (send full history each turn)
+- Google GenAI: Stateful sessions (history managed internally)
 
-| Tool | Loop Location |
-|------|---------------|
-| LangChain | `AgentExecutor` (application code) |
-| Aider | `base_coder.py` (shared client layer) |
-| goose | `crates/goose/src/agents/` (orchestration) |
-| Continue | `core/llm/streamChat.ts` (core layer) |
-| Go libraries | Application/builder code |
-
-**Pattern**: Provider implementations handle single request/response. The multi-turn loop lives in business logic. This aligns with Option 1A but clarifies that "thin interface" means single-turn API, with the loop in `GitHubReleaseBuilder`.
+These fundamental differences mean a thick shared abstraction would leak. A thin single-turn interface lets each provider use its SDK naturally while the builder owns conversation state.
 
 ### Gemini Function Calling
 
@@ -185,7 +176,7 @@ Provider handles single request/response. Multi-turn loop lives in `GitHubReleas
 - Multi-turn logic written once in builder
 - Each provider uses native SDK patterns
 - Easy to mock for unit tests (just mock `Complete()`)
-- Validated by industry research (see External Research section)
+- Matches industry patterns for multi-provider LLM tools
 
 **Cons:**
 - Must define common Message/Response types
@@ -346,7 +337,7 @@ Providers implement single-turn request/response only. The multi-turn conversati
 
 ### Rationale
 
-1. **Thin Interface (1A)**: Research across 9 tools/frameworks shows consensus that conversation loops belong in the orchestration layer, not provider implementations. Providers should handle single-turn only, making them simple to implement, test, and maintain. The loop in `GitHubReleaseBuilder` can optimize for the specific recipe generation use case.
+1. **Thin Interface (1A)**: Industry patterns show conversation loops belong in the orchestration layer, not provider implementations. Providers should handle single-turn only, making them simple to implement, test, and maintain. The loop in `GitHubReleaseBuilder` can optimize for the specific recipe generation use case.
 
 2. **Per-Provider Breakers (2A)**: The whole point of having two providers is resilience. Coupling their failure states defeats that purpose. Per-provider breakers let Claude outages gracefully failover to Gemini.
 
