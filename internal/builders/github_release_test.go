@@ -584,10 +584,7 @@ func TestWithTelemetryClient(t *testing.T) {
 		t.Fatalf("NewGitHubReleaseBuilder error: %v", err)
 	}
 
-	// Verify the builder was created successfully with the telemetry client
-	if b == nil {
-		t.Error("expected builder to be non-nil")
-	}
+	// Verify the telemetry client was set correctly
 	if b.telemetryClient != telemetryClient {
 		t.Error("telemetry client not set correctly")
 	}
