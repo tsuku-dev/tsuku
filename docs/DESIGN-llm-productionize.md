@@ -369,6 +369,34 @@ const (
 )
 ```
 
+**Config CLI integration** - add to `AvailableKeys()` in userconfig.go:
+
+```go
+func AvailableKeys() map[string]string {
+    return map[string]string{
+        "telemetry":            "Enable anonymous usage statistics (true/false)",
+        "llm.enabled":          "Enable LLM features for recipe generation (true/false)",
+        "llm.providers":        "Preferred LLM provider order (comma-separated, e.g., claude,gemini)",
+        "llm.daily_budget":     "Daily LLM cost limit in USD (default: 5.0)",
+        "llm.hourly_rate_limit": "Max LLM generations per hour (default: 10)",
+    }
+}
+```
+
+**Usage examples**:
+```bash
+# View current settings
+tsuku config get llm.daily_budget
+tsuku config get llm.hourly_rate_limit
+
+# Increase limits for power users
+tsuku config set llm.daily_budget 10
+tsuku config set llm.hourly_rate_limit 20
+
+# Disable rate limiting (not recommended)
+tsuku config set llm.hourly_rate_limit 0
+```
+
 ### 2. State Tracking Extensions
 
 Add to `internal/state/state.go`:
