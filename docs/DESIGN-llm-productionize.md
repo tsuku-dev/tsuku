@@ -504,24 +504,71 @@ func promptForApproval() (bool, error) {
 
 ### 5. Progress Indicators
 
+Progress messages should communicate what's happening at each stage of the workflow:
+
+**Workflow stages**:
+1. **Gathering info** - Fetching release metadata from GitHub
+2. **Analyzing** - LLM analyzing assets to generate recipe
+3. **Validating** - Running recipe in container
+4. **Fixing** - LLM repairing recipe based on validation errors (repair loop)
+
 ```go
+// Progress output for a typical successful generation:
+//
+// Creating recipe for gh from github:cli/cli...
+// Fetching release metadata... done (v2.42.0, 24 assets)
+// Analyzing assets with Claude... done
+// Validating in container... done
+//
+// For a generation requiring repair:
+//
+// Creating recipe for ripgrep from github:BurntSushi/ripgrep...
+// Fetching release metadata... done (14.1.0, 18 assets)
+// Analyzing assets with Claude... done
+// Validating in container... failed
+// Repairing recipe (attempt 1/3)... done
+// Validating in container... done
+
 func printProgress(stage string) {
-    // Clear line and print status
-    fmt.Printf("\r%s... ", stage)
+    fmt.Printf("%s... ", stage)
 }
 
-func printProgressDone(stage string) {
-    fmt.Printf("\r%s... done\n", stage)
+func printProgressDone(detail string) {
+    if detail != "" {
+        fmt.Printf("done (%s)\n", detail)
+    } else {
+        fmt.Printf("done\n")
+    }
+}
+
+func printProgressFailed() {
+    fmt.Printf("failed\n")
 }
 
 // Usage in create command:
-printProgress("Fetching release metadata")
-releases, err := builder.FetchReleases(ctx, owner, repo)
-printProgressDone("Fetching release metadata")
+fmt.Printf("Creating recipe for %s from github:%s/%s...\n", name, owner, repo)
 
-printProgress("Analyzing assets with LLM")
-// ... LLM call
-printProgressDone("Analyzing assets with LLM")
+printProgress("Fetching release metadata")
+release, err := builder.FetchLatestRelease(ctx, owner, repo)
+printProgressDone(fmt.Sprintf("%s, %d assets", release.Tag, len(release.Assets)))
+
+printProgress("Analyzing assets with " + provider)
+recipe, err := builder.GenerateRecipe(ctx, release)
+printProgressDone("")
+
+for attempt := 1; attempt <= maxRepairs; attempt++ {
+    printProgress("Validating in container")
+    result, err := validator.Validate(ctx, recipe)
+    if result.Success {
+        printProgressDone("")
+        break
+    }
+    printProgressFailed()
+
+    printProgress(fmt.Sprintf("Repairing recipe (attempt %d/%d)", attempt, maxRepairs))
+    recipe, err = builder.RepairRecipe(ctx, recipe, result.Error)
+    printProgressDone("")
+}
 ```
 
 ### 6. Actionable Error Messages
