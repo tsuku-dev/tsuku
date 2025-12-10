@@ -19,9 +19,9 @@ Add the flag and variable now so the infrastructure is in place. When the previe
 
 ## Implementation Steps
 
-- [ ] Add `createAutoApprove` variable and `--yes` flag in `init()`
-- [ ] Add warning message when `--yes` flag is used in `runCreate()`
-- [ ] Update help text to document the flag
+- [x] Add `createAutoApprove` variable and `--yes` flag in `init()`
+- [x] Add warning message when `--yes` flag is used in `runCreate()`
+- [x] Update help text to document the flag (handled by cobra)
 
 ## Testing Strategy
 
