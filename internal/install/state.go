@@ -61,7 +61,7 @@ type LLMUsage struct {
 // State represents the global state of installed tools and libraries
 type State struct {
 	Installed map[string]ToolState                      `json:"installed"`
-	Libs      map[string]map[string]LibraryVersionState `json:"libs,omitempty"`     // map[libName]map[version]LibraryVersionState
+	Libs      map[string]map[string]LibraryVersionState `json:"libs,omitempty"`      // map[libName]map[version]LibraryVersionState
 	LLMUsage  *LLMUsage                                 `json:"llm_usage,omitempty"` // LLM generation tracking
 }
 
