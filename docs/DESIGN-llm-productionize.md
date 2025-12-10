@@ -94,7 +94,7 @@ From [DESIGN-llm-builder-infrastructure.md](docs/DESIGN-llm-builder-infrastructu
 
 | Gap | Upstream Requirement | Implementation Needed |
 |-----|---------------------|----------------------|
-| Secrets manager | API key resolution with 0600 enforcement | New `internal/secrets/` package |
+| Secrets manager | API key resolution with 0600 enforcement | Deferred to #369 (env vars sufficient) |
 | Cost display | Show cost after generation | Extend create command output |
 | Cost confirmation | Prompt for operations >$0.50 | New confirmation logic |
 | Rate limiting | Max 10 generations/hour | State file + enforcement |
@@ -316,12 +316,13 @@ Rationale: Balances user fairness (repair loops are automatic, not user-initiate
 
 | Area | Change |
 |------|--------|
-| `internal/secrets/` | New package for API key resolution with 0600 enforcement |
 | `internal/userconfig/` | Add rate limit, budget settings, config validation |
 | `internal/state/` | Add LLM generation tracking with timestamp pruning |
 | `internal/builders/` | Inject checksums from validation into recipes |
 | `cmd/tsuku/create.go` | Add `--skip-validation`, `--yes`, preview flow, progress |
 | Error templates | New actionable error messages with recovery guidance |
+
+**Deferred**: Secrets manager with config file support (#369) - env vars are sufficient for MVP.
 
 ## Solution Architecture
 
@@ -333,49 +334,24 @@ Rationale: Balances user fairness (repair loops are automatic, not user-initiate
 │   ┌─────────────┬─────────────┬──────────────┬───────────┐ │
 │   │ Flags       │ Preview     │ Progress     │ Errors    │ │
 │   │ --skip-val  │ Recipe      │ Indicators   │ Actionable│ │
-│   │ --force     │ Summary     │              │ Messages  │ │
+│   │ --yes       │ Summary     │              │ Messages  │ │
 │   └─────────────┴─────────────┴──────────────┴───────────┘ │
 └────────────────────────────┬────────────────────────────────┘
                              │
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
-┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ secrets/     │   │ userconfig/      │   │ state/           │
-│ manager.go   │   │ (existing)       │   │ (existing)       │
-│              │   │ + daily_budget   │   │ + llm_usage      │
-│ - Env vars   │   │ + confirm_above  │   │ - timestamps     │
-│ - Config     │   │                  │   │ - daily_cost     │
-│ - 0600 check │   │                  │   │                  │
-└──────────────┘   └──────────────────┘   └──────────────────┘
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+    ┌──────────────────┐          ┌──────────────────┐
+    │ userconfig/      │          │ state/           │
+    │ (existing)       │          │ (existing)       │
+    │ + daily_budget   │          │ + llm_usage      │
+    │ + confirm_above  │          │ - timestamps     │
+    │ + hourly_limit   │          │ - daily_cost     │
+    └──────────────────┘          └──────────────────┘
 ```
 
-### 1. Secrets Manager (`internal/secrets/manager.go`)
+**Note**: API keys continue to use environment variables (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`). Config file support deferred to #369.
 
-```go
-// Manager resolves API keys from multiple sources.
-type Manager struct {
-    configPath string
-}
-
-// Get retrieves an API key by name (e.g., "anthropic", "google").
-// Resolution order:
-// 1. Environment variable (ANTHROPIC_API_KEY, GOOGLE_API_KEY)
-// 2. Config file $TSUKU_HOME/config.toml [secrets] section
-// Returns error if not found or config has insecure permissions.
-func (m *Manager) Get(name string) (string, error)
-
-// RequireSecurePermissions checks config file is 0600 or tighter.
-func RequireSecurePermissions(path string) error
-```
-
-Config file format (in `$TSUKU_HOME/config.toml`):
-```toml
-[secrets]
-anthropic_api_key = "sk-ant-..."
-google_api_key = "AIza..."
-```
-
-### 2. User Configuration Extensions
+### 1. User Configuration Extensions
 
 Add to `internal/userconfig/userconfig.go`:
 
@@ -396,7 +372,7 @@ const (
 )
 ```
 
-### 3. State Tracking Extensions
+### 2. State Tracking Extensions
 
 Add to `internal/state/state.go`:
 
@@ -422,7 +398,7 @@ func (s *State) CanGenerate(config *userconfig.Config) (bool, string)
 func (s *State) DailySpent() float64
 ```
 
-### 4. Create Command Enhancements
+### 3. Create Command Enhancements
 
 ```go
 // New flags
@@ -441,7 +417,7 @@ func init() {
 }
 ```
 
-### 5. Recipe Preview Flow
+### 4. Recipe Preview Flow
 
 ```go
 func previewRecipe(recipe *recipe.Recipe, result *BuildResult) (approved bool, err error) {
@@ -501,7 +477,7 @@ func promptForApproval() (bool, error) {
 }
 ```
 
-### 6. Progress Indicators
+### 5. Progress Indicators
 
 ```go
 func printProgress(stage string) {
@@ -523,7 +499,7 @@ printProgress("Analyzing assets with LLM")
 printProgressDone("Analyzing assets with LLM")
 ```
 
-### 7. Actionable Error Messages
+### 6. Actionable Error Messages
 
 Create error templates:
 
@@ -577,7 +553,7 @@ var ErrorBudgetExceeded = ErrorTemplate{
 }
 ```
 
-### 8. Cost Confirmation Flow
+### 7. Cost Confirmation Flow
 
 ```go
 func confirmCostIfNeeded(estimatedCost float64, config *userconfig.Config) (bool, error) {
@@ -598,10 +574,8 @@ func confirmCostIfNeeded(estimatedCost float64, config *userconfig.Config) (bool
 
 ### Phase 1: Core Infrastructure
 
-1. Create `internal/secrets/manager.go` with env + config resolution
-2. Add permission checking for config file
-3. Extend `internal/userconfig/` with LLM budget settings
-4. Extend `internal/state/` with LLM usage tracking
+1. Extend `internal/userconfig/` with LLM budget settings
+2. Extend `internal/state/` with LLM usage tracking
 
 ### Phase 2: CLI Enhancements
 
@@ -697,14 +671,13 @@ func RunBenchmark(repos []string) []BenchmarkResult
 
 ### API Key Storage
 
-**Risk**: API keys stored in config file could be exposed.
+**Risk**: API keys in environment variables could be exposed via process listings or shell history.
+
+**Current approach**: Environment variables (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`) are the only supported method. This is standard practice for API keys.
 
 **Mitigations**:
-- Use atomic file creation with `os.OpenFile(..., 0600)` to prevent race conditions
-- Environment variables take priority and remain the recommended method
-- Config file option is convenience, not recommendation
-- Warn users to add config.toml to .gitignore
-- Clear documentation warning about config file storage and backup exposure
+- Document that users should set env vars in shell profile, not inline commands
+- Future: Config file support with permission enforcement (#369)
 
 ### Cost Controls
 
@@ -761,13 +734,12 @@ func RunBenchmark(repos []string) []BenchmarkResult
 
 ### Safety Requirements
 - [ ] Rate limiting prevents >10 generations per rolling hour
-- [ ] Config file permission check uses atomic creation (0600)
 - [ ] `--skip-validation` requires explicit y/n consent
 - [ ] `--yes` flag shows warning about skipping review
 - [ ] State file corruption resets with warning (not silent)
 
 ### Testing Requirements
-- [ ] Unit tests for secrets manager, rate limiting, budget enforcement
+- [ ] Unit tests for rate limiting, budget enforcement
 - [ ] Integration tests with mock LLM responses
 - [ ] Concurrent access to state file doesn't corrupt data
 
@@ -787,6 +759,7 @@ func RunBenchmark(repos []string) []BenchmarkResult
 - `--skip-validation` reduces security guarantees
 
 ### Technical Debt
-- External secret manager integration deferred (Option 1C)
-- Server-side rate limiting not implemented (would require connectivity)
-- No key rotation or expiration guidance
+- Secrets manager with config file support (#369)
+- External secret manager integration (keychain, pass)
+- Server-side rate limiting (would require connectivity)
+- Key rotation / expiration guidance
