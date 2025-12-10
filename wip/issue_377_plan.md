@@ -25,12 +25,12 @@ None - all changes fit within existing files.
 
 ## Implementation Steps
 
-- [ ] Add `ProgressReporter` interface to builders package with stage reporting methods
-- [ ] Add `WithProgressReporter` option to `GitHubReleaseBuilder`
-- [ ] Add progress callbacks at key points: fetch metadata, LLM analysis, validation, repair
-- [ ] Create CLI progress reporter implementation in create.go
-- [ ] Pass reporter to builder in runCreate
-- [ ] Add unit tests for progress reporting
+- [x] Add `ProgressReporter` interface to builders package with stage reporting methods
+- [x] Add `WithProgressReporter` option to `GitHubReleaseBuilder`
+- [x] Add progress callbacks at key points: fetch metadata, LLM analysis, validation, repair
+- [x] Create CLI progress reporter implementation in create.go
+- [x] Pass reporter to builder in runCreate
+- [x] Add unit tests for progress reporting
 
 ## Progress Stages
 

@@ -589,3 +589,177 @@ func TestWithTelemetryClient(t *testing.T) {
 		t.Error("telemetry client not set correctly")
 	}
 }
+
+// mockProgressReporter records progress events for testing.
+type mockProgressReporter struct {
+	stages []string
+	dones  []string
+	fails  int
+}
+
+func (m *mockProgressReporter) OnStageStart(stage string) {
+	m.stages = append(m.stages, stage)
+}
+
+func (m *mockProgressReporter) OnStageDone(detail string) {
+	m.dones = append(m.dones, detail)
+}
+
+func (m *mockProgressReporter) OnStageFailed() {
+	m.fails++
+}
+
+func TestWithProgressReporter(t *testing.T) {
+	ctx := context.Background()
+	mockProv := &mockProvider{name: "mock"}
+	factory := createMockFactory(mockProv)
+
+	reporter := &mockProgressReporter{}
+
+	b, err := NewGitHubReleaseBuilder(ctx, WithFactory(factory), WithProgressReporter(reporter))
+	if err != nil {
+		t.Fatalf("NewGitHubReleaseBuilder error: %v", err)
+	}
+
+	// Verify the progress reporter was set correctly
+	if b.progress != reporter {
+		t.Error("progress reporter not set correctly")
+	}
+}
+
+func TestProgressReporterHelpers(t *testing.T) {
+	ctx := context.Background()
+	mockProv := &mockProvider{name: "mock"}
+	factory := createMockFactory(mockProv)
+
+	reporter := &mockProgressReporter{}
+
+	b, err := NewGitHubReleaseBuilder(ctx, WithFactory(factory), WithProgressReporter(reporter))
+	if err != nil {
+		t.Fatalf("NewGitHubReleaseBuilder error: %v", err)
+	}
+
+	// Test reportStart
+	b.reportStart("Fetching metadata")
+	if len(reporter.stages) != 1 || reporter.stages[0] != "Fetching metadata" {
+		t.Errorf("reportStart: got stages=%v, want [Fetching metadata]", reporter.stages)
+	}
+
+	// Test reportDone
+	b.reportDone("v1.0.0, 5 assets")
+	if len(reporter.dones) != 1 || reporter.dones[0] != "v1.0.0, 5 assets" {
+		t.Errorf("reportDone: got dones=%v, want [v1.0.0, 5 assets]", reporter.dones)
+	}
+
+	// Test reportFailed
+	b.reportFailed()
+	if reporter.fails != 1 {
+		t.Errorf("reportFailed: got fails=%d, want 1", reporter.fails)
+	}
+}
+
+func TestProgressReporterNilSafe(t *testing.T) {
+	ctx := context.Background()
+	mockProv := &mockProvider{name: "mock"}
+	factory := createMockFactory(mockProv)
+
+	// No progress reporter set
+	b, err := NewGitHubReleaseBuilder(ctx, WithFactory(factory))
+	if err != nil {
+		t.Fatalf("NewGitHubReleaseBuilder error: %v", err)
+	}
+
+	// These should not panic when progress is nil
+	b.reportStart("test")
+	b.reportDone("test")
+	b.reportFailed()
+}
+
+func TestProgressReporterCalledDuringBuild(t *testing.T) {
+	// Set up mock GitHub server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/repo/releases":
+			releases := []map[string]any{
+				{
+					"tag_name": "v1.0.0",
+					"assets": []map[string]any{
+						{"name": "test_linux_amd64.tar.gz", "browser_download_url": "http://example.com/test.tar.gz"},
+					},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/repos/test/repo":
+			repo := map[string]any{
+				"description": "Test tool",
+				"homepage":    "https://example.com",
+				"html_url":    "https://github.com/test/repo",
+			}
+			_ = json.NewEncoder(w).Encode(repo)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	mockProv := &mockProvider{name: "claude"}
+	factory := createMockFactory(mockProv)
+
+	reporter := &mockProgressReporter{}
+	telemetryClient := telemetry.NewClientWithOptions("http://unused", 0, true, false)
+
+	b, err := NewGitHubReleaseBuilder(ctx,
+		WithFactory(factory),
+		WithGitHubBaseURL(server.URL),
+		WithProgressReporter(reporter),
+		WithTelemetryClient(telemetryClient),
+	)
+	if err != nil {
+		t.Fatalf("NewGitHubReleaseBuilder error: %v", err)
+	}
+
+	// Run build
+	_, err = b.Build(ctx, BuildRequest{
+		Package:   "test",
+		SourceArg: "test/repo",
+	})
+	if err != nil {
+		t.Fatalf("Build error: %v", err)
+	}
+
+	// Verify progress events were emitted
+	// Should have: "Fetching release metadata" and "Analyzing assets with claude"
+	if len(reporter.stages) < 2 {
+		t.Errorf("expected at least 2 stages, got %d: %v", len(reporter.stages), reporter.stages)
+	}
+
+	// Check for expected stage names
+	foundMetadata := false
+	foundAnalysis := false
+	for _, stage := range reporter.stages {
+		if stage == "Fetching release metadata" {
+			foundMetadata = true
+		}
+		if stage == "Analyzing assets with claude" {
+			foundAnalysis = true
+		}
+	}
+
+	if !foundMetadata {
+		t.Error("expected 'Fetching release metadata' stage")
+	}
+	if !foundAnalysis {
+		t.Error("expected 'Analyzing assets with claude' stage")
+	}
+
+	// Verify dones were called (at least for metadata and analysis)
+	if len(reporter.dones) < 2 {
+		t.Errorf("expected at least 2 done calls, got %d", len(reporter.dones))
+	}
+
+	// First done should have version and asset count
+	if len(reporter.dones) > 0 && reporter.dones[0] != "v1.0.0, 1 assets" {
+		t.Errorf("expected first done to be 'v1.0.0, 1 assets', got %q", reporter.dones[0])
+	}
+}
