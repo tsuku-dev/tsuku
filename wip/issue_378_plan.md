@@ -19,10 +19,10 @@ Use the existing infrastructure from #371 (userconfig) and #372 (state tracking)
 
 ## Implementation Steps
 
-- [ ] Import `install` and `userconfig` packages in create.go
-- [ ] Add rate limit check before creating GitHubReleaseBuilder (only for GitHub source)
-- [ ] Add `RecordGeneration` call after successful build (only for GitHub source)
-- [ ] Add helper function to format wait time for error message
+- [x] Import `install` and `userconfig` packages in create.go
+- [x] Add rate limit check before creating GitHubReleaseBuilder (only for GitHub source)
+- [x] Add `RecordGeneration` call after successful build (only for GitHub source)
+- [x] Add helper function to format wait time for error message
 
 ## Testing Strategy
 
