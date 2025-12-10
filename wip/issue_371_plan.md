@@ -20,15 +20,15 @@ Extend the existing `LLMConfig` struct with two new fields using pointer types t
 - None
 
 ## Implementation Steps
-- [ ] Add `DailyBudget` and `HourlyRateLimit` fields to `LLMConfig` struct
-- [ ] Add default constants `DefaultDailyBudget` and `DefaultHourlyRateLimit`
-- [ ] Add helper methods `LLMDailyBudget()` and `LLMHourlyRateLimit()` returning effective values
-- [ ] Update `AvailableKeys()` with new keys and descriptions
-- [ ] Update `Get()` to handle new keys
-- [ ] Update `Set()` to handle new keys with validation
-- [ ] Add unit tests for get/set of new fields
-- [ ] Add unit tests for file save/load of new fields
-- [ ] Add unit test for zero value behavior (disables limit)
+- [x] Add `DailyBudget` and `HourlyRateLimit` fields to `LLMConfig` struct
+- [x] Add default constants `DefaultDailyBudget` and `DefaultHourlyRateLimit`
+- [x] Add helper methods `LLMDailyBudget()` and `LLMHourlyRateLimit()` returning effective values
+- [x] Update `AvailableKeys()` with new keys and descriptions
+- [x] Update `Get()` to handle new keys
+- [x] Update `Set()` to handle new keys with validation
+- [x] Add unit tests for get/set of new fields
+- [x] Add unit tests for file save/load of new fields
+- [x] Add unit test for zero value behavior (disables limit)
 
 ## Testing Strategy
 - Unit tests: Get/Set methods, file persistence, default values, zero-value behavior
