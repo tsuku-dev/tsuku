@@ -392,12 +392,13 @@ $TSUKU_HOME/
 - Immutable by design - content never changes once stored
 
 **Cons:**
-- Significant architectural change - not incremental
-- Requires tsuku to manage artifact storage (currently delegated to filesystem)
-- Doesn't help with team sharing unless CAS is shared/remote
+- Significant architectural change to storage layout - not incremental
+- Requires migration of existing installations
+- Doesn't help with team sharing unless CAS is shared/remote (team members would need the same CAS entries)
 - Higher complexity for limited benefit over URL+checksum approach
+- Adds indirection: `$TSUKU_HOME/tools/ripgrep-14.1.0/` becomes a symlink to `$TSUKU_HOME/cas/sha256-abc123/`
 
-**Why not chosen as primary approach:** Tsuku downloads binaries from upstream sources; we don't control artifact storage. URL+checksum provides equivalent guarantees for our use case without requiring a storage layer. CAS would be valuable if tsuku hosted artifacts (like a proxy), but that's not the current model.
+**Why not chosen as primary approach:** URL+checksum provides equivalent reproducibility guarantees for our use case. CAS adds value primarily for deduplication (same binary used by multiple tools) and immutability enforcement, but these benefits don't outweigh the migration complexity and indirection cost for the initial implementation. CAS could be a future enhancement if deduplication becomes valuable.
 
 ---
 
