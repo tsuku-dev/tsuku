@@ -34,7 +34,7 @@ For this feature to be considered production-ready:
 |-----------|--------|
 | Recipe success rate | 80% of generated recipes install successfully |
 | Cost predictability | Actual cost within 2x of estimate (accounts for repair loops) |
-| Maximum single-operation cost | $1.00 without explicit user confirmation |
+| Maximum single-operation cost | ~$0.10 typical (rate limiting prevents runaway) |
 | Daily cost cap | $5.00 default, configurable |
 | User visibility | Users see cost, downloads, and verification status before approval |
 
@@ -96,7 +96,6 @@ From [DESIGN-llm-builder-infrastructure.md](docs/DESIGN-llm-builder-infrastructu
 |-----|---------------------|----------------------|
 | Secrets manager | API key resolution with 0600 enforcement | Deferred to #369 (env vars sufficient) |
 | Cost display | Show cost after generation | Extend create command output |
-| Cost confirmation | Prompt for operations >$0.50 | New confirmation logic |
 | Rate limiting | Max 10 generations/hour | State file + enforcement |
 | Daily budget | $5 default, configurable | State tracking + config |
 | Recipe preview | Mandatory before install | New preview flow |
@@ -344,8 +343,8 @@ Rationale: Balances user fairness (repair loops are automatic, not user-initiate
     │ userconfig/      │          │ state/           │
     │ (existing)       │          │ (existing)       │
     │ + daily_budget   │          │ + llm_usage      │
-    │ + confirm_above  │          │ - timestamps     │
-    │ + hourly_limit   │          │ - daily_cost     │
+    │ + hourly_limit   │          │ - timestamps     │
+    │                  │          │ - daily_cost     │
     └──────────────────┘          └──────────────────┘
 ```
 
@@ -360,14 +359,12 @@ type LLMConfig struct {
     Enabled         *bool    `toml:"enabled,omitempty"`
     Providers       []string `toml:"providers,omitempty"`
     DailyBudget     *float64 `toml:"daily_budget,omitempty"`     // USD, default $5
-    ConfirmAbove    *float64 `toml:"confirm_above,omitempty"`    // USD, default $0.50
     HourlyRateLimit *int     `toml:"hourly_rate_limit,omitempty"` // default 10
 }
 
 // Defaults
 const (
-    DefaultDailyBudget     = 5.0   // $5
-    DefaultConfirmAbove    = 0.50  // $0.50
+    DefaultDailyBudget     = 5.0  // $5
     DefaultHourlyRateLimit = 10
 )
 ```
@@ -553,23 +550,6 @@ var ErrorBudgetExceeded = ErrorTemplate{
 }
 ```
 
-### 7. Cost Confirmation Flow
-
-```go
-func confirmCostIfNeeded(estimatedCost float64, config *userconfig.Config) (bool, error) {
-    threshold := config.ConfirmAbove()
-    if estimatedCost <= threshold {
-        return true, nil
-    }
-
-    fmt.Printf("Estimated cost: $%.4f (above $%.2f threshold)\n",
-        estimatedCost, threshold)
-    fmt.Print("Continue? [y/N] ")
-
-    // Read y/n
-}
-```
-
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure
@@ -588,7 +568,6 @@ func confirmCostIfNeeded(estimatedCost float64, config *userconfig.Config) (bool
 
 1. Implement rate limiting (check before generation)
 2. Implement daily budget enforcement
-3. Add cost confirmation prompt for high-cost operations
 
 ### Phase 4: Error UX
 
@@ -686,9 +665,8 @@ func RunBenchmark(repos []string) []BenchmarkResult
 **Mitigations**:
 - Rate limiting (10/hour default, per user-initiated attempt)
 - Daily budget ($5 default)
-- Confirmation for operations >$0.50
 - All limits configurable but with sensible defaults
-- Actual cost displayed after generation (in addition to estimate before)
+- Cost displayed after generation for transparency
 
 ### Recipe Preview
 
@@ -723,7 +701,6 @@ func RunBenchmark(repos []string) []BenchmarkResult
 - [ ] `tsuku create <tool> --from github` works end-to-end
 - [ ] Configuration hierarchy (flags → env → file → defaults) works correctly
 - [ ] Cost is displayed after generation
-- [ ] Confirmation required for operations >$0.50
 - [ ] Rate limiting enforced (10/hour rolling window)
 - [ ] Daily budget enforced ($5 default, resets at UTC midnight)
 - [ ] Recipe preview shown before installation with checksum status
