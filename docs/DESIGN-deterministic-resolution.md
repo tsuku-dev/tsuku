@@ -15,7 +15,6 @@ Tsuku should separate recipe evaluation from plan execution, making determinism 
 1. **Reproducible installations**: Re-running the same install produces identical results
 2. **Recipe testing without installation**: Verify builders produce correct plans
 3. **Air-gapped deployments**: Generate plans online, execute offline
-4. **Simple lock files**: Version pins only, plans handle complexity
 
 ## Problem Statement
 
@@ -111,28 +110,6 @@ The installation plan is the key artifact - a fully-resolved, deterministic spec
 - CI can generate plans and distribute to build nodes
 - Aligns with LLM validation's pre-download model (see Integration section)
 
-### Milestone 4: Lock Files
-
-**Goal**: Simple version coordination for teams.
-
-**Deliverables**:
-- `tsuku.lock` file format (simple version pins)
-- `tsuku install --lock` reads versions from lock file
-- Plans handle complexity; lock files are just version declarations
-
-**Value delivered**:
-- Teams share version intent via simple, readable lock file
-- Cross-platform: same lock file works for all platforms
-- Plans computed per-platform at install time
-
-**Lock file format** (intentionally simple):
-```toml
-[tools]
-ripgrep = "14.1.0"
-go = "1.22.0"
-node = "20.11.0"
-```
-
 ## Integration with Existing Infrastructure
 
 ### Download Infrastructure Reuse
@@ -187,9 +164,8 @@ The executor should be refactored to:
 
 1. **Determinism by default**: Don't require flags for reproducibility
 2. **Testability**: Enable recipe testing without installation
-3. **Simplicity**: Lock files should be trivial; plans handle complexity
-4. **Reuse**: Leverage existing download and validation infrastructure
-5. **Security**: Checksum verification is mandatory, mismatches are failures
+3. **Reuse**: Leverage existing download and validation infrastructure
+4. **Security**: Checksum verification is mandatory, mismatches are failures
 
 ## Open Questions
 
@@ -221,16 +197,17 @@ The executor should be refactored to:
 ## Success Criteria
 
 - [ ] `tsuku eval ripgrep@14.1.0` outputs deterministic plan
-- [ ] Re-installing uses stored plan (no re-evaluation)
+- [ ] Re-installing uses stored plan (no re-evaluation) for pinned versions
 - [ ] Checksum mismatch fails installation
 - [ ] `tsuku install --plan` works with pre-downloaded assets
-- [ ] Lock files are simple version declarations
 - [ ] Recipe changes can be tested via plan comparison
+
+## Future Work
+
+Lock files for team version coordination are tracked separately in the vision repository. This design provides the infrastructure (installation plans) that lock files will build upon.
 
 ## References
 
 - Issue #227: Deterministic Recipe Resolution
-- Issue #216 (vision): Lock Files for Reproducible Installations
 - Issue #303: Asset pre-download with checksum capture
 - Design: Container Validation Slice 2 (pre-download pattern)
-- Research: `wip/research/code_reuse_analysis.md`
