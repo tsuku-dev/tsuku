@@ -7,10 +7,10 @@ import (
 
 // RateLimitError indicates the hourly LLM generation rate limit was exceeded.
 type RateLimitError struct {
-	Limit       int           // Maximum generations per hour
-	Count       int           // Current count in the last hour
-	RetryAfter  time.Duration // Time until next generation is allowed
-	ConfigKey   string        // Config key to adjust limit
+	Limit      int           // Maximum generations per hour
+	Count      int           // Current count in the last hour
+	RetryAfter time.Duration // Time until next generation is allowed
+	ConfigKey  string        // Config key to adjust limit
 }
 
 // Error implements the error interface.
