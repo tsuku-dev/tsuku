@@ -124,10 +124,7 @@ func NewGitHubReleaseBuilder(ctx context.Context, opts ...GitHubReleaseBuilderOp
 		b.telemetryClient = telemetry.NewClient()
 	}
 
-	// Set up factory callbacks for telemetry events
-	b.factory.SetOnFailover(func(from, to, reason string) {
-		b.telemetryClient.SendLLM(telemetry.NewLLMProviderFailoverEvent(from, to, reason))
-	})
+	// Set up factory callback for circuit breaker telemetry
 	b.factory.SetOnBreakerTrip(func(provider string, failures int) {
 		b.telemetryClient.SendLLM(telemetry.NewLLMCircuitBreakerTripEvent(provider, failures))
 	})

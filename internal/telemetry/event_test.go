@@ -182,26 +182,6 @@ func TestNewLLMValidationResultEvent(t *testing.T) {
 	}
 }
 
-func TestNewLLMProviderFailoverEvent(t *testing.T) {
-	e := NewLLMProviderFailoverEvent("claude", "gemini", "circuit_breaker_open")
-
-	if e.Action != "llm_provider_failover" {
-		t.Errorf("Action = %q, want %q", e.Action, "llm_provider_failover")
-	}
-	if e.FromProvider != "claude" {
-		t.Errorf("FromProvider = %q, want %q", e.FromProvider, "claude")
-	}
-	if e.ToProvider != "gemini" {
-		t.Errorf("ToProvider = %q, want %q", e.ToProvider, "gemini")
-	}
-	if e.Reason != "circuit_breaker_open" {
-		t.Errorf("Reason = %q, want %q", e.Reason, "circuit_breaker_open")
-	}
-	if e.OS != runtime.GOOS {
-		t.Errorf("OS = %q, want %q", e.OS, runtime.GOOS)
-	}
-}
-
 func TestNewLLMCircuitBreakerTripEvent(t *testing.T) {
 	e := NewLLMCircuitBreakerTripEvent("claude", 3)
 

@@ -140,16 +140,6 @@ func NewLLMValidationResultEvent(passed bool, errorCategory string, attemptNumbe
 	return e
 }
 
-// NewLLMProviderFailoverEvent creates an event for when provider failover occurs.
-func NewLLMProviderFailoverEvent(fromProvider, toProvider, reason string) LLMEvent {
-	e := newBaseLLMEvent()
-	e.Action = "llm_provider_failover"
-	e.FromProvider = fromProvider
-	e.ToProvider = toProvider
-	e.Reason = reason
-	return e
-}
-
 // NewLLMCircuitBreakerTripEvent creates an event for when a circuit breaker trips.
 func NewLLMCircuitBreakerTripEvent(provider string, failures int) LLMEvent {
 	e := newBaseLLMEvent()

@@ -923,22 +923,6 @@ describe("tsuku-telemetry worker", () => {
       expect(await response.text()).toBe("ok");
     });
 
-    it("returns ok for valid llm_provider_failover event", async () => {
-      const response = await SELF.fetch("http://localhost/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "llm_provider_failover",
-          from_provider: "claude",
-          to_provider: "gemini",
-          reason: "circuit_breaker_open",
-          ...baseFields,
-        }),
-      });
-      expect(response.status).toBe(200);
-      expect(await response.text()).toBe("ok");
-    });
-
     it("returns ok for valid llm_circuit_breaker_trip event", async () => {
       const response = await SELF.fetch("http://localhost/event", {
         method: "POST",
@@ -1125,37 +1109,6 @@ describe("tsuku-telemetry worker", () => {
       });
       expect(response.status).toBe(400);
       expect(await response.text()).toContain("attempt_number is required");
-    });
-
-    // Validation: llm_provider_failover required fields
-    it("returns 400 for llm_provider_failover missing from_provider", async () => {
-      const response = await SELF.fetch("http://localhost/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "llm_provider_failover",
-          to_provider: "gemini",
-          reason: "circuit_breaker_open",
-          ...baseFields,
-        }),
-      });
-      expect(response.status).toBe(400);
-      expect(await response.text()).toContain("from_provider is required");
-    });
-
-    it("returns 400 for llm_provider_failover missing to_provider", async () => {
-      const response = await SELF.fetch("http://localhost/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "llm_provider_failover",
-          from_provider: "claude",
-          reason: "circuit_breaker_open",
-          ...baseFields,
-        }),
-      });
-      expect(response.status).toBe(400);
-      expect(await response.text()).toContain("to_provider is required");
     });
 
     // Validation: llm_circuit_breaker_trip required fields

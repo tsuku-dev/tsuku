@@ -327,53 +327,6 @@ func TestGetProviderEmptyFactory(t *testing.T) {
 	}
 }
 
-func TestSetOnFailover(t *testing.T) {
-	providers := map[string]Provider{
-		"claude": &mockProvider{name: "claude"},
-		"gemini": &mockProvider{name: "gemini"},
-	}
-
-	factory := NewFactoryWithProviders(providers)
-
-	var callbackCalled bool
-	var fromProvider, toProvider, reason string
-
-	factory.SetOnFailover(func(from, to, r string) {
-		callbackCalled = true
-		fromProvider = from
-		toProvider = to
-		reason = r
-	})
-
-	// Trip the primary (claude) breaker
-	for i := 0; i < 3; i++ {
-		factory.ReportFailure("claude")
-	}
-
-	ctx := context.Background()
-	provider, err := factory.GetProvider(ctx)
-	if err != nil {
-		t.Fatalf("GetProvider failed: %v", err)
-	}
-
-	if provider.Name() != "gemini" {
-		t.Errorf("GetProvider returned %q, want %q", provider.Name(), "gemini")
-	}
-
-	if !callbackCalled {
-		t.Error("failover callback should be called")
-	}
-	if fromProvider != "claude" {
-		t.Errorf("from = %q, want %q", fromProvider, "claude")
-	}
-	if toProvider != "gemini" {
-		t.Errorf("to = %q, want %q", toProvider, "gemini")
-	}
-	if reason != "circuit_breaker_open" {
-		t.Errorf("reason = %q, want %q", reason, "circuit_breaker_open")
-	}
-}
-
 func TestSetOnBreakerTrip(t *testing.T) {
 	providers := map[string]Provider{
 		"claude": &mockProvider{name: "claude"},
@@ -410,29 +363,6 @@ func TestSetOnBreakerTrip(t *testing.T) {
 	}
 	if callbackFailures != 3 {
 		t.Errorf("failures = %d, want %d", callbackFailures, 3)
-	}
-}
-
-func TestSetOnFailoverNilCallback(t *testing.T) {
-	providers := map[string]Provider{
-		"claude": &mockProvider{name: "claude"},
-		"gemini": &mockProvider{name: "gemini"},
-	}
-
-	factory := NewFactoryWithProviders(providers)
-
-	// Setting nil callback should not panic
-	factory.SetOnFailover(nil)
-
-	// Trip primary and get fallback - should not panic
-	for i := 0; i < 3; i++ {
-		factory.ReportFailure("claude")
-	}
-
-	ctx := context.Background()
-	_, err := factory.GetProvider(ctx)
-	if err != nil {
-		t.Fatalf("GetProvider failed: %v", err)
 	}
 }
 

@@ -17,7 +17,6 @@ type LLMActionType =
   | "llm_generation_completed"
   | "llm_repair_attempt"
   | "llm_validation_result"
-  | "llm_provider_failover"
   | "llm_circuit_breaker_trip";
 
 interface TelemetryEvent {
@@ -46,8 +45,6 @@ interface LLMTelemetryEvent {
   attempt_number?: number;
   error_category?: string;
   passed?: boolean;
-  from_provider?: string;
-  to_provider?: string;
   reason?: string;
   failures?: number;
   os?: string;
@@ -209,10 +206,6 @@ function validateLLMEvent(event: LLMTelemetryEvent): string | null {
     case "llm_validation_result":
       if (event.attempt_number === undefined) return "attempt_number is required for llm_validation_result";
       break;
-    case "llm_provider_failover":
-      if (!event.from_provider) return "from_provider is required for llm_provider_failover";
-      if (!event.to_provider) return "to_provider is required for llm_provider_failover";
-      break;
     case "llm_circuit_breaker_trip":
       if (!event.provider) return "provider is required for llm_circuit_breaker_trip";
       if (event.failures === undefined) return "failures is required for llm_circuit_breaker_trip";
@@ -369,7 +362,6 @@ export default {
           "llm_generation_completed",
           "llm_repair_attempt",
           "llm_validation_result",
-          "llm_provider_failover",
           "llm_circuit_breaker_trip",
         ];
 
@@ -386,8 +378,6 @@ export default {
             attempt_number: event.attempt_number as number | undefined,
             error_category: event.error_category as string | undefined,
             passed: event.passed as boolean | undefined,
-            from_provider: event.from_provider as string | undefined,
-            to_provider: event.to_provider as string | undefined,
             reason: event.reason as string | undefined,
             failures: event.failures as number | undefined,
             os: event.os as string | undefined,
@@ -418,8 +408,8 @@ export default {
               llmEvent.attempt_number !== undefined ? String(llmEvent.attempt_number) : "", // blob7: attempt_number
               llmEvent.error_category || "", // blob8: error_category
               llmEvent.passed !== undefined ? String(llmEvent.passed) : "", // blob9: passed
-              llmEvent.from_provider || llmEvent.reason || "", // blob10: from_provider or reason
-              llmEvent.to_provider || (llmEvent.failures !== undefined ? String(llmEvent.failures) : ""), // blob11: to_provider or failures
+              llmEvent.reason || "", // blob10: reason
+              llmEvent.failures !== undefined ? String(llmEvent.failures) : "", // blob11: failures
               llmEvent.os || "", // blob12: os
               llmEvent.arch || "", // blob13: arch
               llmEvent.tsuku_version || "", // blob14: tsuku_version
