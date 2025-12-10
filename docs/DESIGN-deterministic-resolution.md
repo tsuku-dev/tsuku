@@ -19,7 +19,7 @@ Recipe (templates) → Version Resolution (GitHub API) → Template Expansion �
 ```
 
 Even when a user specifies an exact version like `ripgrep@14.1.0`, several factors are resolved at runtime:
-1. **Platform detection**: `{{os}}` and `{{arch}}` are expanded based on the current machine
+1. **Platform detection**: `{os}` and `{arch}` are expanded based on the current machine
 2. **URL construction**: The download URL is constructed dynamically from templates
 3. **Asset selection**: For GitHub releases, the specific asset to download is matched at runtime
 
@@ -37,156 +37,84 @@ This means:
 
 3. **Recipe updates**: The recipe registry updates `ripgrep.toml` to use a different download mirror or change the asset selection pattern. The same `tsuku install ripgrep@14.1.0` command now resolves to a different URL.
 
-4. **Platform drift**: A developer installs on Linux x64, but CI runs on arm64. Without explicit platform tracking, reinstallation on a different machine silently uses different binaries
+4. **Platform drift**: A developer installs on Linux x64, but CI runs on arm64. Without explicit platform tracking, reinstallation on a different machine silently uses different binaries.
 
 **Why this matters now:**
 
 1. **Team workflows**: As tsuku gains adoption, teams need confidence that `tsuku install` produces identical results across all machines
 2. **CI/CD reproducibility**: Build pipelines should install the exact same tool binaries every time
 3. **Audit trail**: For security-sensitive environments, knowing exactly what was installed (URLs, checksums) matters
-4. **Defense-in-depth**: This complements the verification work (#192) - verification confirms you got the right thing, determinism ensures you'll always get the same thing
+4. **Testing**: Recipe builders need to verify their changes don't alter the effective installation plan
 
 ### Scope
 
 **In scope:**
-- Capturing resolved state (version, URLs, checksums, platform info) after installation
-- Replaying installations from captured state without re-resolving
-- Lock file format for project-level reproducibility
-- Integration with existing `state.json` for single-machine state
+- Two-phase installation model: evaluation (produces plan) and execution (runs plan)
+- Immutable installation plans that capture all resolved state
+- New `tsuku eval` command to produce plans without installing
+- Re-install semantics that replay plans by default
+- Simple lock files that reference version pins
 
 **Out of scope:**
 - Changes to recipe format (recipes remain dynamic)
-- Cross-platform lock files (a lock file captures one platform's resolution)
 - Cryptographic signature verification (separate concern, see #208)
-- Automatic lock file updates (manual workflow initially)
+- Remote plan sharing/caching (future enhancement)
 
 ## Decision Drivers
 
-1. **Reproducibility**: Same input (recipe + version + lock) must yield identical installation
-2. **Transparency**: Users should be able to inspect exactly what will be downloaded
-3. **Incremental adoption**: Lock files should be optional; tsuku must work without them
-4. **Minimal overhead**: Lock file creation shouldn't significantly slow installation
-5. **Platform awareness**: Lock files are inherently platform-specific; this should be explicit
-6. **Compatibility with verification**: Must work with verification modes (#192) - lock files capture what was resolved, verification confirms what was installed
+1. **Determinism by default**: Every installation should be reproducible without opt-in flags
+2. **Transparency**: Users should be able to inspect exactly what will be downloaded before it happens
+3. **Testability**: Recipe changes should be verifiable without actual installation
+4. **Simplicity**: Lock files should be simple version pins, not duplicated resolution metadata
+5. **Separation of concerns**: "What to install" (eval) should be separate from "how to install" (exec)
 
-## External Research
+## Core Insight
 
-### mise.lock (mise-en-place)
+**A recipe is a program that produces a deterministic installation plan.**
 
-[mise](https://mise.jdx.dev/dev-tools/mise-lock.html) implements a TOML-based lock file with per-platform sections:
-
-```toml
-[[tools.ripgrep]]
-version = "14.1.1"
-backend = "aqua:BurntSushi/ripgrep"
-
-[tools.ripgrep.platforms.linux-x64]
-checksum = "sha256:4cf9f2741e6c465ffdb7c26f38056a59e2a2544b51f7cc128ef28337eeae4d8e"
-size = 1234567
-url = "https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz"
-```
-
-**Key design decisions:**
-- Platform keys use `{os}-{arch}` format (e.g., `linux-x64`, `macos-arm64`)
-- Each platform section is independent - different team members on different platforms don't conflict
-- Checksum and URL are captured together
-- `mise lock` command explicitly generates/updates the lock file
-- `mise settings locked=true` enables strict mode where unresolved tools fail
-
-**Relevance to tsuku:** mise's platform-keyed approach solves the multi-platform team problem elegantly. Tsuku could adopt a similar structure.
-
-### Cargo.lock (Rust)
-
-[Cargo.lock](https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html) captures resolved dependencies for Rust projects:
-
-```toml
-[[package]]
-name = "serde"
-version = "1.0.193"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25dd9975e68d0cb5aa1120c288333fc98731bd1dd12f561e468ea4728c042b89"
-```
-
-**Key design decisions:**
-- Automatically generated on first build, updated on dependency changes
-- Checksums included inline with package entries
-- Git-merge-friendly format (deduplicated information)
-- Should be committed to version control
-
-**Relevance to tsuku:** Cargo's approach of inline checksums per entry is cleaner than separate checksum files. The automatic generation model may not fit tsuku's explicit workflow.
-
-### go.sum (Go)
-
-[go.sum](https://go.dev/ref/mod) takes a different approach - it's a checksum file, not a lock file:
+The key architectural shift is separating recipe evaluation from plan execution:
 
 ```
-golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
-golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+┌─────────────────────────────────────────────────────────────────────┐
+│  Phase 1: Evaluation (dynamic, may call external APIs)             │
+│                                                                     │
+│  Recipe + Version + Platform → Installation Plan                    │
+│                                                                     │
+│  - Query version providers (GitHub, npm, etc.)                      │
+│  - Expand templates ({version}, {os}, {arch})                       │
+│  - Select assets from releases                                      │
+│  - Compute expected checksums                                       │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    Installation Plan (JSON)
+                    - Fully resolved URLs
+                    - Expected checksums
+                    - Concrete installation steps
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  Phase 2: Execution (deterministic, no external API calls)         │
+│                                                                     │
+│  Installation Plan → Download → Verify → Install                    │
+│                                                                     │
+│  - Download from exact URLs in plan                                 │
+│  - Verify checksums match plan                                      │
+│  - Execute concrete installation steps                              │
+│  - Fail if any checksum mismatches                                  │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key design decisions:**
-- Two lines per module: one for content hash, one for go.mod hash
-- Checksums verified against public transparency log (sum.golang.org)
-- Format is extremely simple: `module version hash`
-- Acts as a tamper detection mechanism, not version locking
+## Considered Options
 
-**Relevance to tsuku:** The transparency log concept is interesting for future work but out of scope here. The line-per-module format is too simple for tsuku's needs (no platform info, no URLs).
+### Decision 1: Installation Plan Storage
 
-### flake.lock (Nix)
+**Question:** Where should installation plans be stored?
 
-[flake.lock](https://nixos.wiki/wiki/Flakes) uses JSON to capture the exact inputs for a Nix flake:
+#### Option 1A: Inline in state.json
 
-```json
-{
-  "nodes": {
-    "nixpkgs": {
-      "locked": {
-        "lastModified": 1234567890,
-        "narHash": "sha256-...",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "abc123...",
-        "type": "github"
-      }
-    }
-  }
-}
-```
+Store plans as part of the existing state file:
 
-**Key design decisions:**
-- Captures git revision, timestamp, and content hash
-- Graph structure for transitive dependencies
-- Fully deterministic builds when flake.lock is present
-- `nix flake lock` updates the lock file
-
-**Relevance to tsuku:** Nix's concept of content-addressable storage (narHash) provides stronger guarantees than URL+checksum. However, tsuku doesn't control upstream artifact storage, so this model doesn't directly apply.
-
-### Research Summary
-
-| System | Format | Platform Handling | Checksum | Auto-Update |
-|--------|--------|-------------------|----------|-------------|
-| mise | TOML | Per-platform sections | SHA256/Blake3 | Manual (`mise lock`) |
-| Cargo | TOML | N/A (source-only) | SHA256 inline | Automatic |
-| go.sum | Text | N/A | SHA256 | Automatic |
-| Nix | JSON | N/A (content-addressed) | NAR hash | Manual (`nix flake lock`) |
-
-**Key insights:**
-1. **TOML is the standard** for human-readable lock files in modern tools
-2. **Platform-specific sections** (mise) are the cleanest solution for multi-platform teams
-3. **Explicit lock commands** (mise, Nix) work better than automatic updates for reproducibility guarantees
-4. **Checksums should be inline** with the entry they protect, not in separate files
-
-## Implementation Context
-
-### Current Architecture
-
-Tsuku's installation flow involves several components:
-
-1. **Version Resolution** (`internal/version/resolver.go`): Queries external APIs (GitHub, npm, etc.) to resolve version strings
-2. **Template Expansion** (`internal/actions/download.go`): Expands `{version}`, `{os}`, `{arch}` placeholders in URLs
-3. **State Tracking** (`internal/install/state.go`): Records what's installed in `$TSUKU_HOME/state.json`
-
-**Current state.json structure:**
 ```json
 {
   "installed": {
@@ -194,9 +122,7 @@ Tsuku's installation flow involves several components:
       "active_version": "14.1.0",
       "versions": {
         "14.1.0": {
-          "requested": "14.1.0",
-          "binaries": ["rg"],
-          "installed_at": "2025-01-01T00:00:00Z"
+          "plan": { /* full installation plan */ }
         }
       }
     }
@@ -204,755 +130,452 @@ Tsuku's installation flow involves several components:
 }
 ```
 
-**What's missing for reproducibility:**
-- The actual URL that was used for download
-- The checksum of the downloaded artifact
-- Platform information (OS, architecture)
-- Version provider metadata (which GitHub repo, which npm package)
+**Pros:**
+- No new files
+- Plans naturally associated with installed versions
 
-### Existing Patterns
+**Cons:**
+- state.json grows large
+- Plans not easily shareable or inspectable
 
-**Similar implementations in the codebase:**
-- `state.json` already has per-version metadata via `VersionState`
-- Atomic file operations with locking already exist
-- Version resolution returns `VersionInfo` with both tag and normalized version
+#### Option 1B: Separate Plan Files
 
-**Conventions to follow:**
-- JSON for machine state (`state.json`), TOML for user-facing config
-- Atomic writes via temp file + rename
-- File locking for concurrent access
+Store plans in dedicated directory:
 
-### Integration Points
+```
+$TSUKU_HOME/
+├── plans/
+│   ├── ripgrep@14.1.0-linux-x64.json
+│   └── go@1.22.0-linux-x64.json
+└── tools/
+    └── ...
+```
 
-A lock file solution must integrate with:
-1. **Executor** (`internal/executor/executor.go`): To capture resolved URLs during install
-2. **Download action** (`internal/actions/download.go`): To record checksums after download
-3. **State manager** (`internal/install/state.go`): To optionally extend or coexist with existing state
+**Pros:**
+- Plans are inspectable files
+- Can be copied/shared independently
+- state.json stays lightweight
 
-## Considered Options
+**Cons:**
+- Additional files to manage
+- Need to handle orphaned plans
 
-This design involves three independent decisions that compose together:
+#### Option 1C: Plans in state.json, exportable on demand
 
-### Decision 1: Lock File Format
+Store plans inline but provide export command:
 
-**Question:** What format should tsuku.lock use?
+```bash
+tsuku plan show ripgrep@14.1.0    # Display stored plan
+tsuku plan export ripgrep@14.1.0  # Export to file
+```
 
-#### Option 1A: TOML
+**Pros:**
+- Simple storage model
+- Export when needed for sharing/testing
 
-Use TOML format, following mise and Cargo conventions:
+**Cons:**
+- Two representations to keep in sync
+
+---
+
+### Decision 2: Re-install Behavior
+
+**Question:** What happens when you run `tsuku install ripgrep@14.1.0` for a tool that's already installed?
+
+#### Option 2A: Re-evaluate (current behavior)
+
+Always re-run evaluation, potentially getting different results.
+
+**Pros:**
+- Picks up upstream changes automatically
+- Simpler mental model
+
+**Cons:**
+- Not deterministic
+- Can't guarantee same binary
+
+#### Option 2B: Replay Plan by Default
+
+If a plan exists for this tool+version+platform, replay it:
+
+```bash
+tsuku install ripgrep@14.1.0
+# → Uses stored plan, verifies checksums
+# → Fails if upstream content changed
+
+tsuku install ripgrep@14.1.0 --refresh
+# → Re-evaluates recipe, creates new plan
+```
+
+**Pros:**
+- Deterministic by default
+- Explicit opt-in to get new content
+- Detects upstream changes via checksum failure
+
+**Cons:**
+- Stale plans if upstream fixes security issues
+- Users must learn `--refresh` flag
+
+#### Option 2C: Verify and Warn
+
+Replay plan but warn if checksums differ without failing:
+
+**Pros:**
+- Non-breaking behavior change
+
+**Cons:**
+- Weaker guarantee
+- Warning fatigue
+
+---
+
+### Decision 3: Lock File Format
+
+**Question:** What should lock files contain?
+
+#### Option 3A: Full Plans (current design)
+
+Lock files contain complete resolution metadata:
 
 ```toml
 [[tools.ripgrep]]
 version = "14.1.0"
 
 [tools.ripgrep.platforms.linux-x64]
-url = "https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz"
-checksum = "sha256:abc123..."
+url = "https://github.com/..."
+checksum = "sha256:..."
 ```
 
 **Pros:**
-- Consistent with recipe format (also TOML)
-- Human-readable and editable
-- Industry standard for lock files (Cargo, mise)
-- Git-merge-friendly with proper structure
+- Self-contained
+- Works without plan storage
 
 **Cons:**
-- Requires TOML parsing library (already used for recipes)
-- Nested structures can get verbose
+- Duplicates plan information
+- Complex structure
+- Platform-specific sections
 
-#### Option 1B: JSON
+#### Option 3B: Version Pins Only
 
-Use JSON format, consistent with state.json:
+Lock files are simple version declarations:
 
-```json
-{
-  "tools": {
-    "ripgrep": {
-      "version": "14.1.0",
-      "platforms": {
-        "linux-x64": {
-          "url": "https://...",
-          "checksum": "sha256:abc123..."
-        }
-      }
-    }
-  }
-}
+```toml
+[tools]
+ripgrep = "14.1.0"
+go = "1.22.0"
+node = "20.11.0"
 ```
 
 **Pros:**
-- Consistent with existing state.json format
-- No additional parsing dependencies
-- Native Go encoding/json support
+- Simple, human-readable
+- Cross-platform (same lock file for all platforms)
+- Plans handle the complexity
 
 **Cons:**
-- Less human-readable than TOML
-- More prone to merge conflicts
-- Inconsistent with recipe format (TOML)
+- Requires plan storage/regeneration
+- Less self-contained
 
----
+#### Option 3C: Version Pins with Checksum Validation
 
-### Decision 2: Lock File Scope
+Lock files declare versions, execution validates checksums:
 
-**Question:** Where should lock files live and what should they capture?
+```toml
+[tools]
+ripgrep = "14.1.0"
+go = "1.22.0"
 
-#### Option 2A: Project-Level Lock File (`tsuku.lock`)
-
-Lock file in project directory, capturing tools defined in a project manifest:
-
-```
-myproject/
-├── tsuku.toml      # Project tool manifest
-├── tsuku.lock      # Locked resolutions
-└── src/
+[checksums.linux-x64]
+"ripgrep@14.1.0" = "sha256:abc123..."
+"go@1.22.0" = "sha256:def456..."
 ```
 
 **Pros:**
-- Familiar model (package.json/package-lock.json, Cargo.toml/Cargo.lock)
-- Natural for teams: commit lock file to share resolutions
-- Scoped to project - different projects can have different versions
+- Simple version section
+- Per-platform checksums for validation
+- Can detect upstream changes
 
 **Cons:**
-- Requires project manifest feature (new `tsuku.toml`)
-- More complex workflow: must be in project directory
-- Doesn't help with global tool installations
-
-#### Option 2B: Extend state.json with Resolution Metadata
-
-Add URL and checksum fields to the existing `state.json`:
-
-```json
-{
-  "installed": {
-    "ripgrep": {
-      "active_version": "14.1.0",
-      "versions": {
-        "14.1.0": {
-          "requested": "14.1.0",
-          "binaries": ["rg"],
-          "installed_at": "...",
-          "resolution": {
-            "url": "https://...",
-            "checksum": "sha256:...",
-            "platform": "linux-x64"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-**Pros:**
-- Minimal new concepts - extends existing pattern
-- Works for all installations (global and project)
-- No new files to manage
-- Immediate benefit: audit trail for what was installed
-
-**Cons:**
-- state.json is machine-specific, not shareable
-- Doesn't directly solve team reproducibility
-- Mixes "what's installed" with "how to reproduce"
-
-#### Option 2C: Hybrid - state.json for audit + tsuku.lock for sharing
-
-Extend state.json for audit trail, add optional tsuku.lock for team sharing:
-
-- state.json gains resolution metadata (Option 2B)
-- tsuku.lock is an optional export format for project-level reproducibility
-- `tsuku lock export` generates tsuku.lock from state.json
-- `tsuku install --locked` uses tsuku.lock if present
-
-**Pros:**
-- Immediate value: audit trail in state.json
-- Future value: team sharing via lock file
-- Clear separation: state.json = machine state, tsuku.lock = shared intent
-- Incremental adoption: start with state.json, add lock file later
-
-**Cons:**
-- Two concepts to understand
-- Potential for state.json and tsuku.lock to drift
-
-#### Option 2D: Content-Addressable Storage (Nix/Bazel model)
-
-Store downloaded artifacts by content hash rather than name/version:
-
-```
-$TSUKU_HOME/
-├── cas/
-│   └── sha256-abc123.../    # Artifact stored by hash
-└── tools/
-    └── ripgrep-14.1.0/      # Symlink to CAS entry
-```
-
-**Pros:**
-- Strongest reproducibility guarantee - same hash always means same content
-- Automatic deduplication of identical artifacts
-- Industry standard for hermetic builds (Nix, Bazel)
-- Immutable by design - content never changes once stored
-
-**Cons:**
-- Significant architectural change to storage layout - not incremental
-- Requires migration of existing installations
-- Doesn't help with team sharing unless CAS is shared/remote (team members would need the same CAS entries)
-- Higher complexity for limited benefit over URL+checksum approach
-- Adds indirection: `$TSUKU_HOME/tools/ripgrep-14.1.0/` becomes a symlink to `$TSUKU_HOME/cas/sha256-abc123/`
-
-**Why not chosen as primary approach:** URL+checksum provides equivalent reproducibility guarantees for our use case. CAS adds value primarily for deduplication (same binary used by multiple tools) and immutability enforcement, but these benefits don't outweigh the migration complexity and indirection cost for the initial implementation. CAS could be a future enhancement if deduplication becomes valuable.
-
----
-
-### Decision 3: Lock File Generation
-
-**Question:** When and how are lock entries created?
-
-#### Option 3A: Automatic on Install
-
-Lock entries are automatically recorded during `tsuku install`:
-
-```bash
-tsuku install ripgrep@14.1.0
-# → Installs tool AND records resolution in state.json/lock file
-```
-
-**Pros:**
-- Zero friction - works automatically
-- Always up-to-date with what's installed
-- Familiar from npm/Cargo model
-
-**Cons:**
-- Lock file changes on every install (noisy git history)
-- May capture unintended installations
-- Less control over what gets locked
-
-#### Option 3B: Explicit Lock Command
-
-Lock entries are only created via explicit command:
-
-```bash
-tsuku install ripgrep@14.1.0  # Installs but doesn't lock
-tsuku lock                     # Creates/updates lock file from current state
-tsuku lock ripgrep             # Locks specific tool
-```
-
-**Pros:**
-- Full control over what gets locked
-- Clean separation between "install" and "lock"
-- Lock file only changes intentionally
-- Matches mise/Nix model
-
-**Cons:**
-- Extra step for users who want locking
-- Risk of forgetting to lock
-- state.json won't have resolution metadata unless we separate concerns
-
-#### Option 3C: Automatic in state.json, Explicit for tsuku.lock
-
-Resolution metadata is always captured in state.json during install, but tsuku.lock requires explicit generation:
-
-```bash
-tsuku install ripgrep@14.1.0  # Installs, records resolution in state.json
-tsuku lock                     # Exports to tsuku.lock for sharing
-```
-
-**Pros:**
-- Audit trail always available (state.json)
-- Lock file for sharing is intentional
-- Best of both worlds
-
-**Cons:**
-- Users may not realize resolution is being tracked
-- Two places where resolution data lives
+- Two sections to manage
+- Checksums must be updated per-platform
 
 ---
 
 ### Evaluation Against Decision Drivers
 
-| Decision | Option | Reproducibility | Transparency | Incremental | Overhead | Platform-Aware | Verification |
-|----------|--------|-----------------|--------------|-------------|----------|----------------|--------------|
-| Format | 1A: TOML | Good | Good | Good | Low | Good | Good |
-| Format | 1B: JSON | Good | Fair | Good | Low | Good | Good |
-| Scope | 2A: Project-only | Good | Good | Poor | Medium | Good | Good |
-| Scope | 2B: state.json | Fair | Good | Good | Low | Fair | Good |
-| Scope | 2C: Hybrid | Good | Good | Good | Medium | Good | Good |
-| Scope | 2D: CAS | Excellent | Fair | Poor | High | Good | Good |
-| Generation | 3A: Automatic | Good | Fair | Good | Low | Good | Good |
-| Generation | 3B: Explicit | Good | Good | Fair | Medium | Good | Good |
-| Generation | 3C: Hybrid | Good | Good | Good | Low | Good | Good |
-| Platform | 4A: Single-platform | Fair | Good | Good | Low | Poor | Good |
-| Platform | 4B: Multi-platform | Good | Good | Fair | Medium | Good | Good |
-| Platform | 4C: On-demand | Fair | Good | Good | Low | Fair | Good |
-
----
-
-### Decision 4: Platform Handling
-
-**Question:** How should lock files handle multi-platform teams?
-
-#### Option 4A: Single-Platform Lock Files
-
-Each lock file captures resolutions for one platform only:
-
-```toml
-# tsuku.lock (generated on Linux x64)
-platform = "linux-x64"
-
-[[tools.ripgrep]]
-version = "14.1.0"
-url = "https://..."
-checksum = "sha256:..."
-```
-
-**Pros:**
-- Simple implementation
-- No need to fetch metadata for platforms you're not on
-- Mirrors how state.json works today
-
-**Cons:**
-- Teams need separate lock files per platform (tsuku-linux-x64.lock, tsuku-darwin-arm64.lock)
-- More files to manage and keep in sync
-- CI/CD must generate lock files for all target platforms
-
-#### Option 4B: Multi-Platform Lock Files (mise model)
-
-Lock file contains sections for each platform:
-
-```toml
-[[tools.ripgrep]]
-version = "14.1.0"
-
-[tools.ripgrep.platforms.linux-x64]
-url = "https://github.com/.../ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz"
-checksum = "sha256:abc123..."
-
-[tools.ripgrep.platforms.darwin-arm64]
-url = "https://github.com/.../ripgrep-14.1.0-aarch64-apple-darwin.tar.gz"
-checksum = "sha256:def456..."
-```
-
-**Pros:**
-- Single lock file for entire team
-- Platforms don't conflict - entries are additive
-- Standard approach (mise uses this)
-
-**Cons:**
-- Requires mechanism to populate other platforms' entries
-- Lock file grows with platform count
-- Some tools may not be available on all platforms
-
-#### Option 4C: On-Demand Platform Resolution
-
-Lock file captures current platform; other platforms resolve dynamically:
-
-```toml
-[[tools.ripgrep]]
-version = "14.1.0"
-# Only linux-x64 is locked; darwin users will resolve dynamically
-
-[tools.ripgrep.platforms.linux-x64]
-url = "https://..."
-checksum = "sha256:..."
-```
-
-**Pros:**
-- Minimal overhead - only lock what you've installed
-- Natural workflow - run `tsuku lock` on each platform as needed
-- Graceful fallback for unlocked platforms
-
-**Cons:**
-- Partial reproducibility - not all platforms are deterministic
-- May surprise users who expect full locking
-
----
-
-### Resolution Precedence
-
-When installing a tool, multiple sources of information may be available. This section defines the precedence order.
-
-**Precedence (highest to lowest):**
-
-1. **Lock file entry for current platform** (`tsuku.lock` with matching platform key)
-   - If `--locked` flag is set and no entry exists, fail
-   - URL and checksum from lock file are used directly; no version resolution occurs
-
-2. **Lock file version without platform entry**
-   - Version is pinned, but platform-specific resolution happens dynamically
-   - Checksum is computed post-download and compared if present
-
-3. **Explicit version from command line** (`tsuku install tool@1.0.0`)
-   - Version resolution is skipped; URL is constructed from recipe template
-   - Checksum is computed post-download
-
-4. **Dynamic resolution** (no lock file, no explicit version)
-   - Full resolution: query version provider, expand templates, download
-   - Current behavior unchanged
-
-**Conflict handling:**
-
-- If lock file specifies version `1.0.0` but user runs `tsuku install tool@2.0.0`, the explicit version wins (with warning)
-- If `--locked` flag is used and versions don't match, fail with error
-- If lock file checksum doesn't match downloaded content, fail with error
-
-### Uncertainties
-
-- **Cross-platform population:** How should `tsuku lock` populate entries for platforms the user isn't running on? Options:
-  - Manual: Run `tsuku lock` on each platform (most reliable)
-  - API-based: Query GitHub releases API for all platform assets (requires parsing asset names)
-  - Hybrid: Lock current platform automatically, allow `tsuku lock --platforms linux-x64,darwin-arm64` to fetch others
-
-- **Checksum computation:** Some downloads don't have published checksums. We will compute SHA256 after download, which adds latency but ensures we always have a checksum.
-
-- **Recipe version pinning:** Should the lock file also pin the recipe version (commit hash)? This provides stronger reproducibility but adds complexity. Initial implementation will not pin recipe versions.
-
-- **Multi-step installs:** Some recipes have multiple download steps. All downloads will be captured in an array:
-  ```toml
-  [[tools.complex-tool.platforms.linux-x64.downloads]]
-  url = "https://..."
-  checksum = "sha256:..."
-
-  [[tools.complex-tool.platforms.linux-x64.downloads]]
-  url = "https://..."
-  checksum = "sha256:..."
-  ```
+| Decision | Option | Determinism | Transparency | Testability | Simplicity |
+|----------|--------|-------------|--------------|-------------|------------|
+| Storage | 1A: Inline | Good | Poor | Fair | Good |
+| Storage | 1B: Separate files | Good | Good | Good | Fair |
+| Storage | 1C: Inline + export | Good | Good | Good | Good |
+| Re-install | 2A: Re-evaluate | Poor | Fair | Poor | Good |
+| Re-install | 2B: Replay plan | Good | Good | Good | Fair |
+| Re-install | 2C: Warn only | Fair | Fair | Fair | Good |
+| Lock format | 3A: Full plans | Good | Fair | Fair | Poor |
+| Lock format | 3B: Version pins | Good | Good | Good | Good |
+| Lock format | 3C: Pins + checksums | Good | Good | Good | Fair |
 
 ## Decision Outcome
 
-**Chosen: 1A (TOML) + 2C (Hybrid) + 3C (Automatic state.json, Explicit lock) + 4B (Multi-platform)**
+**Chosen: 1C (Inline + export) + 2B (Replay plan) + 3B (Version pins)**
 
 ### Summary
 
-We will use TOML format for a multi-platform lock file (`tsuku.lock`) that is explicitly generated via `tsuku lock`, while automatically capturing resolution metadata in `state.json` during every install. This provides immediate audit trail value, supports team sharing via a familiar lock file model, and handles multi-platform teams cleanly.
+Installation becomes a two-phase process: evaluation produces an immutable plan, execution replays that plan deterministically. Plans are stored in state.json and can be exported for inspection or testing. Lock files are simple version pins - the complexity lives in plans, not lock files.
 
 ### Rationale
 
-**Format (1A: TOML):**
-- Consistent with recipe format - users already understand TOML from `ripgrep.toml`
-- Industry standard for lock files (Cargo, mise) - familiar to developers
-- Human-readable and git-merge-friendly - essential for team workflows
+**Storage (1C: Inline + export):**
+- Plans stored in state.json keeps the model simple
+- Export enables inspection and testing use cases
+- No orphaned files to manage
 
-**Scope (2C: Hybrid):**
-- Immediate value via state.json - every install captures URL and checksum (audit trail)
-- Optional sharing via tsuku.lock - teams can opt-in to reproducibility
-- Clean separation - state.json is machine state, tsuku.lock is shared intent
-- Incremental adoption - works without lock file, gains value with it
+**Re-install (2B: Replay plan by default):**
+- Determinism is the default, not opt-in
+- Users get explicit `--refresh` when they want new content
+- Checksum mismatches are failures, not warnings - this is a security feature
 
-**Generation (3C: Automatic state.json + Explicit lock):**
-- Zero friction for audit trail - state.json captures resolution automatically
-- Intentional sharing - `tsuku lock` is an explicit action, not a side effect
-- Matches mise/Nix model - proven UX for reproducibility workflows
-- Avoids noisy git history - lock file only changes when user runs `tsuku lock`
-
-**Platform (4B: Multi-platform):**
-- Single lock file for teams - no platform-specific files to manage
-- Additive entries - different developers add their platform sections
-- Industry standard - mise uses exactly this model
-- Scales gracefully - only populated platforms are present
-
-### Alternatives Rejected
-
-- **1B (JSON):** Less readable, more merge conflicts, inconsistent with recipe format
-- **2A (Project-only):** Requires new project manifest feature, doesn't help global installs
-- **2B (state.json only):** Doesn't solve team reproducibility - state.json is machine-specific
-- **2D (CAS):** Significant architectural change with limited incremental benefit
-- **3A (Automatic lock):** Too noisy for version control, less control over what gets locked
-- **3B (Explicit only):** No audit trail unless user explicitly locks
-- **4A (Single-platform):** Multiple files to manage, poor team experience
-- **4C (On-demand):** Partial reproducibility defeats the purpose
+**Lock format (3B: Version pins only):**
+- Lock files become trivially simple
+- Plans handle all the complexity
+- Cross-platform teams use the same lock file
+- `tsuku install --lock` = "install these versions, evaluate fresh plans for each"
 
 ### Trade-offs Accepted
 
-1. **Two concepts to learn:** Users need to understand both state.json (audit) and tsuku.lock (sharing). This is acceptable because:
-   - state.json already exists; we're just adding fields
-   - tsuku.lock is opt-in; users who don't need team reproducibility can ignore it
-   - The concepts mirror npm (node_modules vs package-lock.json) which developers understand
+1. **Learning curve**: Users must understand eval vs exec phases. Mitigated by good documentation and intuitive defaults.
 
-2. **Potential for drift:** state.json and tsuku.lock can get out of sync. This is acceptable because:
-   - They serve different purposes - drift is expected (state.json reflects what's installed now, tsuku.lock reflects shared intent)
-   - `tsuku lock` always regenerates from state.json, so syncing is one command
+2. **Stale plans**: Plans don't auto-update. Mitigated by `--refresh` flag and `tsuku outdated` warnings.
 
-3. **Multi-platform population requires coordination:** Each developer must run `tsuku lock` on their platform. This is acceptable because:
-   - This is the most reliable approach (no need to parse upstream asset names)
-   - CI can automate this for common platforms
-   - Future enhancement can add `tsuku lock --platforms` for API-based resolution
+3. **Lock files don't contain checksums**: Validation happens at plan level. Acceptable because plans are the source of truth.
 
 ## Solution Architecture
 
 ### Overview
 
-The solution extends tsuku's installation flow with resolution capture and lock file support:
-
 ```
-                               ┌─────────────────────────────────────────────────────────────┐
-                               │                    tsuku install                            │
-                               └─────────────────────────────────────────────────────────────┘
-                                                          │
-                               ┌──────────────────────────┼──────────────────────────┐
-                               │                          │                          │
-                               ▼                          ▼                          ▼
-                        ┌─────────────┐           ┌─────────────┐           ┌─────────────┐
-                        │ --locked    │           │ tsuku.lock  │           │ No lock     │
-                        │ flag set    │           │ exists      │           │ (default)   │
-                        └─────────────┘           └─────────────┘           └─────────────┘
-                               │                          │                          │
-                               ▼                          ▼                          ▼
-                        Require lock entry         Use lock if present        Dynamic resolution
-                        for current platform       else resolve dynamically   (current behavior)
-                               │                          │                          │
-                               └──────────────────────────┴──────────────────────────┘
-                                                          │
-                                                          ▼
-                                                 ┌─────────────────┐
-                                                 │    Download     │
-                                                 │  (capture URL)  │
-                                                 └─────────────────┘
-                                                          │
-                                                          ▼
-                                                 ┌─────────────────┐
-                                                 │ Compute SHA256  │
-                                                 │  (verify if     │
-                                                 │   locked)       │
-                                                 └─────────────────┘
-                                                          │
-                                                          ▼
-                                                 ┌─────────────────┐
-                                                 │ Update state.json│
-                                                 │ (resolution     │
-                                                 │  metadata)      │
-                                                 └─────────────────┘
+                            ┌──────────────────────────────────────────┐
+                            │           tsuku install ripgrep          │
+                            └──────────────────────────────────────────┘
+                                               │
+                        ┌──────────────────────┴──────────────────────┐
+                        │                                              │
+                        ▼                                              ▼
+               Plan exists for                                 No plan exists
+               ripgrep@<version>                                      │
+               on this platform?                                      │
+                        │                                              │
+                        ▼                                              │
+                  Replay plan                              ┌──────────┴──────────┐
+                  (Phase 2 only)                           │   tsuku eval ripgrep │
+                        │                                  │   (Phase 1)          │
+                        │                                  └──────────┬──────────┘
+                        │                                              │
+                        │                                              ▼
+                        │                                     Installation Plan
+                        │                                              │
+                        │                                              ▼
+                        │                                  ┌──────────────────────┐
+                        │                                  │   Execute Plan       │
+                        │                                  │   (Phase 2)          │
+                        │                                  └──────────┬──────────┘
+                        │                                              │
+                        └──────────────────────┬───────────────────────┘
+                                               │
+                                               ▼
+                                    Download → Verify → Install
+                                               │
+                                               ▼
+                                    Store plan in state.json
 ```
 
-### Components
+### New Commands
 
-#### 1. Resolution Metadata (`internal/install/resolution.go`)
+| Command | Description |
+|---------|-------------|
+| `tsuku eval <tool>[@version]` | Produce installation plan without installing |
+| `tsuku eval <tool> --output plan.json` | Save plan to file |
+| `tsuku install <tool> --refresh` | Re-evaluate plan even if one exists |
+| `tsuku install --plan <file>` | Install from a pre-computed plan file |
+| `tsuku plan show <tool>[@version]` | Display stored plan for installed tool |
+| `tsuku plan export <tool>[@version]` | Export plan to file |
 
-New struct to capture resolved installation details:
+### Installation Plan Format
+
+```json
+{
+  "schema_version": 1,
+  "tool": "ripgrep",
+  "version": "14.1.0",
+  "platform": "linux-x64",
+  "evaluated_at": "2025-12-09T10:30:00Z",
+  "recipe_hash": "sha256:...",
+  "downloads": [
+    {
+      "url": "https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz",
+      "checksum": "sha256:abc123...",
+      "size": 1234567,
+      "extract": {
+        "format": "tar.gz",
+        "strip_components": 1
+      }
+    }
+  ],
+  "binaries": ["rg"],
+  "verify": {
+    "command": "rg --version",
+    "pattern": "ripgrep {version}"
+  }
+}
+```
+
+### Lock File Format
+
+```toml
+# tsuku.lock - simple version pins
+# Plans are evaluated per-platform at install time
+
+[tools]
+ripgrep = "14.1.0"
+go = "1.22.0"
+node = "20.11.0"
+```
+
+When `tsuku install --lock` runs:
+1. Read versions from lock file
+2. For each tool, check if plan exists for this version+platform
+3. If plan exists: replay it
+4. If no plan: evaluate recipe for locked version, save plan, execute
+
+### Key Data Structures
 
 ```go
-// ResolutionMetadata captures the exact resolution used for an installation.
-// This data enables reproducible installs and provides an audit trail.
-type ResolutionMetadata struct {
-    Platform  string   `json:"platform"`            // e.g., "linux-x64"
-    Downloads []Download `json:"downloads"`         // All downloaded artifacts
-    ResolvedAt time.Time `json:"resolved_at"`       // When resolution occurred
+// InstallationPlan represents a fully-resolved, deterministic installation.
+type InstallationPlan struct {
+    SchemaVersion int       `json:"schema_version"`
+    Tool          string    `json:"tool"`
+    Version       string    `json:"version"`
+    Platform      string    `json:"platform"`
+    EvaluatedAt   time.Time `json:"evaluated_at"`
+    RecipeHash    string    `json:"recipe_hash,omitempty"`
+    Downloads     []Download `json:"downloads"`
+    Binaries      []string  `json:"binaries"`
+    Verify        *VerifySpec `json:"verify,omitempty"`
 }
 
 type Download struct {
-    URL       string `json:"url"`                   // Actual URL used
-    Checksum  string `json:"checksum"`              // sha256:... computed post-download
-    Size      int64  `json:"size,omitempty"`        // File size in bytes
+    URL      string       `json:"url"`
+    Checksum string       `json:"checksum"`
+    Size     int64        `json:"size,omitempty"`
+    Extract  *ExtractSpec `json:"extract,omitempty"`
 }
-```
 
-#### 2. Extended VersionState (`internal/install/state.go`)
-
-Extend existing struct to include resolution metadata:
-
-```go
-type VersionState struct {
-    Requested   string             `json:"requested"`
-    Binaries    []string           `json:"binaries,omitempty"`
-    InstalledAt time.Time          `json:"installed_at"`
-    Resolution  *ResolutionMetadata `json:"resolution,omitempty"`  // NEW
-}
-```
-
-#### 3. Lock File Types (`internal/lock/types.go`)
-
-New package for lock file handling:
-
-```go
-// LockFile represents the tsuku.lock structure
+// LockFile represents a simple version-pinning lock file.
 type LockFile struct {
-    Version int                     `toml:"version"`  // Lock file format version
-    Tools   map[string]LockedTool   `toml:"tools"`
-}
-
-// LockedTool represents a locked tool with platform-specific entries
-type LockedTool struct {
-    Version   string                      `toml:"version"`
-    Platforms map[string]PlatformEntry    `toml:"platforms"`
-}
-
-// PlatformEntry contains resolution data for a specific platform.
-// For single-download recipes, use URL/Checksum/Size directly.
-// For multi-download recipes, use Downloads array instead (URL/Checksum/Size should be empty).
-type PlatformEntry struct {
-    // Single-download fields (use when Downloads is empty)
-    URL       string   `toml:"url,omitempty"`
-    Checksum  string   `toml:"checksum,omitempty"`
-    Size      int64    `toml:"size,omitempty"`
-    // Multi-download field (use when recipe has multiple download steps)
-    Downloads []DownloadEntry `toml:"downloads,omitempty"`
-}
-
-type DownloadEntry struct {
-    URL      string `toml:"url"`
-    Checksum string `toml:"checksum"`
-    Size     int64  `toml:"size,omitempty"`
+    Tools map[string]string `toml:"tools"` // tool name → version
 }
 ```
 
-#### 4. Lock File Manager (`internal/lock/manager.go`)
+### Testing Use Case
 
-Operations for reading and writing lock files:
+The `tsuku eval` command enables golden file testing for recipes:
 
-```go
-type Manager struct {
-    path string  // Path to tsuku.lock
-}
+```bash
+# Generate expected plans for a recipe
+tsuku eval ripgrep@14.1.0 --output testdata/ripgrep-14.1.0-linux-x64.json
 
-func (m *Manager) Load() (*LockFile, error)
-func (m *Manager) Save(lock *LockFile) error
-func (m *Manager) GetEntry(tool, platform string) (*PlatformEntry, error)
-func (m *Manager) UpdateFromState(state *install.State, tools []string) error
+# In CI, verify recipe still produces same plan
+tsuku eval ripgrep@14.1.0 --output actual.json
+diff testdata/ripgrep-14.1.0-linux-x64.json actual.json
 ```
 
-### Key Interfaces
-
-#### Platform Detection
-
-```go
-// internal/platform/platform.go
-func CurrentPlatform() string  // Returns "linux-x64", "darwin-arm64", etc.
-func NormalizePlatform(os, arch string) string
-```
-
-Platform key format: `{os}-{arch}` where:
-- `os`: `linux`, `darwin`, `windows`
-- `arch`: `x64`, `arm64`, `x86`
-
-Platform normalization uses `runtime.GOOS` and `runtime.GOARCH`:
-- `amd64` → `x64`
-- `386` → `x86`
-
-**Lock file location:** `tsuku.lock` is always in the current working directory (project-local), following the mise/npm model. This enables project-specific tool versions.
-
-#### Checksum Computation
-
-```go
-// internal/checksum/sha256.go
-func ComputeSHA256(reader io.Reader) (string, error)
-func FormatChecksum(hash []byte) string  // Returns "sha256:..."
-func VerifyChecksum(reader io.Reader, expected string) error
-```
-
-### Data Flow
-
-#### Install with Lock File
-
-```
-1. User runs: tsuku install ripgrep --locked
-2. Load tsuku.lock from current directory
-3. Look up entry for ripgrep + current platform
-4. If found:
-   a. Use URL from lock entry directly (skip version resolution)
-   b. Download artifact
-   c. Compute SHA256 of downloaded content
-   d. Compare with locked checksum → fail if mismatch
-   e. Continue with normal installation
-5. If not found and --locked: fail with error
-6. Update state.json with resolution metadata
-```
-
-#### Lock File Generation
-
-```
-1. User runs: tsuku lock [tool...]
-2. Load current state.json
-3. For each installed tool (or specified tools):
-   a. Get resolution metadata from state
-   b. Create/update lock entry for current platform
-4. Write tsuku.lock (merge with existing entries for other platforms)
-```
+This allows:
+- Testing builder changes without downloading binaries
+- Verifying recipe updates don't change effective output
+- Comparing plans across recipe versions
 
 ## Implementation Approach
 
-### Phase 1: Resolution Capture
+### Phase 1: Installation Plans
 
-**Goal:** Capture resolution metadata during installation without changing behavior.
-
-**Changes:**
-- Add `ResolutionMetadata` struct to `internal/install/`
-- Extend `VersionState` with optional `Resolution` field
-- Update download action to compute SHA256 and record URL
-- Modify executor to populate resolution metadata before state save
-
-**Deliverables:**
-- `state.json` captures URL, checksum, platform for every install
-- Existing tests pass unchanged
-- New tests verify resolution capture
-
-**Backward compatibility:** Existing `state.json` files without `resolution` field continue to work. The field is optional (`omitempty`) and only populated for new installs.
-
-### Phase 2: Lock File Format
-
-**Goal:** Implement lock file reading and writing.
+**Goal:** Introduce the plan concept and `tsuku eval` command.
 
 **Changes:**
-- Create `internal/lock/` package with types and manager
-- Add `tsuku lock` command to generate lock file from state
-- Support tool filtering: `tsuku lock ripgrep go` locks specific tools
+- Add `InstallationPlan` type
+- Create plan evaluation logic (refactor from executor)
+- Add `tsuku eval` command
+- Store plans in state.json alongside version info
+- Add `tsuku plan show` and `tsuku plan export`
 
 **Deliverables:**
-- `tsuku lock` generates `tsuku.lock` from state.json
-- Lock file uses TOML format with platform sections
-- Lock entries merge with existing entries for other platforms
+- `tsuku eval ripgrep` outputs a plan
+- Plans are stored after installation
+- Plans can be inspected and exported
 
-### Phase 3: Locked Installation
+### Phase 2: Deterministic Execution
 
-**Goal:** Enable installation from lock file.
+**Goal:** Make plan replay the default for re-installs.
 
 **Changes:**
-- Add `--locked` flag to `tsuku install`
-- Modify executor to check lock file before version resolution
-- Implement checksum verification during download
-- Add clear error messages for missing/mismatched entries
+- Refactor executor to accept plans
+- Check for existing plan before evaluation
+- Add `--refresh` flag to force re-evaluation
+- Implement checksum verification during execution
+- Fail on checksum mismatch
 
 **Deliverables:**
-- `tsuku install --locked` uses lock file when present
-- Checksum mismatch fails installation with clear error
-- Missing lock entry with `--locked` flag fails
+- Re-installing uses stored plan by default
+- Checksum mismatches fail installation
+- `--refresh` forces fresh evaluation
 
-### Phase 4: Documentation and Polish
+### Phase 3: Plan-Based Installation
 
-**Goal:** Complete the feature for release.
+**Goal:** Enable installation from plan files.
 
 **Changes:**
-- Add user documentation for lock file workflow
-- Add `tsuku lock --help` with examples
-- Consider `TSUKU_LOCKED=1` environment variable for CI
-- Add warnings when lock file is stale (installed versions differ)
+- Add `tsuku install --plan <file>` flag
+- Validate plan schema and checksums
+- Support piping: `tsuku eval ripgrep | tsuku install --plan -`
 
 **Deliverables:**
-- User documentation in README or docs/
-- Help text for new commands and flags
-- CI-friendly environment variable support
+- Can install from exported plan files
+- Enables offline installation (if artifacts are cached)
+
+### Phase 4: Lock Files
+
+**Goal:** Simple version-pinning lock files.
+
+**Changes:**
+- Add lock file parser (TOML, version pins only)
+- Add `tsuku install --lock` flag
+- Read versions from lock file, use plans for execution
+
+**Deliverables:**
+- `tsuku.lock` with simple `[tools]` section
+- `tsuku install --lock` uses lock file versions
 
 ## Consequences
 
 ### Positive
 
-1. **Reproducible installations**: Teams can guarantee identical tool versions across machines
-2. **Audit trail**: `state.json` now records exactly what was downloaded
-3. **CI/CD confidence**: Locked installations ensure build consistency
-4. **Incremental adoption**: Works without lock file; lock file is purely additive
-5. **Debugging support**: When something goes wrong, the URL and checksum are recorded
+1. **Determinism by default**: Re-installs are reproducible without opt-in
+2. **Testability**: `tsuku eval` enables recipe testing without installation
+3. **Transparency**: Users can inspect exactly what will be downloaded
+4. **Simple lock files**: Version pins are easy to read, write, and merge
+5. **Clear separation**: Evaluation vs execution have distinct responsibilities
 
 ### Negative
 
-1. **Increased complexity**: Two concepts (state.json resolution, tsuku.lock) to understand
-2. **Checksum computation overhead**: SHA256 adds latency to every download
-3. **Lock file maintenance**: Teams must run `tsuku lock` on each platform
-4. **Storage increase**: state.json grows with resolution metadata (~100-200 bytes per tool)
+1. **Behavior change**: Re-install no longer picks up upstream changes automatically
+2. **Plan storage**: state.json grows with plan data
+3. **Learning curve**: Users must understand when to use `--refresh`
 
 ### Mitigations
 
 | Consequence | Mitigation |
 |-------------|------------|
-| Complexity | Clear documentation; tsuku.lock is opt-in |
-| SHA256 overhead | Computed during download (streaming); negligible for typical binary sizes |
-| Lock file maintenance | CI can automate; future `--platforms` flag for API-based population |
-| Storage increase | Resolution metadata is compact; state.json remains small |
+| Behavior change | Clear documentation; `tsuku outdated` warns of stale plans |
+| Plan storage | Plans are compact JSON; consider pruning old plans |
+| Learning curve | Sensible defaults; `--refresh` is explicit opt-in |
 
 ## Security Considerations
 
@@ -960,130 +583,71 @@ func VerifyChecksum(reader io.Reader, expected string) error
 
 **How are downloaded artifacts validated?**
 
-This design adds SHA256 checksum verification as a mandatory part of locked installations:
-
-1. **During normal install**: SHA256 is computed post-download and stored in `state.json`. This provides an audit trail but does not verify against a known-good value.
-
-2. **During locked install** (`--locked` flag): SHA256 is computed post-download and compared against the checksum in `tsuku.lock`. Mismatch causes installation to fail.
-
-3. **Checksum format**: Uses `sha256:` prefix (e.g., `sha256:a1b2c3...`) for future extensibility to other algorithms.
-
-**Failure behavior:**
-- Checksum mismatch with `--locked`: Installation fails immediately with clear error message showing expected vs actual checksum
-- Checksum computation failure: Installation fails (do not proceed with unverified binary)
-
-**Limitations:**
-- Without `--locked`, checksum is recorded but not verified - this is intentional (first install creates the baseline)
-- Checksums are computed post-download; a compromised binary is already on disk (but not installed)
+Checksums are mandatory in plans. During execution:
+1. Download artifact to temporary location
+2. Compute SHA256 of downloaded content
+3. Compare with plan's expected checksum
+4. **Fail immediately** if mismatch - this indicates upstream content changed
 
 **TOCTOU mitigation:**
-To prevent time-of-check/time-of-use attacks where a binary is swapped between verification and installation:
-1. Download to a temporary directory with restricted permissions (0700)
-2. Compute checksum on the downloaded file
-3. Verify checksum before any extraction or installation
-4. Use atomic rename to move verified content to final location
-5. For extracted archives, verify checksum of the archive file, not extracted contents
-
-This ensures the verified content is the same content that gets installed.
+- Download to temp directory with restricted permissions (0700)
+- Verify checksum before any extraction
+- Use atomic rename to move verified content to final location
 
 ### Execution Isolation
 
 **What permissions does this feature require?**
 
-This feature does not change the execution model:
+No change to execution model:
+- File system: write to `$TSUKU_HOME/` directory
+- Network: HTTPS to upstream sources
+- No privilege escalation
 
-- **File system access**: Same as current tsuku - write to `$TSUKU_HOME/` directory and `tsuku.lock` in current directory
-- **Network access**: Same as current tsuku - HTTPS to upstream artifact sources
-- **No privilege escalation**: Lock file operations run as current user
-
-**New file locations:**
-- `tsuku.lock` in current working directory (user-controlled, committed to version control)
-- Resolution metadata in `$TSUKU_HOME/state.json` (existing file, new fields)
-
-**Lock file as trusted input:**
-When using `--locked`, the `tsuku.lock` file is treated as trusted input:
-- URLs from the lock file are used directly for downloads
-- A malicious lock file could point to malicious URLs
-- **Mitigation**: Lock files are committed to version control and should be reviewed like code
+**Plan files as trusted input:**
+When using `--plan`, the file is trusted:
+- URLs are used directly for downloads
+- Checksums are used for verification
+- A malicious plan could point to malicious URLs
+- **Mitigation**: Plans should be generated via `tsuku eval`, not hand-crafted
 
 ### Supply Chain Risks
 
 **Where do artifacts come from?**
 
-This feature does not change artifact sources - it records and verifies them:
+Plans capture exact URLs and checksums:
+- If upstream re-tags a release, checksum mismatch is detected
+- Plans provide audit trail of what was intended
+- `--refresh` explicitly opts into new upstream content
 
-1. **Source trust model**: Artifacts still come from upstream sources (GitHub releases, npm, etc.) - no change
-2. **Lock file trust**: The lock file becomes part of the supply chain:
-   - Lock files should be committed to version control
-   - Lock file changes should be reviewed (new URLs, changed checksums)
-   - CI should use `--locked` to ensure lock file is authoritative
-
-**New supply chain considerations:**
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Malicious lock file | Attacker could redirect downloads to compromised URLs | Lock files committed to VCS, reviewed like code |
-| Lock file tampering | Attacker modifies lock file to bypass verification | VCS history provides audit trail; signed commits |
-| Stale lock file | Old checksums may mask upstream compromise | `tsuku outdated` warns of version drift; regular updates |
-
-**What if upstream is compromised?**
-
-Lock files provide defense-in-depth against upstream compromise:
-- If upstream re-tags a release with different content, checksum mismatch is detected
-- Historical lock files can be compared to identify when compromise occurred
-- However, if lock file is generated after compromise, it will contain the malicious checksum
-
-**Residual risk:** Lock files cannot protect against compromise that occurs before the lock file is created.
+**Residual risk:** Initial plan creation inherits any existing compromise.
 
 ### User Data Exposure
 
 **What user data does this feature access or transmit?**
 
-This feature has minimal data exposure:
+Minimal exposure:
+- Plans contain URLs and checksums (not sensitive)
+- Lock files contain tool names and versions (not sensitive)
+- No new network traffic beyond current behavior
 
-1. **Local data accessed:**
-   - `$TSUKU_HOME/state.json` - reads and writes installation state
-   - `tsuku.lock` - reads and writes lock file
-   - Downloaded artifacts (existing behavior)
+## Future Enhancements
 
-2. **Data transmitted:**
-   - No new data transmitted
-   - Same HTTP requests as current installation flow
-   - URLs from lock file may reveal tool preferences (same as current behavior)
+### Plan Caching/Sharing
 
-3. **Privacy implications:**
-   - Lock file may contain internal tool versions if committed publicly
-   - This is intentional - lock files are designed to be shared
-   - Sensitive tools should not be in public lock files
+Plans could be cached centrally:
+- `tsuku eval` checks plan cache before evaluating
+- Common tool+version+platform combinations are pre-computed
+- Reduces API calls to version providers
 
-**No telemetry changes:** This feature does not add any new data collection or transmission.
+### Offline Installation
 
-### Mitigations Summary
+With pre-computed plans and cached artifacts:
+- `tsuku install --offline` uses only local plans and cache
+- Useful for air-gapped environments
 
-| Risk | Mitigation | Residual Risk |
-|------|------------|---------------|
-| Malicious lock file | VCS review, treat as code | Trusted committers could inject malicious entries |
-| Checksum bypass | `--locked` flag makes verification mandatory | Users may forget to use flag |
-| Stale checksums | `tsuku outdated` warnings | Users may ignore warnings |
-| URL manipulation | Lock file URLs are exact; no template expansion | Lock file reviewer must verify URLs |
-| Post-download tampering | Checksum computed before extraction | Narrow window between download and checksum |
-| Compromised upstream | Checksum mismatch detected on reinstall | Initial lock creation inherits compromise |
-| Archive path traversal | Existing extraction code validates paths | Depends on extraction implementation correctness |
+### Plan Diffing
 
-### Defense-in-Depth Position
-
-This feature is Layer 3 in tsuku's defense-in-depth strategy:
-
+Compare plans to understand changes:
+```bash
+tsuku plan diff ripgrep@14.0.0 ripgrep@14.1.0
 ```
-Layer 4: Functional Testing (future)
-Layer 3: Deterministic Resolution (this design) ← NEW
-Layer 2: Version Verification (#192)
-Layer 1: Download Checksums (existing)
-```
-
-Each layer provides independent protection:
-- **Layer 1** verifies artifact integrity (what was downloaded)
-- **Layer 2** verifies version correctness (what version is installed)
-- **Layer 3** ensures reproducibility (same artifact every time)
-- **Layer 4** verifies functionality (does it work correctly)
-
