@@ -358,6 +358,22 @@ func (b *GitHubReleaseBuilder) generateWithRepair(
 			return nil, &totalUsage, repairAttempts, validationSkipped, fmt.Errorf("failed to generate recipe for validation: %w", err)
 		}
 
+		// Substitute {version} in verify command and pattern with actual version tag
+		// This allows the pattern check to work correctly during validation
+		if genCtx.tag != "" {
+			// Strip 'v' prefix if present for version matching
+			version := genCtx.tag
+			if strings.HasPrefix(version, "v") {
+				version = version[1:]
+			}
+			if r.Verify.Command != "" {
+				r.Verify.Command = strings.ReplaceAll(r.Verify.Command, "{version}", version)
+			}
+			if r.Verify.Pattern != "" {
+				r.Verify.Pattern = strings.ReplaceAll(r.Verify.Pattern, "{version}", version)
+			}
+		}
+
 		// Build asset URL for validation
 		assetURL := b.buildAssetURL(genCtx, pattern)
 
