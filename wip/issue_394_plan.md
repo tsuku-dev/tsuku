@@ -102,7 +102,7 @@ The package already has separate provider files (`provider_*.go`). The main reso
 ## Implementation Steps
 
 - [x] Create refactoring issue for `internal/version/resolver.go` with detailed split proposal (#397)
-- [ ] Create refactoring issue for `cmd/tsuku/install.go` with detailed split proposal
+- [x] Create refactoring issue for `cmd/tsuku/install.go` with detailed split proposal (#398)
 - [ ] Create refactoring issue for `internal/install/state.go` with detailed split proposal
 - [ ] Evaluate `internal/builders/github_release.go` and decide if issue needed
 - [ ] Document refactoring guidelines in CONTRIBUTING.md or docs/
