@@ -55,7 +55,7 @@ The current `--dry-run` flag shows what *would* be installed but doesn't capture
 
 ### Key Assumptions
 
-- Plans are platform-specific: a plan generated on macOS applies only to macOS
+- Plans are platform-specific by default, but `--os` and `--arch` flags enable cross-platform generation
 - Plans are immutable once generated; regeneration creates a new plan
 - Evaluation is idempotent and does not modify installation state
 - "Reproducibility" means bitwise identical downloads given the same plan
@@ -202,8 +202,8 @@ Plans capture only download-related information: URLs, checksums, sizes.
 
 ## Uncertainties
 
-- **Cache interaction**: How should evaluation interact with the existing download cache? Should evaluated files be cached? The recommendation is yes (reuse for installation).
-- **Multi-platform plans**: The upstream design asks whether plans should support generating for other platforms. For Milestone 1, current-platform-only is sufficient.
+- **Cache interaction**: How should evaluation interact with the existing download cache? Resolved: yes, evaluated files are cached for reuse during installation.
+- **Multi-platform plans**: Resolved: support `--os` and `--arch` flags to generate plans for other platforms.
 
 ## Decision Outcome
 
@@ -315,6 +315,39 @@ type ResolvedStep struct {
 
 **Note**: PreDownloader reuses the existing `internal/actions/download_cache.go` infrastructure. Downloaded files are cached for subsequent installation.
 
+### Deterministic Download Cache
+
+Downloads during evaluation are stored in the existing download cache (`$TSUKU_HOME/cache/downloads/`). The cache key is derived from the URL, making it deterministic:
+
+1. **During evaluation**: Files are downloaded and cached with their computed checksums
+2. **During installation**: If a cached file exists and checksum matches, skip re-download
+3. **Cache invalidation**: Checksum mismatch triggers re-download (detects upstream changes)
+
+This ensures that `tsuku install` immediately after `tsuku eval` reuses the already-downloaded files, avoiding redundant network requests.
+
+### Platform Override Flags
+
+The `tsuku eval` command supports platform override flags for cross-platform plan generation:
+
+```
+tsuku eval [--os <os>] [--arch <arch>] <tool>[@version]
+```
+
+- `--os`: Override the operating system (e.g., `linux`, `darwin`, `windows`)
+- `--arch`: Override the architecture (e.g., `amd64`, `arm64`)
+
+If omitted, flags default to the current system's values (`runtime.GOOS`, `runtime.GOARCH`).
+
+**Use cases**:
+- CI can generate plans for all target platforms from a single runner
+- Recipe builders can test cross-platform URL resolution without multiple machines
+- Golden file testing can verify all platform variants
+
+**Limitations**:
+- Cross-platform plans cannot be installed on the current system
+- Some version providers may not support cross-platform queries (e.g., GitHub asset selection)
+- Downloaded files for other platforms cannot be verified locally (stored but not checksummed)
+
 ### Key Interfaces
 
 **PlanGenerator** (new in `internal/executor/plan.go`):
@@ -424,13 +457,13 @@ The `recipe_hash` field captures a SHA256 hash of the raw TOML recipe file conte
 
 - Evaluation requires network access and may be slow for large downloads
 - state.json grows with plan data (typically 1-5KB per tool)
-- Plans are platform-specific; cross-platform testing requires multiple machines
+- Cross-platform eval has limitations (some providers may not support it)
 
 ### Mitigations
 
 - Progress display during evaluation reduces user frustration
 - Plan data is relatively small; state.json growth is acceptable
-- Future work could add `--platform` flag for cross-platform plan generation
+- `--os` and `--arch` flags enable cross-platform testing from a single machine
 
 ## Security Considerations
 
