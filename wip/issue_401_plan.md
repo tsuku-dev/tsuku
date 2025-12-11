@@ -24,11 +24,11 @@ None - this issue only adds new types.
 
 ## Implementation Steps
 
-- [ ] Create `internal/executor/plan.go` with InstallationPlan, Platform, and ResolvedStep structs
-- [ ] Add ActionEvaluability constant map classifying all actions
-- [ ] Add FormatVersion constant (set to 1)
-- [ ] Create `internal/executor/plan_test.go` with JSON serialization tests
-- [ ] Run tests and verify build
+- [x] Create `internal/executor/plan.go` with InstallationPlan, Platform, and ResolvedStep structs
+- [x] Add ActionEvaluability constant map classifying all actions
+- [x] Add FormatVersion constant (set to 1)
+- [x] Create `internal/executor/plan_test.go` with JSON serialization tests
+- [x] Run tests and verify build
 
 ## Testing Strategy
 
@@ -46,14 +46,14 @@ None - this issue only adds new types.
 
 ## Success Criteria
 
-- [ ] `InstallationPlan` struct defined with all required fields and JSON tags
-- [ ] `Platform` struct defined with OS and Arch fields
-- [ ] `ResolvedStep` struct defined with Action, Params, Evaluable, URL, Checksum, Size fields
-- [ ] Action evaluability classification documented via ActionEvaluability map
-- [ ] FormatVersion constant set to 1
-- [ ] JSON serialization tests pass
-- [ ] `go build ./...` succeeds
-- [ ] `go test ./internal/executor/...` passes
+- [x] `InstallationPlan` struct defined with all required fields and JSON tags
+- [x] `Platform` struct defined with OS and Arch fields
+- [x] `ResolvedStep` struct defined with Action, Params, Evaluable, URL, Checksum, Size fields
+- [x] Action evaluability classification documented via ActionEvaluability map
+- [x] FormatVersion constant set to 1
+- [x] JSON serialization tests pass
+- [x] `go build ./...` succeeds
+- [x] `go test ./internal/executor/...` passes
 
 ## Open Questions
 
