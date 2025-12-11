@@ -43,6 +43,7 @@ The current `--dry-run` flag shows what *would* be installed but doesn't capture
 - Plan-based installation (`tsuku install --plan`) - Milestone 3
 - Deterministic re-installation from cached plans - Milestone 2
 - Lock files for team coordination - tracked separately
+- Ecosystem installations (npm, pip, cargo, etc.) - deferred pending action evaluability analysis
 
 ## Decision Drivers
 
@@ -265,8 +266,9 @@ type InstallationPlan struct {
 }
 
 type ResolvedStep struct {
-    Action string                 `json:"action"`
-    Params map[string]interface{} `json:"params"`
+    Action    string                 `json:"action"`
+    Params    map[string]interface{} `json:"params"`
+    Evaluable bool                   `json:"evaluable"` // false for run_command, ecosystem installs
 
     // For download steps only
     URL      string `json:"url,omitempty"`
@@ -379,6 +381,32 @@ Recipe steps may have `when` clauses that filter by platform. During plan genera
 ### Recipe Hash Computation
 
 The `recipe_hash` field captures a SHA256 hash of the raw TOML recipe file content. This enables detection of recipe changes: if the hash differs, the plan may be stale.
+
+### Action Evaluability
+
+Not all actions can be evaluated deterministically. Actions are classified by their evaluability:
+
+**Fully evaluable actions** (can be captured in plans):
+- `download`, `download_archive`, `github_archive`, `github_file` - URL and checksum captured
+- `extract` - format, strip_dirs, files captured
+- `install_binaries`, `chmod` - parameters captured verbatim
+
+**Non-evaluable actions** (cannot guarantee reproducibility):
+- `run_command` - arbitrary shell execution, outcome unpredictable
+- `npm_install`, `pipx_install`, `gem_install`, `cargo_install`, `go_install` - delegate to external package managers
+- `cpan_install`, `nix_install` - external ecosystem resolution
+
+A recipe is considered **evaluable** if all its actions (after `when` clause filtering) are fully evaluable.
+
+**Behavior for non-evaluable recipes**:
+- `tsuku eval` on a non-evaluable recipe outputs a partial plan with warnings
+- Non-evaluable steps are marked in the plan with `"evaluable": false`
+- Users are informed which steps cannot be guaranteed reproducible
+
+This classification enables future work:
+- Recipe metadata could explicitly declare evaluability
+- CI could enforce evaluability for recipes in the registry
+- `tsuku eval --strict` could fail on non-evaluable recipes
 
 ### Data Flow
 
