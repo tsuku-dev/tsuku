@@ -70,9 +70,10 @@ func validateIP(ip net.IP, host string) error {
 	return httputil.ValidateIP(ip, host)
 }
 
-// New creates a new version resolver
-// If GITHUB_TOKEN environment variable is set, it will be used for authenticated requests
-func New() *Resolver {
+// New creates a new version resolver with optional configuration.
+// If GITHUB_TOKEN environment variable is set, it will be used for authenticated requests.
+// Options can be used to override default registry URLs for testing.
+func New(opts ...Option) *Resolver {
 	var githubHTTPClient *http.Client
 	authenticated := false
 
@@ -83,7 +84,7 @@ func New() *Resolver {
 		authenticated = true
 	}
 
-	return &Resolver{
+	r := &Resolver{
 		client:              github.NewClient(githubHTTPClient),
 		httpClient:          NewHTTPClient(),                   // HTTP client with proper timeouts
 		registry:            NewRegistry(),                     // Initialize with default resolvers
@@ -96,6 +97,13 @@ func New() *Resolver {
 		goProxyURL:          "https://proxy.golang.org",        // Production default
 		authenticated:       authenticated,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 // NewWithNpmRegistry creates a resolver with custom npm registry (for testing)
