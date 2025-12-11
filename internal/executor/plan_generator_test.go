@@ -22,7 +22,7 @@ func TestComputeRecipeHash(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     []byte
-		wantLen     int  // expected hash length
+		wantLen     int // expected hash length
 		expectError bool
 	}{
 		{
