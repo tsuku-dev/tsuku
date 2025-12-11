@@ -52,15 +52,15 @@ Extract code incrementally, ensuring tests pass after each step:
 
 ### Step 4: Remove duplicate constructors
 
-- [ ] Delete `NewWithNpmRegistry()` - replaced by `New(WithNpmRegistry(url))`
-- [ ] Delete `NewWithPyPIRegistry()` - replaced by `New(WithPyPIRegistry(url))`
-- [ ] Delete `NewWithCratesIORegistry()` - replaced by `New(WithCratesIORegistry(url))`
-- [ ] Delete `NewWithRubyGemsRegistry()` - replaced by `New(WithRubyGemsRegistry(url))`
-- [ ] Delete `NewWithMetaCPANRegistry()` - replaced by `New(WithMetaCPANRegistry(url))`
-- [ ] Delete `NewWithGoDevURL()` - replaced by `New(WithGoDevURL(url))`
-- [ ] Delete `NewWithGoProxyURL()` - replaced by `New(WithGoProxyURL(url))`
-- [ ] Update all call sites using old constructors
-- [ ] Verify tests pass
+- [x] Delete `NewWithNpmRegistry()` - replaced by `New(WithNpmRegistry(url))`
+- [x] Delete `NewWithPyPIRegistry()` - replaced by `New(WithPyPIRegistry(url))`
+- [x] Delete `NewWithCratesIORegistry()` - replaced by `New(WithCratesIORegistry(url))`
+- [x] Delete `NewWithRubyGemsRegistry()` - replaced by `New(WithRubyGemsRegistry(url))`
+- [x] Delete `NewWithMetaCPANRegistry()` - replaced by `New(WithMetaCPANRegistry(url))`
+- [x] Delete `NewWithGoDevURL()` - replaced by `New(WithGoDevURL(url))`
+- [x] Delete `NewWithGoProxyURL()` - replaced by `New(WithGoProxyURL(url))`
+- [x] Update all call sites using old constructors
+- [x] Verify tests pass
 
 ### Step 5: Move npm resolution to npm.go
 

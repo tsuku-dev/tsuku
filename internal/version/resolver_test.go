@@ -90,44 +90,71 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestNewWithNpmRegistry(t *testing.T) {
-	resolver := NewWithNpmRegistry("express")
-	if resolver == nil {
-		t.Fatal("NewWithNpmRegistry() returned nil")
-	}
-	if resolver.httpClient == nil {
-		t.Error("NewWithNpmRegistry() did not initialize httpClient")
-	}
-}
+func TestNewWithOptions(t *testing.T) {
+	t.Run("WithNpmRegistry", func(t *testing.T) {
+		resolver := New(WithNpmRegistry("http://localhost:8080"))
+		if resolver == nil {
+			t.Fatal("New(WithNpmRegistry(...)) returned nil")
+		}
+		if resolver.httpClient == nil {
+			t.Error("New(WithNpmRegistry(...)) did not initialize httpClient")
+		}
+		if resolver.npmRegistryURL != "http://localhost:8080" {
+			t.Errorf("WithNpmRegistry did not set URL, got %s", resolver.npmRegistryURL)
+		}
+	})
 
-func TestNewWithCratesIORegistry(t *testing.T) {
-	resolver := NewWithCratesIORegistry("ripgrep")
-	if resolver == nil {
-		t.Fatal("NewWithCratesIORegistry() returned nil")
-	}
-	if resolver.httpClient == nil {
-		t.Error("NewWithCratesIORegistry() did not initialize httpClient")
-	}
-}
+	t.Run("WithCratesIORegistry", func(t *testing.T) {
+		resolver := New(WithCratesIORegistry("http://localhost:8081"))
+		if resolver == nil {
+			t.Fatal("New(WithCratesIORegistry(...)) returned nil")
+		}
+		if resolver.httpClient == nil {
+			t.Error("New(WithCratesIORegistry(...)) did not initialize httpClient")
+		}
+		if resolver.cratesIORegistryURL != "http://localhost:8081" {
+			t.Errorf("WithCratesIORegistry did not set URL, got %s", resolver.cratesIORegistryURL)
+		}
+	})
 
-func TestNewWithRubyGemsRegistry(t *testing.T) {
-	resolver := NewWithRubyGemsRegistry("rails")
-	if resolver == nil {
-		t.Fatal("NewWithRubyGemsRegistry() returned nil")
-	}
-	if resolver.httpClient == nil {
-		t.Error("NewWithRubyGemsRegistry() did not initialize httpClient")
-	}
-}
+	t.Run("WithRubyGemsRegistry", func(t *testing.T) {
+		resolver := New(WithRubyGemsRegistry("http://localhost:8082"))
+		if resolver == nil {
+			t.Fatal("New(WithRubyGemsRegistry(...)) returned nil")
+		}
+		if resolver.httpClient == nil {
+			t.Error("New(WithRubyGemsRegistry(...)) did not initialize httpClient")
+		}
+		if resolver.rubygemsRegistryURL != "http://localhost:8082" {
+			t.Errorf("WithRubyGemsRegistry did not set URL, got %s", resolver.rubygemsRegistryURL)
+		}
+	})
 
-func TestNewWithPyPIRegistry(t *testing.T) {
-	resolver := NewWithPyPIRegistry("requests")
-	if resolver == nil {
-		t.Fatal("NewWithPyPIRegistry() returned nil")
-	}
-	if resolver.httpClient == nil {
-		t.Error("NewWithPyPIRegistry() did not initialize httpClient")
-	}
+	t.Run("WithPyPIRegistry", func(t *testing.T) {
+		resolver := New(WithPyPIRegistry("http://localhost:8083"))
+		if resolver == nil {
+			t.Fatal("New(WithPyPIRegistry(...)) returned nil")
+		}
+		if resolver.httpClient == nil {
+			t.Error("New(WithPyPIRegistry(...)) did not initialize httpClient")
+		}
+		if resolver.pypiRegistryURL != "http://localhost:8083" {
+			t.Errorf("WithPyPIRegistry did not set URL, got %s", resolver.pypiRegistryURL)
+		}
+	})
+
+	t.Run("multiple options", func(t *testing.T) {
+		resolver := New(
+			WithNpmRegistry("http://npm:8080"),
+			WithPyPIRegistry("http://pypi:8080"),
+		)
+		if resolver.npmRegistryURL != "http://npm:8080" {
+			t.Errorf("WithNpmRegistry did not set URL, got %s", resolver.npmRegistryURL)
+		}
+		if resolver.pypiRegistryURL != "http://pypi:8080" {
+			t.Errorf("WithPyPIRegistry did not set URL, got %s", resolver.pypiRegistryURL)
+		}
+	})
 }
 
 func TestWrapGitHubRateLimitError(t *testing.T) {
