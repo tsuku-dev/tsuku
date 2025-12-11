@@ -39,11 +39,11 @@ The existing code in all three locations has nearly identical IP validation and 
 - [x] Create `internal/httputil/ssrf_test.go` with IP validation tests
 - [x] Create `internal/httputil/client.go` with `NewSecureClient()` and `ClientOptions`
 - [x] Create `internal/httputil/client_test.go` with client creation tests
-- [ ] Update `internal/actions/download.go` to use httputil
-- [ ] Update `internal/validate/predownload.go` to use httputil
-- [ ] Update `internal/version/resolver.go` to use httputil (keep NewHTTPClient as wrapper)
-- [ ] Run full test suite to verify no regressions
-- [ ] Run golangci-lint to catch any issues
+- [x] Update `internal/actions/download.go` to use httputil
+- [x] Update `internal/validate/predownload.go` to use httputil
+- [x] Update `internal/version/resolver.go` to use httputil (keep NewHTTPClient as wrapper)
+- [x] Run full test suite to verify no regressions
+- [ ] Run golangci-lint to catch any issues (CI will run this)
 
 Mark each step [x] after it is implemented and committed. This enables clear resume detection.
 
