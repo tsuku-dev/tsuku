@@ -1,6 +1,6 @@
 # DESIGN: Structured Logging Framework
 
-**Status:** Proposed
+**Status:** Accepted
 
 ## Context and Problem Statement
 
