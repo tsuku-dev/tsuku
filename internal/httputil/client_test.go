@@ -69,7 +69,10 @@ func TestNewSecureClient_RedirectToHTTP_Blocked(t *testing.T) {
 	// Re-add our redirect checker
 	client.CheckRedirect = makeRedirectChecker(10)
 
-	_, err := client.Get(server.URL)
+	resp, err := client.Get(server.URL)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	if err == nil {
 		t.Fatal("Expected error for redirect to HTTP, got nil")
 	}
@@ -90,7 +93,10 @@ func TestNewSecureClient_RedirectToPrivateIP_Blocked(t *testing.T) {
 	client.Transport = server.Client().Transport
 	client.CheckRedirect = makeRedirectChecker(10)
 
-	_, err := client.Get(server.URL)
+	resp, err := client.Get(server.URL)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	if err == nil {
 		t.Fatal("Expected error for redirect to private IP, got nil")
 	}
@@ -111,7 +117,10 @@ func TestNewSecureClient_RedirectToLoopback_Blocked(t *testing.T) {
 	client.Transport = server.Client().Transport
 	client.CheckRedirect = makeRedirectChecker(10)
 
-	_, err := client.Get(server.URL)
+	resp, err := client.Get(server.URL)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	if err == nil {
 		t.Fatal("Expected error for redirect to loopback, got nil")
 	}
