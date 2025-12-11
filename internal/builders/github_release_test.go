@@ -763,3 +763,95 @@ func TestProgressReporterCalledDuringBuild(t *testing.T) {
 		t.Errorf("expected first done to be 'v1.0.0, 1 assets', got %q", reporter.dones[0])
 	}
 }
+
+func TestGitHubReleaseBuilder_Build_VersionPlaceholders(t *testing.T) {
+	ctx := context.Background()
+
+	// Create mock provider that returns {version} placeholders in verify command and pattern
+	mockProv := &mockProvider{
+		name: "mock",
+		responses: []*llm.CompletionResponse{
+			{
+				Content:    "Analyzing the release...",
+				StopReason: "tool_use",
+				ToolCalls: []llm.ToolCall{
+					{
+						ID:   "call_1",
+						Name: llm.ToolExtractPattern,
+						Arguments: map[string]any{
+							"mappings": []map[string]any{
+								{"os": "linux", "arch": "amd64", "asset": "tool_1.2.3_linux_amd64.tar.gz", "format": "tar.gz"},
+							},
+							"executable":     "tool",
+							"verify_command": "tool --version | grep {version}",
+							"verify_pattern": "tool {version}",
+						},
+					},
+				},
+				Usage: llm.Usage{InputTokens: 100, OutputTokens: 50},
+			},
+		},
+	}
+	factory := createMockFactory(mockProv)
+
+	// Create mock GitHub API server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/tool/releases":
+			releases := []githubRelease{
+				{
+					TagName: "v1.2.3",
+					Assets: []githubAsset{
+						{Name: "tool_1.2.3_linux_amd64.tar.gz"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/repos/test/tool":
+			repo := githubRepo{
+				Description: "A test tool",
+				Homepage:    "https://example.com",
+				HTMLURL:     "https://github.com/test/tool",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(repo)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	// Build without executor - the returned recipe retains {version} placeholders
+	// since version substitution only happens internally during validation.
+	// The placeholders are preserved so tsuku install can substitute them at runtime.
+	b, err := NewGitHubReleaseBuilder(ctx,
+		WithFactory(factory),
+		WithGitHubBaseURL(server.URL),
+	)
+	if err != nil {
+		t.Fatalf("NewGitHubReleaseBuilder error: %v", err)
+	}
+
+	result, err := b.Build(ctx, BuildRequest{
+		Package:   "tool",
+		SourceArg: "test/tool",
+	})
+	if err != nil {
+		t.Fatalf("Build error: %v", err)
+	}
+
+	if result.Recipe == nil {
+		t.Fatal("expected recipe, got nil")
+	}
+
+	// Verify the {version} placeholder is preserved in the output recipe
+	// generateRecipe always uses "{version}" as the pattern (line 872 in github_release.go)
+	if result.Recipe.Verify.Pattern != "{version}" {
+		t.Errorf("Verify.Pattern = %q, want %q (placeholder preserved)", result.Recipe.Verify.Pattern, "{version}")
+	}
+	// The verify command from LLM should be preserved with {version} placeholder
+	if result.Recipe.Verify.Command != "tool --version | grep {version}" {
+		t.Errorf("Verify.Command = %q, want %q (placeholder preserved)", result.Recipe.Verify.Command, "tool --version | grep {version}")
+	}
+}
