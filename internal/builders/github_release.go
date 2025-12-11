@@ -362,10 +362,7 @@ func (b *GitHubReleaseBuilder) generateWithRepair(
 		// This allows the pattern check to work correctly during validation
 		if genCtx.tag != "" {
 			// Strip 'v' prefix if present for version matching
-			version := genCtx.tag
-			if strings.HasPrefix(version, "v") {
-				version = version[1:]
-			}
+			version := strings.TrimPrefix(genCtx.tag, "v")
 			if r.Verify.Command != "" {
 				r.Verify.Command = strings.ReplaceAll(r.Verify.Command, "{version}", version)
 			}
