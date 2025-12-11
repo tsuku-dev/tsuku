@@ -254,15 +254,26 @@ The solution introduces an installation plan concept that captures the fully-res
 
 ```go
 type InstallationPlan struct {
+    // Format version for future compatibility
+    FormatVersion int `json:"format_version"` // Currently 1
+
     // Metadata
     Tool        string    `json:"tool"`
     Version     string    `json:"version"`
-    Platform    string    `json:"platform"`     // e.g., "linux/amd64"
+    Platform    Platform  `json:"platform"`
     GeneratedAt time.Time `json:"generated_at"`
-    RecipeHash  string    `json:"recipe_hash"`  // SHA256 of recipe file
+
+    // Recipe provenance
+    RecipeHash   string `json:"recipe_hash"`   // SHA256 of recipe file content
+    RecipeSource string `json:"recipe_source"` // "registry" or file path
 
     // Resolved steps
     Steps []ResolvedStep `json:"steps"`
+}
+
+type Platform struct {
+    OS   string `json:"os"`   // e.g., "linux"
+    Arch string `json:"arch"` // e.g., "amd64"
 }
 
 type ResolvedStep struct {
@@ -276,6 +287,8 @@ type ResolvedStep struct {
     Size     int64  `json:"size,omitempty"`
 }
 ```
+
+**Format versioning**: The `format_version` field enables future evolution of the plan format. Readers should reject plans with unsupported versions. Version 1 is the initial format defined here.
 
 ### Components
 
@@ -327,6 +340,11 @@ Downloads during evaluation are stored in the existing download cache (`$TSUKU_H
 
 This ensures that `tsuku install` immediately after `tsuku eval` reuses the already-downloaded files, avoiding redundant network requests.
 
+**Implementation requirements**:
+- Cache directory must be created with mode 0700 (user-only) to prevent exposure on multi-user systems
+- Cache writes must check for symlinks via `os.Lstat()` before writing to prevent symlink attacks
+- Cache eviction policy is deferred to future work; for now, cache grows unbounded (acceptable for Milestone 1)
+
 ### Platform Override Flags
 
 The `tsuku eval` command supports platform override flags for cross-platform plan generation:
@@ -340,6 +358,11 @@ tsuku eval [--os <os>] [--arch <arch>] <tool>[@version]
 
 If omitted, flags default to the current system's values (`runtime.GOOS`, `runtime.GOARCH`).
 
+**Implementation requirements**:
+- Flag values must be validated against a whitelist of known OS/arch values to prevent path traversal injection through template variables
+- Valid OS values: `linux`, `darwin`, `windows`, `freebsd`
+- Valid arch values: `amd64`, `arm64`, `386`, `arm`
+
 **Use cases**:
 - CI can generate plans for all target platforms from a single runner
 - Recipe builders can test cross-platform URL resolution without multiple machines
@@ -347,8 +370,10 @@ If omitted, flags default to the current system's values (`runtime.GOOS`, `runti
 
 **Limitations**:
 - Cross-platform plans cannot be installed on the current system
-- Some version providers may not support cross-platform queries (e.g., GitHub asset selection)
-- Downloaded files for other platforms cannot be verified locally (stored but not checksummed)
+- Some version providers may not support cross-platform queries (e.g., GitHub asset selection may differ)
+- Binaries for other platforms cannot be executed locally for verification
+
+**Note**: SHA256 checksums are platform-agnostic and can be computed for any downloaded file regardless of target platform. The limitation is execution/extraction verification, not checksum computation.
 
 ### Key Interfaces
 
@@ -387,9 +412,12 @@ The `recipe_hash` field captures a SHA256 hash of the raw TOML recipe file conte
 Not all actions can be evaluated deterministically. Actions are classified by their evaluability:
 
 **Fully evaluable actions** (can be captured in plans):
-- `download`, `download_archive`, `github_archive`, `github_file` - URL and checksum captured
+- `download`, `download_archive`, `github_archive`, `github_file`, `hashicorp_release` - URL and checksum captured
 - `extract` - format, strip_dirs, files captured
 - `install_binaries`, `chmod` - parameters captured verbatim
+- `create_symlink`, `set_env`, `write_file` - parameters captured verbatim
+- `validate_checksum` - checksum value captured
+- `set_rpath`, `link_dependencies`, `install_libraries` - parameters captured verbatim
 
 **Non-evaluable actions** (cannot guarantee reproducibility):
 - `run_command` - arbitrary shell execution, outcome unpredictable
@@ -553,6 +581,9 @@ The `tsuku plan show/export` commands only read from state.json; they have no ne
 | Plan file manipulation | Plans should be generated via tsuku eval | User trust decision for external plans |
 | Information disclosure via network | Standard exposure, same as install | None beyond existing |
 | Resource exhaustion (large downloads) | PreDownloader uses context cancellation; users can interrupt | Large files may fill disk before cancelled |
+| Cache symlink attacks | Check via `os.Lstat()` before writing cache files | None if implemented |
+| Cache directory exposure | Create cache directory with mode 0700 | None if implemented |
+| Platform flag injection | Validate against whitelist of known OS/arch values | None if implemented |
 
 ### Future Security Enhancements (Milestone 2+)
 
