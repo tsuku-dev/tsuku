@@ -951,10 +951,53 @@ You have three tools available:
 2. inspect_archive: Inspect the contents of an archive to find the executable
 3. extract_pattern: Call this when you've determined the asset-to-platform mappings
 
-Common patterns you should recognize:
-- Rust-style targets: x86_64-unknown-linux-musl, aarch64-apple-darwin
-- Go-style targets: linux_amd64, darwin_arm64
-- Generic: linux-x64, macos-arm64, linux-amd64
+CRITICAL: When calling extract_pattern, you MUST use these exact normalized values:
+- os: "linux" or "darwin" (NOT "Linux", "Darwin", "macOS", "macos", or target triples)
+- arch: "amd64" or "arm64" (NOT "x86_64", "aarch64", "64bit", "ARM64", or other variants)
+
+The os and arch values are Go runtime constants (GOOS/GOARCH). The asset filename in the mapping shows what string appears in the actual file.
+
+Example 1 - Go-style naming (k9s_Linux_amd64.tar.gz):
+{
+  "mappings": [
+    {"asset": "k9s_Linux_amd64.tar.gz", "os": "linux", "arch": "amd64", "format": "tar.gz"},
+    {"asset": "k9s_Linux_arm64.tar.gz", "os": "linux", "arch": "arm64", "format": "tar.gz"},
+    {"asset": "k9s_Darwin_amd64.tar.gz", "os": "darwin", "arch": "amd64", "format": "tar.gz"},
+    {"asset": "k9s_Darwin_arm64.tar.gz", "os": "darwin", "arch": "arm64", "format": "tar.gz"}
+  ],
+  "executable": "k9s",
+  "verify_command": "k9s version"
+}
+
+Example 2 - Rust-style naming (app-x86_64-unknown-linux-gnu.zip):
+{
+  "mappings": [
+    {"asset": "app-x86_64-unknown-linux-gnu.zip", "os": "linux", "arch": "amd64", "format": "zip"},
+    {"asset": "app-aarch64-unknown-linux-gnu.zip", "os": "linux", "arch": "arm64", "format": "zip"},
+    {"asset": "app-x86_64-apple-darwin.zip", "os": "darwin", "arch": "amd64", "format": "zip"},
+    {"asset": "app-aarch64-apple-darwin.zip", "os": "darwin", "arch": "arm64", "format": "zip"}
+  ],
+  "executable": "app",
+  "verify_command": "app --version"
+}
+
+Example 3 - Custom naming (trivy_0.50.0_macOS-ARM64.tar.gz):
+{
+  "mappings": [
+    {"asset": "trivy_0.50.0_Linux-64bit.tar.gz", "os": "linux", "arch": "amd64", "format": "tar.gz"},
+    {"asset": "trivy_0.50.0_Linux-ARM64.tar.gz", "os": "linux", "arch": "arm64", "format": "tar.gz"},
+    {"asset": "trivy_0.50.0_macOS-64bit.tar.gz", "os": "darwin", "arch": "amd64", "format": "tar.gz"},
+    {"asset": "trivy_0.50.0_macOS-ARM64.tar.gz", "os": "darwin", "arch": "arm64", "format": "tar.gz"}
+  ],
+  "executable": "trivy",
+  "verify_command": "trivy --version"
+}
+
+Common filename patterns to recognize:
+- Rust targets: x86_64-unknown-linux-musl, aarch64-apple-darwin -> os: linux/darwin, arch: amd64/arm64
+- Go targets: linux_amd64, darwin_arm64 -> os: linux/darwin, arch: amd64/arm64
+- Capitalized: Linux, Darwin, macOS -> os: linux/darwin
+- Architecture variants: x86_64, amd64, 64bit -> arch: amd64; aarch64, arm64, ARM64 -> arch: arm64
 
 When analyzing assets:
 - Look for patterns in filenames that indicate OS and architecture
