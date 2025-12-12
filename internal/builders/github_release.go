@@ -993,6 +993,28 @@ Example 3 - Custom naming (trivy_0.50.0_macOS-ARM64.tar.gz):
   "verify_command": "trivy --version"
 }
 
+Example 4 - tar.xz format (helix-24.07-x86_64-linux.tar.xz):
+{
+  "mappings": [
+    {"asset": "helix-24.07-x86_64-linux.tar.xz", "os": "linux", "arch": "amd64", "format": "tar.xz"},
+    {"asset": "helix-24.07-aarch64-linux.tar.xz", "os": "linux", "arch": "arm64", "format": "tar.xz"},
+    {"asset": "helix-24.07-x86_64-macos.tar.xz", "os": "darwin", "arch": "amd64", "format": "tar.xz"},
+    {"asset": "helix-24.07-aarch64-macos.tar.xz", "os": "darwin", "arch": "arm64", "format": "tar.xz"}
+  ],
+  "executable": "hx",
+  "verify_command": "hx --version"
+}
+
+Example 5 - tbz format (btop-x86_64-linux-musl.tbz):
+{
+  "mappings": [
+    {"asset": "btop-x86_64-linux-musl.tbz", "os": "linux", "arch": "amd64", "format": "tbz"},
+    {"asset": "btop-aarch64-linux-musl.tbz", "os": "linux", "arch": "arm64", "format": "tbz"}
+  ],
+  "executable": "btop",
+  "verify_command": "btop --version"
+}
+
 Common filename patterns to recognize:
 - Rust targets: x86_64-unknown-linux-musl, aarch64-apple-darwin -> os: linux/darwin, arch: amd64/arm64
 - Go targets: linux_amd64, darwin_arm64 -> os: linux/darwin, arch: amd64/arm64
@@ -1001,7 +1023,7 @@ Common filename patterns to recognize:
 
 When analyzing assets:
 - Look for patterns in filenames that indicate OS and architecture
-- Identify the archive format (tar.gz, zip, or bare binary)
+- Identify the archive format from the file extension: tar.gz, tar.xz, zip, tbz (bzip2 tar), tgz, or binary (no extension)
 - Determine the executable name inside the archive
 - Consider common verification commands (tool --version, tool version)
 
