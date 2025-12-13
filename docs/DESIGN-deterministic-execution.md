@@ -306,8 +306,8 @@ The cache key is based on what Phase 1 produces, not what the user typed. This m
                     │                           │
                     ▼                           ▼
           ┌─────────────────┐         ┌─────────────────┐
-          │   Cache Hit     │         │   Cache Miss    │
-          │   (or --fresh)  │         │   (Phase 2)     │
+          │   Cache Hit     │         │  Cache Miss     │
+          │                 │         │  (or --fresh)   │
           └────────┬────────┘         └────────┬────────┘
                    │                           │
                    │                           ▼
