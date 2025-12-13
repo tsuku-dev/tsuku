@@ -38,7 +38,7 @@ graph TD
     A491 --> A494
     Phase2 -.-> Future
 
-    style A488 fill:#c8e6c9
+    style A488 fill:#bbdefb
     style A489 fill:#fff9c4
     style A490 fill:#fff9c4
     style A491 fill:#fff9c4
@@ -51,7 +51,7 @@ graph TD
     style A498 fill:#e1bee7
 ```
 
-**Legend**: Green = ready, Yellow = blocked, Purple = needs-design
+**Legend**: Green = done, Blue = ready, Yellow = blocked, Purple = needs-design
 
 ### Implementation Issues
 
