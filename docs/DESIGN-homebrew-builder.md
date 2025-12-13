@@ -71,7 +71,7 @@ The LLM generates a recipe without platform-specific details; the action resolve
 
 ## Decision Drivers
 
-- **Security first**: Generated recipes execute binaries on user machines; validation is non-negotiable
+- **Security by default**: Validation enabled by default, but users can opt-out with `--skip-validation`
 - **Leverage existing infrastructure**: Reuse `homebrew_bottle` action, LLM client, container validator
 - **Incremental complexity**: Start with bottles (simpler), extend to source builds (harder)
 - **Predictable success rate**: Target ~75% success rate for bottle-based formulas
@@ -190,7 +190,7 @@ Casks are simpler (declarative, no build logic) but:
 3. **homebrew-core only**: Third-party taps require explicit opt-in
 4. **LLM output schema excludes checksums**: Obtained from GHCR at runtime
 5. **URL allowlist**: Only `ghcr.io`, `github.com`, `formulae.brew.sh`
-6. **Container validation mandatory**: No `--skip-validation` for LLM-generated recipes
+6. **Container validation by default**: Users can pass `--skip-validation` to trust Homebrew directly
 
 **Prompt injection risk**: Formula descriptions are user-controlled content. Mitigations:
 - Structured prompts with JSON code blocks
@@ -1039,7 +1039,9 @@ Implementation is organized into two major phases: Bottles (Phase 1) and Source 
 
 ## Security Considerations
 
-Security is non-negotiable for tsuku. Generated recipes execute binaries on user machines.
+Security is important, but we trust Homebrew. For homebrew-core formulas, using tsuku should be equivalent to running `brew install` - we're fetching from the same trusted source (GHCR bottles, Homebrew CI-vetted formulas).
+
+Validation catches LLM mistakes (wrong binary names, missing deps), not Homebrew supply chain attacks. Users can skip validation with `--skip-validation` when they trust the formula.
 
 ### Threat Model
 
@@ -1156,7 +1158,7 @@ Third-party tap support requires explicit opt-in with security warnings.
 - [ ] Formula metadata sanitization (control chars, template syntax, max lengths)
 - [ ] Tool-use enforcement (no free-text LLM responses)
 - [ ] `homebrew_bottle` action for bottle-based recipes
-- [ ] Container validation with `--network=none` mandatory
+- [ ] Container validation with `--network=none` (enabled by default, skippable)
 - [ ] Tap source validation (reject non-homebrew-core formulas)
 - [ ] Prompt injection test cases in CI
 - [ ] API key leak audit (no secrets in logs)
