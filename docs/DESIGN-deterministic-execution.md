@@ -56,7 +56,7 @@ The upstream strategic design mandates that `tsuku install foo` must be function
 3. **Performance**: Avoid redundant plan generation when cached plans are valid
 4. **Consistency**: `tsuku eval` and `tsuku install` should have coherent, predictable caching behavior
 5. **Industry alignment**: Follow established patterns from Nix, Terraform, Cargo, npm
-6. **Backward compatibility**: Existing installations without plans should continue to work
+6. **Simplicity**: Prefer clean architecture over backward compatibility (pre-1.0, no users yet)
 
 ## Considered Options
 
@@ -196,36 +196,22 @@ Add a new `ExecutePlan(ctx, plan)` method alongside existing `Execute(ctx)`.
 - Clear separation of concerns
 
 **Cons:**
-- Two code paths to maintain initially
+- Two code paths to maintain
 - Risk of divergence between Execute and ExecutePlan
 
-#### Option 4B: Rewrite Execute to Use Plans
+#### Option 4B: Replace Execute with Plan-Based Flow
 
-Modify `Execute(ctx)` to internally generate a plan, then execute it.
-
-**Pros:**
-- Single code path
-- Guarantees equivalence
-- Cleaner long-term architecture
-
-**Cons:**
-- Larger change
-- Requires all callers to have plans available
-- Harder to review/test incrementally
-
-#### Option 4C: Execute Delegates to ExecutePlan
-
-`Execute(ctx)` generates plan and calls `ExecutePlan(ctx, plan)`. Both methods public.
+Remove `Execute(ctx)`, replace with `ExecutePlan(ctx, plan)` as the only execution method.
 
 **Pros:**
-- Single execution path (ExecutePlan)
-- Backward compatible (Execute still works)
+- Single code path (all execution goes through plans)
+- Guarantees architectural equivalence
+- Clean architecture, no legacy path
 - Enables Milestone 3 (`--plan` flag) naturally
-- Incremental migration possible
 
 **Cons:**
-- Two entry points to document
-- Plan generation always happens (even if Execute called)
+- All callers must provide plans
+- Larger refactoring change
 
 ### Decision 5: Checksum Mismatch Behavior
 
@@ -273,11 +259,11 @@ Fail on mismatch, but provide clear recovery command (`--refresh` to regenerate 
 
 ## Decision Outcome
 
-**Chosen: 1A + 2C + 3B + 4C + 5C**
+**Chosen: 1A + 2C + 3B + 4B + 5C**
 
 ### Summary
 
-`tsuku eval` always generates fresh plans (1A) while `tsuku install` uses cached plans for exact versions and regenerates for dynamic constraints (2C). Plans are validated against recipe hash, format version, and platform (3B). The executor delegates to an `ExecutePlan` method that handles plan execution (4C). Checksum mismatches are hard failures with clear recovery instructions (5C).
+`tsuku eval` always generates fresh plans (1A) while `tsuku install` uses cached plans for exact versions and regenerates for dynamic constraints (2C). Plans are validated against recipe hash, format version, and platform (3B). The executor's `Execute()` method is replaced with `ExecutePlan()` as the only execution path (4B). Checksum mismatches are hard failures with clear recovery instructions (5C).
 
 ### Rationale
 
@@ -287,7 +273,7 @@ Fail on mismatch, but provide clear recovery command (`--refresh` to regenerate 
 
 **Multi-factor validation (3B)** prevents subtle bugs. Recipe hash alone misses format version evolution (plan format v1 vs v2) and platform mismatches. Full validation ensures cached plans are actually compatible.
 
-**Execute delegates to ExecutePlan (4C)** provides a clean architecture where all execution goes through one code path, while maintaining backward compatibility. This naturally supports Milestone 3 (`tsuku install --plan <file>`) since `ExecutePlan` already exists.
+**Replace Execute with ExecutePlan (4B)** provides the cleanest architecture. Since we're pre-1.0 with no users, backward compatibility isn't a concern. Removing the old `Execute()` method ensures all execution goes through plans by construction—there's no way to accidentally bypass the plan-based flow. This naturally supports Milestone 3 (`tsuku install --plan <file>`) since `ExecutePlan` is the only entry point.
 
 **Hard failure with recovery (5C)** balances security with usability. Checksum mismatches indicate upstream changes—potentially malicious re-tagging. Hard failure prevents silent installation of modified binaries. The `--refresh` flag provides a clear, intentional path forward. This aligns with Cargo's strict `--locked` mode and npm's `npm ci` behavior.
 
@@ -297,11 +283,15 @@ By choosing version-constraint-based caching (2C), we accept:
 - More complex version parsing logic
 - Users must understand the version constraint taxonomy
 
+By choosing to replace Execute (4B), we accept:
+- All callers must provide plans (no direct recipe execution)
+- Larger initial refactoring effort
+
 By choosing hard failure on checksum mismatch (5C), we accept:
 - Blocked installations when upstream changes
 - Users must explicitly opt-in to accepting changes via `--refresh`
 
-These trade-offs favor security and determinism over convenience, which aligns with the project's philosophy.
+These trade-offs favor simplicity, security, and determinism, which aligns with the project's philosophy.
 
 ## Solution Architecture
 
@@ -784,17 +774,18 @@ The following security improvements are explicitly out of scope for this design 
 
 - **Deterministic installations**: Exact version constraints produce identical results across time and machines
 - **Detects upstream changes**: Checksum mismatches surface supply chain concerns
-- **Single execution path**: All installations go through `ExecutePlan`, ensuring consistency
+- **Single execution path**: All installations go through `ExecutePlan`, ensuring consistency by construction
+- **Clean architecture**: No legacy code path to maintain; plan-based flow is the only way to install
 - **Performance improvement**: Cached plans avoid redundant downloads and checksum computation
 - **Foundation for Milestone 3**: `ExecutePlan` enables `tsuku install --plan <file>`
 
 ### Negative
 
-- **Breaking change for workflows expecting fresh plans**: Scripts that reinstall expecting latest must use `--refresh`
 - **Increased complexity**: Version constraint classification and cache validation add code paths
-- **Blocked installations on upstream changes**: Users must explicitly acknowledge changes
+- **Blocked installations on upstream changes**: Users must explicitly acknowledge changes via `--refresh`
+- **All callers must provide plans**: Direct recipe execution is no longer possible
 
 ### Neutral
 
-- **Backward compatibility maintained**: Existing `state.json` files without plans continue to work (treated as cache miss)
 - **eval behavior unchanged**: `tsuku eval` continues to generate fresh plans
+- **Existing state files without plans**: Treated as cache miss, triggers fresh plan generation
