@@ -275,6 +275,8 @@ The solution refactors the installation flow into two distinct phases:
 
 The cache key is based on what Phase 1 produces, not what the user typed. This means `tsuku eval ripgrep` and `tsuku eval ripgrep@14.1.0` that resolve to the same version share the same cache.
 
+**Download cache reuse**: Phase 2 downloads artifacts to `$TSUKU_HOME/cache/downloads/` to compute checksums. When `ExecutePlan()` runs, the download action checks this cache first—if the file exists and the checksum matches the plan, the download is skipped. This avoids re-downloading artifacts that were just verified during plan generation.
+
 ### Component Architecture
 
 ```
