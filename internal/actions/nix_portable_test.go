@@ -73,3 +73,90 @@ func TestResolveNixPortable_NotInstalled(t *testing.T) {
 	// Just verify it doesn't panic
 	_ = result
 }
+
+func TestGetNixFlakeMetadata_NixPortableNotAvailable(t *testing.T) {
+	// Skip if nix-portable is actually available
+	if ResolveNixPortable() != "" {
+		t.Skip("nix-portable is installed, skipping unavailable test")
+	}
+
+	_, err := GetNixFlakeMetadata(context.Background(), "nixpkgs#hello")
+	if err == nil {
+		t.Error("GetNixFlakeMetadata() should fail when nix-portable is not available")
+	}
+	if err != nil && err.Error() != "nix-portable not available" {
+		t.Errorf("Expected 'nix-portable not available' error, got: %v", err)
+	}
+}
+
+func TestGetNixDerivationPath_NixPortableNotAvailable(t *testing.T) {
+	// Skip if nix-portable is actually available
+	if ResolveNixPortable() != "" {
+		t.Skip("nix-portable is installed, skipping unavailable test")
+	}
+
+	_, _, err := GetNixDerivationPath(context.Background(), "nixpkgs#hello")
+	if err == nil {
+		t.Error("GetNixDerivationPath() should fail when nix-portable is not available")
+	}
+	if err != nil && err.Error() != "nix-portable not available" {
+		t.Errorf("Expected 'nix-portable not available' error, got: %v", err)
+	}
+}
+
+func TestGetNixVersion_NixPortableNotAvailable(t *testing.T) {
+	// Skip if nix-portable is actually available
+	if ResolveNixPortable() != "" {
+		t.Skip("nix-portable is installed, skipping unavailable test")
+	}
+
+	version := GetNixVersion()
+	if version != "" {
+		t.Errorf("GetNixVersion() should return empty string when nix-portable is not available, got: %q", version)
+	}
+}
+
+func TestFlakeMetadataStruct(t *testing.T) {
+	// Verify FlakeMetadata struct can be instantiated and holds JSON data
+	metadata := FlakeMetadata{
+		URL:         "github:NixOS/nixpkgs/abc123",
+		ResolvedURL: "https://github.com/NixOS/nixpkgs/archive/abc123.tar.gz",
+		Locked:      []byte(`{"type": "github", "rev": "abc123"}`),
+		Locks:       []byte(`{"version": 7, "root": "root"}`),
+	}
+
+	if metadata.URL != "github:NixOS/nixpkgs/abc123" {
+		t.Errorf("metadata.URL = %q, want %q", metadata.URL, "github:NixOS/nixpkgs/abc123")
+	}
+	if metadata.ResolvedURL != "https://github.com/NixOS/nixpkgs/archive/abc123.tar.gz" {
+		t.Errorf("metadata.ResolvedURL = %q, want expected value", metadata.ResolvedURL)
+	}
+	if len(metadata.Locked) == 0 {
+		t.Error("metadata.Locked should not be empty")
+	}
+	if len(metadata.Locks) == 0 {
+		t.Error("metadata.Locks should not be empty")
+	}
+}
+
+func TestDerivationInfoStruct(t *testing.T) {
+	// Verify DerivationInfo struct can be instantiated and holds output paths
+	info := DerivationInfo{
+		Outputs: map[string]struct {
+			Path string `json:"path"`
+		}{
+			"out": {Path: "/nix/store/abc123-hello-1.0.0"},
+			"dev": {Path: "/nix/store/xyz789-hello-1.0.0-dev"},
+		},
+	}
+
+	if len(info.Outputs) != 2 {
+		t.Errorf("len(info.Outputs) = %d, want 2", len(info.Outputs))
+	}
+	if info.Outputs["out"].Path != "/nix/store/abc123-hello-1.0.0" {
+		t.Errorf("info.Outputs[out].Path = %q, want expected value", info.Outputs["out"].Path)
+	}
+	if info.Outputs["dev"].Path != "/nix/store/xyz789-hello-1.0.0-dev" {
+		t.Errorf("info.Outputs[dev].Path = %q, want expected value", info.Outputs["dev"].Path)
+	}
+}

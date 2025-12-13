@@ -1,6 +1,8 @@
 package actions
 
 import (
+	"context"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -145,4 +147,127 @@ func TestGetNixInternalDir(t *testing.T) {
 	if !strings.Contains(dir, ".nix-internal") {
 		t.Errorf("GetNixInternalDir() = %q, expected to contain '.nix-internal'", dir)
 	}
+}
+
+func TestNixInstallAction_Decompose_PlatformCheck(t *testing.T) {
+	// Skip on Linux - the platform check passes there
+	if runtime.GOOS == "linux" {
+		t.Skip("Skipping platform check test on Linux")
+	}
+
+	action := &NixInstallAction{}
+	ctx := &EvalContext{
+		Context: context.Background(),
+	}
+	params := map[string]interface{}{
+		"package":     "hello",
+		"executables": []string{"hello"},
+	}
+
+	_, err := action.Decompose(ctx, params)
+	if err == nil {
+		t.Error("Expected platform error on non-Linux")
+	}
+	if err != nil && !strings.Contains(err.Error(), "only supports Linux") {
+		t.Errorf("Expected 'only supports Linux' error, got: %v", err)
+	}
+}
+
+func TestNixInstallAction_Decompose_MissingPackage(t *testing.T) {
+	// Skip on non-Linux
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping on non-Linux")
+	}
+
+	action := &NixInstallAction{}
+	ctx := &EvalContext{
+		Context: context.Background(),
+	}
+	params := map[string]interface{}{
+		"executables": []string{"hello"},
+	}
+
+	_, err := action.Decompose(ctx, params)
+	if err == nil {
+		t.Error("Expected error for missing package")
+	}
+	if err != nil && !strings.Contains(err.Error(), "requires 'package'") {
+		t.Errorf("Expected 'requires package' error, got: %v", err)
+	}
+}
+
+func TestNixInstallAction_Decompose_InvalidPackage(t *testing.T) {
+	// Skip on non-Linux
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping on non-Linux")
+	}
+
+	action := &NixInstallAction{}
+	ctx := &EvalContext{
+		Context: context.Background(),
+	}
+	params := map[string]interface{}{
+		"package":     "hello;rm -rf /",
+		"executables": []string{"hello"},
+	}
+
+	_, err := action.Decompose(ctx, params)
+	if err == nil {
+		t.Error("Expected error for invalid package")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid nixpkgs package name") {
+		t.Errorf("Expected 'invalid nixpkgs package name' error, got: %v", err)
+	}
+}
+
+func TestNixInstallAction_Decompose_MissingExecutables(t *testing.T) {
+	// Skip on non-Linux
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping on non-Linux")
+	}
+
+	action := &NixInstallAction{}
+	ctx := &EvalContext{
+		Context: context.Background(),
+	}
+	params := map[string]interface{}{
+		"package": "hello",
+	}
+
+	_, err := action.Decompose(ctx, params)
+	if err == nil {
+		t.Error("Expected error for missing executables")
+	}
+	if err != nil && !strings.Contains(err.Error(), "requires 'executables'") {
+		t.Errorf("Expected 'requires executables' error, got: %v", err)
+	}
+}
+
+func TestNixInstallAction_Decompose_InvalidExecutable(t *testing.T) {
+	// Skip on non-Linux
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping on non-Linux")
+	}
+
+	action := &NixInstallAction{}
+	ctx := &EvalContext{
+		Context: context.Background(),
+	}
+	params := map[string]interface{}{
+		"package":     "hello",
+		"executables": []string{"../evil"},
+	}
+
+	_, err := action.Decompose(ctx, params)
+	if err == nil {
+		t.Error("Expected error for invalid executable")
+	}
+	if err != nil && !strings.Contains(err.Error(), "invalid executable name") {
+		t.Errorf("Expected 'invalid executable name' error, got: %v", err)
+	}
+}
+
+func TestNixInstallAction_ImplementsDecomposable(t *testing.T) {
+	// Verify that NixInstallAction implements Decomposable interface
+	var _ Decomposable = (*NixInstallAction)(nil)
 }
