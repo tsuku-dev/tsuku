@@ -45,6 +45,10 @@ type planCacheReader interface {
 // getOrGeneratePlan implements the two-phase plan retrieval flow:
 // Phase 1 (resolution) always runs, then checks cache, then generates if needed.
 // Returns a plan ready for ExecutePlan().
+//
+// Used by: runInstallWithPlan (wired in #478)
+var _ = getOrGeneratePlan // nolint:unused // infrastructure for #478
+
 func getOrGeneratePlan(
 	ctx context.Context,
 	exec *executor.Executor,
