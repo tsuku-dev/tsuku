@@ -816,7 +816,7 @@ func TestHomebrewBuilder_inspectBottle(t *testing.T) {
 func TestHomebrewBuilder_fetchFormulaJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/formula/test.json" {
-			w.Write([]byte(`{"name": "test", "desc": "Test formula"}`))
+			_, _ = w.Write([]byte(`{"name": "test", "desc": "Test formula"}`))
 			return
 		}
 		if r.URL.Path == "/api/formula/notfound.json" {
@@ -927,7 +927,7 @@ func TestHomebrewBuilder_formatValidationError_LongOutput(t *testing.T) {
 func TestHomebrewBuilder_executeToolCall_DefaultFormula(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/formula/defaultformula.json" {
-			w.Write([]byte(`{"name": "defaultformula"}`))
+			_, _ = w.Write([]byte(`{"name": "defaultformula"}`))
 			return
 		}
 		http.NotFound(w, r)
