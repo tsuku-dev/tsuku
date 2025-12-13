@@ -28,13 +28,13 @@ None - all changes are in existing file.
 
 ## Implementation Steps
 
-- [ ] Add `PrimitiveStep` struct to match design (same as `Step` but for fully decomposed results)
-- [ ] Add `DecomposeToPrimitives()` function with recursive logic
-- [ ] Add cycle detection using visited set with action+params hash
-- [ ] Add helper function to compute params hash for cycle detection
-- [ ] Add unit tests for recursive decomposition
-- [ ] Add unit tests for cycle detection
-- [ ] Add unit tests for checksum/size propagation
+- [x] Add `PrimitiveStep` struct to match design (same as `Step` but for fully decomposed results)
+- [x] Add `DecomposeToPrimitives()` function with recursive logic
+- [x] Add cycle detection using visited set with action+params hash
+- [x] Add helper function to compute params hash for cycle detection
+- [x] Add unit tests for recursive decomposition
+- [x] Add unit tests for cycle detection
+- [x] Add unit tests for checksum/size propagation
 
 Mark each step [x] after it is implemented and committed. This enables clear resume detection.
 
