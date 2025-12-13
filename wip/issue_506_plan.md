@@ -17,12 +17,12 @@ Follow the design document (docs/DESIGN-plan-based-installation.md) exactly. Cre
 - `cmd/tsuku/plan_utils_test.go` - Unit tests for both functions
 
 ## Implementation Steps
-- [ ] Create `cmd/tsuku/plan_utils.go` with `loadPlanFromSource()` function
-- [ ] Add `validateExternalPlan()` function that wraps `executor.ValidatePlan()`
-- [ ] Create unit tests for file loading scenarios
-- [ ] Create unit tests for stdin loading scenarios
-- [ ] Create unit tests for validation scenarios (platform, tool name)
-- [ ] Run `go vet`, `go test`, and `go build` to verify
+- [x] Create `cmd/tsuku/plan_utils.go` with `loadPlanFromSource()` function
+- [x] Add `validateExternalPlan()` function that wraps `executor.ValidatePlan()`
+- [x] Create unit tests for file loading scenarios
+- [x] Create unit tests for stdin loading scenarios
+- [x] Create unit tests for validation scenarios (platform, tool name)
+- [x] Run `go vet`, `go test`, and `go build` to verify
 
 ## Testing Strategy
 - Unit tests for `loadPlanFromSource()`:
@@ -44,12 +44,12 @@ Follow the design document (docs/DESIGN-plan-based-installation.md) exactly. Cre
 - **Mitigation**: Use `io.Reader` abstraction and inject test readers
 
 ## Success Criteria
-- [ ] `loadPlanFromSource()` handles file and stdin paths correctly
-- [ ] `validateExternalPlan()` calls `ValidatePlan()` and adds platform/tool checks
-- [ ] Unit tests cover all scenarios from acceptance criteria
-- [ ] `go vet ./...` passes
-- [ ] `go test ./...` passes (excluding pre-existing LLM failures)
-- [ ] `go build ./cmd/tsuku` succeeds
+- [x] `loadPlanFromSource()` handles file and stdin paths correctly
+- [x] `validateExternalPlan()` calls `ValidatePlan()` and adds platform/tool checks
+- [x] Unit tests cover all scenarios from acceptance criteria
+- [x] `go vet ./...` passes
+- [x] `go test ./...` passes (excluding pre-existing LLM failures)
+- [x] `go build ./cmd/tsuku` succeeds
 
 ## Open Questions
 None - design document provides clear specifications.
