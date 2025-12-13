@@ -472,6 +472,8 @@ Detailed research was conducted for each supported ecosystem. Full reports are a
 
 ### Go
 
+> Full details: [ecosystem_go.md](deterministic-builds/ecosystem_go.md)
+
 **Lock mechanism**: `go.sum` contains cryptographic checksums for all module dependencies. Go's Minimum Version Selection (MVS) algorithm ensures reproducible dependency resolution.
 
 **Eval-time capture**:
@@ -506,6 +508,8 @@ type GoBuildParams struct {
 
 ### Cargo
 
+> Full details: [ecosystem_cargo.md](deterministic-builds/ecosystem_cargo.md)
+
 **Lock mechanism**: `Cargo.lock` contains SHA-256 checksums for all crate dependencies in TOML format.
 
 **Eval-time capture**:
@@ -536,6 +540,8 @@ type CargoBuildParams struct {
 **Security**: Build scripts execute arbitrary code. Mitigated by sandboxing, checksum verification.
 
 ### npm
+
+> Full details: [ecosystem_npm.md](deterministic-builds/ecosystem_npm.md)
 
 **Lock mechanism**: `package-lock.json` v2/v3 contains complete dependency tree with SHA-512 integrity hashes.
 
@@ -568,6 +574,8 @@ type NpmExecParams struct {
 
 ### pip
 
+> Full details: [ecosystem_pip.md](deterministic-builds/ecosystem_pip.md)
+
 **Lock mechanism**: `requirements.txt` with hashes (via pip-tools). Format: `package==version --hash=sha256:...`
 
 **Eval-time capture**:
@@ -599,6 +607,8 @@ type PipInstallParams struct {
 
 ### gem
 
+> Full details: [ecosystem_gem.md](deterministic-builds/ecosystem_gem.md)
+
 **Lock mechanism**: `Gemfile.lock` with SHA-256 checksums (Bundler 2.6+).
 
 **Eval-time capture**:
@@ -628,6 +638,8 @@ type GemExecParams struct {
 **Security**: Install hooks execute arbitrary code (no disable mechanism). Platform gems may differ.
 
 ### Nix
+
+> Full details: [ecosystem_nix.md](deterministic-builds/ecosystem_nix.md)
 
 **Lock mechanism**: `flake.lock` (JSON) pins all flake inputs. Derivation hashes provide content-addressable builds.
 
@@ -663,6 +675,8 @@ type NixRealizeParams struct {
 **Note**: Nix provides the strongest reproducibility guarantees of all ecosystems.
 
 ### CPAN
+
+> Full details: [ecosystem_cpan.md](deterministic-builds/ecosystem_cpan.md)
 
 **Lock mechanism**: `cpanfile.snapshot` (via Carton) captures distribution versions and dependency graph.
 
