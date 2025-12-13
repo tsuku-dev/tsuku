@@ -1,6 +1,6 @@
 # Design: Homebrew Builder
 
-**Status**: Draft (ready for review)
+**Status**: Approved
 
 ## Context and Problem Statement
 
