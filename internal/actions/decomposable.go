@@ -71,6 +71,7 @@ var primitives = map[string]bool{
 	"install_libraries": true,
 	// Ecosystem primitives - have residual non-determinism
 	"cargo_build":    true,
+	"cmake_build":    true,
 	"configure_make": true,
 	"cpan_install":   true,
 	"gem_exec":       true,
@@ -97,6 +98,7 @@ var deterministicActions = map[string]bool{
 	// Ecosystem primitives - NOT deterministic due to compiler versions,
 	// native extensions, platform-specific behavior, etc.
 	"cargo_build":    false,
+	"cmake_build":    false,
 	"configure_make": false,
 	"cpan_install":   false,
 	"gem_exec":       false,

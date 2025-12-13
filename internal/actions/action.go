@@ -89,6 +89,7 @@ func init() {
 	Register(&GoBuildAction{})
 	Register(&NixRealizeAction{})
 	Register(&ConfigureMakeAction{})
+	Register(&CMakeBuildAction{})
 
 	// Composite actions
 	Register(&DownloadArchiveAction{})

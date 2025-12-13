@@ -33,7 +33,7 @@ Extend the existing HomebrewBuilder with two new LLM tools (`fetch_formula_ruby`
   - Run ./configure with args, then make, then make install
   - Copy executables to install_dir/bin
 
-- [ ] 2. Create `cmake_build` action
+- [x] 2. Create `cmake_build` action
   - Parameters: source_dir, cmake_args, executables
   - Create build directory, run cmake, run make
   - Copy executables to install_dir/bin

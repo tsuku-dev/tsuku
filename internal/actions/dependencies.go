@@ -30,6 +30,7 @@ var ActionDependencies = map[string]ActionDeps{
 	"nix_install":    {InstallTime: []string{"nix-portable"}, Runtime: nil},
 	"nix_realize":    {InstallTime: []string{"nix-portable"}, Runtime: nil},
 	"configure_make": {InstallTime: nil, Runtime: nil}, // Uses system make/cc
+	"cmake_build":    {InstallTime: nil, Runtime: nil}, // Uses system cmake/cc
 
 	// Download/extract actions: no dependencies
 	// These actions work with files directly using Go's standard library.
