@@ -25,12 +25,12 @@ The existing `Execute()` method remains functional for now (cleanup in #479).
 
 ## Implementation Steps
 
-- [ ] Add `computeFileChecksum()` helper function
-- [ ] Add `ExecutePlan(ctx, plan)` method to Executor
-- [ ] Add `executeDownloadWithVerification()` helper method
-- [ ] Add unit tests for ExecutePlan with mock plans
-- [ ] Add tests for checksum mismatch scenarios
-- [ ] Verify all tests pass
+- [x] Add `computeFileChecksum()` helper function
+- [x] Add `ExecutePlan(ctx, plan)` method to Executor
+- [x] Add `executeDownloadWithVerification()` helper method
+- [x] Add unit tests for ExecutePlan with mock plans
+- [x] Add tests for checksum mismatch scenarios
+- [x] Verify all tests pass
 
 ## Testing Strategy
 
