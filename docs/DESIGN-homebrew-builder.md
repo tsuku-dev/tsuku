@@ -32,6 +32,7 @@ This manual process is time-consuming and doesn't scale. A developer wanting to 
 **In scope:**
 - LLM-based parsing of Homebrew core formulas
 - Bottle extraction (pre-built binaries from GHCR)
+- **Source-based builds** when bottles are unavailable
 - **Platform-agnostic recipes** that work on both macOS and Linux
 - Dependency extraction and signaling
 - Integration with existing `homebrew_bottle` action
@@ -39,8 +40,16 @@ This manual process is time-consuming and doesn't scale. A developer wanting to 
 **Out of scope (future work):**
 - Casks (GUI applications) - different DSL, macOS-only installation semantics
 - Third-party taps - security and discovery considerations
-- Source-based builds - deferred until bottle coverage proves insufficient
 - Automatic dependency resolution - builders signal up, not recurse
+
+### Implementation Phases
+
+The design covers full Homebrew formula support, but implementation is phased:
+
+1. **Phase 1 (Bottles)**: LLM-generated recipes using `homebrew_bottle` action for formulas with pre-built bottles
+2. **Phase 2 (Source)**: LLM-parsed `install` methods translated to tsuku actions for formulas without bottles
+
+This phasing allows validating the LLM infrastructure on the simpler bottle case before tackling source builds.
 
 ### Platform Strategy
 
@@ -310,43 +319,60 @@ Start with bottle-based generation (Option B), fall back to source builds (Optio
 
 ## Decision Outcome
 
-**Chosen option: Option B (LLM-Enhanced Bottle Builder)**
+**Chosen option: Option D (Hybrid) with phased implementation**
+
+The design covers both bottle-based and source-based recipe generation. Implementation is phased to validate the LLM infrastructure on the simpler bottle case first.
 
 ### Rationale
 
-Option B provides the best balance of success rate, security, and implementation complexity:
+Option D provides maximum formula coverage while managing complexity through phased delivery:
 
-1. **High success rate (~75-85%)**: LLM can intelligently discover executables by inspecting bottle contents and understanding formula semantics. This is significantly better than deterministic guessing (~50-60%).
+1. **Full coverage goal**: The design should support all Homebrew core formulas, not just those with bottles. Some valuable tools don't have bottles, and bottle availability varies by platform.
 
-2. **Proven infrastructure**: Follows the same pattern as `GitHubReleaseBuilder` - conversation loop, tool use, container validation, repair loop. Most code can be shared or adapted.
+2. **Phased risk management**: Start with bottles (simpler, higher success rate) to validate the LLM infrastructure before tackling source builds.
 
-3. **Manageable security**: Bottles are pre-built by Homebrew's trusted CI. We never execute formula Ruby code. Schema enforcement prevents LLM from generating malicious recipes.
+3. **Shared infrastructure**: Both paths use the same LLM conversation loop, validation executor, and dependency tree discovery. The difference is in the tools available and the generated recipe structure.
 
-4. **Cost-effective**: At ~$0.05 per recipe, the LLM cost is acceptable for one-time recipe generation. Users generate once, install many times.
+4. **Platform coverage**: Source builds may be needed when bottles exist for one platform but not another (e.g., macOS bottle available, Linux bottle missing).
 
-5. **Covers majority use cases**: Most popular Homebrew formulas have bottles. The long tail of bottle-less formulas can be addressed in future work.
+### Implementation Phases
 
-### Rejected Options
+**Phase 1: Bottles (Option B)**
+- LLM-generated recipes using `homebrew_bottle` action
+- Target: ~75-85% success rate on formulas with bottles
+- Estimated effort: 1-2 weeks
 
-- **Option A (Deterministic)**: Rejected because the binary name guessing problem significantly reduces success rate. `ripgrep` → `rg`, `fd-find` → `fd` patterns are too common.
+**Phase 2: Source Builds (Option C)**
+- LLM-parsed `install` methods translated to tsuku actions
+- Target: ~50-70% success rate on formulas without bottles
+- Estimated effort: 3-4 weeks additional
 
-- **Option C (Source Builds)**: Deferred to future work. The complexity of parsing Ruby `def install` blocks, handling resources/patches, and security implications of source builds are not justified for MVP.
+### Rejected Option
 
-- **Option D (Hybrid)**: Deferred. Adding source fallback increases complexity significantly. Better to launch with bottle-only support and measure demand for source builds.
+- **Option A (Deterministic)**: Rejected because binary name guessing significantly reduces success rate. `ripgrep` → `rg`, `fd-find` → `fd` patterns are too common.
 
 ### Acceptance Criteria
 
-The Homebrew Builder MVP is complete when:
+**Phase 1 (Bottles) is complete when:**
 
 1. `tsuku create <tool> --from homebrew:<formula>` generates a working recipe
 2. Generated recipes are **platform-agnostic** (single recipe works on macOS and Linux)
-3. Generated recipes use `homebrew_bottle` action exclusively
-4. Container validation passes with `--network=none` isolation on Linux
-5. Success rate on top 100 Homebrew formulas exceeds 70%
+3. Formulas with bottles use `homebrew_bottle` action
+4. Container validation passes with `--network=none` isolation
+5. Success rate on top 100 Homebrew formulas (with bottles) exceeds 70%
 6. Dependency tree is discovered via JSON API before LLM invocation
 7. User sees full dependency tree with cost estimate and confirms before generation
 8. Recipes are generated in topological order (dependencies first)
 9. Security constraints are enforced (URL allowlist, no checksums in LLM output)
+
+**Phase 2 (Source Builds) is complete when:**
+
+1. Formulas without bottles generate recipes using tsuku build actions
+2. LLM correctly maps common build systems: autotools, CMake, Cargo, Go, Make
+3. Platform conditionals (`on_macos`, `on_linux`) are handled correctly
+4. Resources and patches are downloaded and applied
+5. Success rate on formulas without bottles exceeds 50%
+6. Source build security controls are enforced (see Security Considerations)
 
 ## Solution Architecture
 
@@ -566,6 +592,163 @@ runtime = ["pcre2"]
 This single recipe is tested:
 - **Locally on Linux** via container validation
 - **On macOS CI** via GitHub Actions runners
+
+### Source Build Architecture (Phase 2)
+
+When a formula lacks bottles (or bottles for a specific platform), the LLM parses the formula's `install` method and generates a recipe using tsuku's build actions.
+
+#### Additional LLM Tools for Source Builds
+
+```go
+var sourceBuilderTools = []llm.ToolDef{
+    // ... existing tools (fetch_formula_json, inspect_bottle, extract_recipe) ...
+
+    {
+        Name:        "fetch_formula_ruby",
+        Description: "Fetch the raw Ruby formula file to analyze the install method, resources, and patches.",
+        Parameters: map[string]any{
+            "type": "object",
+            "properties": map[string]any{
+                "formula": map[string]any{
+                    "type":        "string",
+                    "description": "Formula name",
+                },
+            },
+            "required": []string{"formula"},
+        },
+    },
+    {
+        Name:        "extract_source_recipe",
+        Description: "Output a source-based recipe structure with build actions.",
+        Parameters: map[string]any{
+            "type": "object",
+            "properties": map[string]any{
+                "build_system": map[string]any{
+                    "type":        "string",
+                    "enum":        []string{"autotools", "cmake", "cargo", "go", "make", "custom"},
+                    "description": "Detected build system",
+                },
+                "source_url": map[string]any{
+                    "type":        "string",
+                    "description": "URL template for source archive",
+                },
+                "build_dependencies": map[string]any{
+                    "type":        "array",
+                    "items":       map[string]any{"type": "string"},
+                    "description": "Build-time dependencies",
+                },
+                "configure_args": map[string]any{
+                    "type":        "array",
+                    "items":       map[string]any{"type": "string"},
+                    "description": "Arguments for configure/cmake",
+                },
+                "executables": map[string]any{
+                    "type":        "array",
+                    "items":       map[string]any{"type": "string"},
+                    "description": "Expected executables after build",
+                },
+                "verify_command": map[string]any{
+                    "type":        "string",
+                    "description": "Command to verify installation",
+                },
+            },
+            "required": []string{"build_system", "source_url", "executables", "verify_command"},
+        },
+    },
+}
+```
+
+#### Build System Mapping
+
+| Homebrew Pattern | tsuku Action | Example |
+|-----------------|--------------|---------|
+| `system "./configure"` + `make` | `configure_make` | jq, curl |
+| `system "cmake"` | `cmake_build` | neovim, llvm |
+| `system "cargo", "install"` | `cargo_install` | ripgrep, fd |
+| `system "go", "build"` | `go_build` | gh, lazygit |
+| `bin.install "binary"` | `install_binaries` | pre-built binaries |
+
+#### Source Build Recipe Example
+
+```toml
+# Generated by HomebrewBuilder (source build) from homebrew:jq
+# Platform-agnostic: builds from source on any platform
+
+[metadata]
+name = "jq"
+description = "Lightweight and flexible command-line JSON processor"
+homepage = "https://jqlang.github.io/jq/"
+
+[version]
+provider = "homebrew:jq"
+
+[[steps]]
+action = "download"
+url = "https://github.com/jqlang/jq/releases/download/jq-{{.Version}}/jq-{{.Version}}.tar.gz"
+
+[[steps]]
+action = "extract"
+strip_dirs = 1
+
+[[steps]]
+action = "configure_make"
+configure_args = ["--disable-maintainer-mode"]
+
+[[steps]]
+action = "install_binaries"
+binaries = ["bin/jq"]
+
+[verify]
+command = "jq --version"
+
+[dependencies]
+build = ["autoconf", "automake", "libtool"]
+runtime = ["oniguruma"]
+```
+
+#### Handling Platform Conditionals
+
+When formulas have `on_macos` / `on_linux` blocks, the LLM generates platform-conditional steps:
+
+```toml
+# Formula has: on_linux do depends_on "libffi" end
+
+[dependencies.linux]
+runtime = ["libffi"]
+
+[dependencies.macos]
+runtime = []
+
+# Or for build steps with platform differences:
+[[steps]]
+action = "configure_make"
+configure_args = ["--prefix={{.InstallDir}}"]
+
+[[steps.macos]]
+action = "run_command"
+command = "install_name_tool -id @rpath/libjq.dylib lib/libjq.dylib"
+
+[[steps.linux]]
+action = "set_rpath"
+path = "lib/libjq.so"
+```
+
+#### Resources and Patches
+
+For formulas with resources (additional downloads) or patches:
+
+```toml
+# Resources are downloaded before build
+[[resources]]
+name = "tree-sitter-c"
+url = "https://github.com/tree-sitter/tree-sitter-c/archive/v0.24.1.tar.gz"
+dest = "deps/tree-sitter-c"
+
+# Patches applied after extraction
+[[patches]]
+url = "https://raw.githubusercontent.com/Homebrew/formula-patches/master/example/fix.patch"
+strip = 1
+```
 
 ### Dependency Handling
 
@@ -794,15 +977,19 @@ Homebrew formulas can have shared dependencies (diamonds) but not cycles. The tr
 
 ## Implementation Approach
 
-### Phase 1: Core Builder (MVP)
+Implementation is organized into two major phases: Bottles (Phase 1) and Source Builds (Phase 2).
+
+### Phase 1: Bottle-Based Recipes
+
+#### 1.1 Core Builder
 
 1. **HomebrewBuilder struct** implementing `Builder` interface
-2. **CanBuild**: Query Homebrew JSON API, check formula exists and has bottles
-3. **Build**: LLM conversation loop with three tools
+2. **CanBuild**: Query Homebrew JSON API, check formula exists
+3. **Build**: LLM conversation loop with bottle inspection tools
 4. **generateRecipe**: Transform extracted pattern to TOML recipe
 5. **Container validation**: Reuse existing executor with bottle pre-download
 
-### Phase 2: Dependency Tree Discovery
+#### 1.2 Dependency Tree Discovery
 
 1. **Tree traversal**: Recursively query Homebrew JSON API for runtime dependencies
 2. **Registry check**: Identify which deps already have tsuku recipes
@@ -810,19 +997,46 @@ Homebrew formulas can have shared dependencies (diamonds) but not cycles. The tr
 4. **Topological generation**: Generate recipes in dependency order (leaves first)
 5. **Progress reporting**: Show generation progress with validation status
 
-### Phase 3: Platform Validation
+#### 1.3 Cross-Platform Validation
 
-1. **Cross-platform testing**: Validate generated recipes on both Linux (local containers) and macOS (CI)
-2. **Bottle availability check**: Verify formula has bottles for all supported platforms during tree discovery
-3. **Graceful degradation**: Warn if bottle missing for a platform rather than failing entirely
+1. **Linux validation**: Container-based testing during development
+2. **macOS validation**: GitHub Actions CI for macOS-specific behavior
+3. **Bottle availability check**: Verify formula has bottles for target platforms
+4. **Graceful degradation**: Warn if bottle missing for a platform
 
-### Future Work (Not MVP)
+### Phase 2: Source Build Recipes
+
+#### 2.1 Ruby Formula Parsing
+
+1. **fetch_formula_ruby tool**: Download raw Ruby formula from homebrew-core
+2. **LLM analysis**: Parse `def install` method, identify build system
+3. **Build system detection**: Map Ruby patterns to tsuku actions (autotools, cmake, cargo, go)
+4. **extract_source_recipe tool**: Output structured build recipe
+
+#### 2.2 Platform Conditionals
+
+1. **Parse `on_macos`/`on_linux` blocks**: Extract platform-specific dependencies and build steps
+2. **Generate conditional recipe sections**: `[dependencies.linux]`, `[[steps.macos]]`
+3. **Test on both platforms**: Ensure recipe works correctly on each
+
+#### 2.3 Resources and Patches
+
+1. **Resource handling**: Download additional archives specified in formula
+2. **Patch application**: Apply patches from Homebrew formula-patches repo
+3. **inreplace operations**: Map text replacements to sed-like actions
+
+#### 2.4 Build Validation
+
+1. **Container-based builds**: Build from source in isolated container
+2. **Build tool availability**: Ensure required build tools (make, cmake, cargo) are available
+3. **Output verification**: Confirm expected binaries are produced
+
+### Future Work
 
 - **Cask support**: Different DSL, macOS-only, script execution concerns
 - **Third-party taps**: Requires tap allowlist and security warnings
-- **Source builds**: Ruby parsing complexity, deferred until demand proven
 - **Historical versions**: Homebrew API only exposes stable version
-- **Parallel generation**: Generate independent deps concurrently (respects tree structure)
+- **Parallel generation**: Generate independent deps concurrently
 
 ## Security Considerations
 
@@ -835,27 +1049,50 @@ Security is non-negotiable for tsuku. Generated recipes execute binaries on user
 | Malicious formula content | Homebrew core compromise | Critical | GHCR immutability, Homebrew CI review |
 | Prompt injection | Formula description manipulation | High | Input sanitization, tool-use-only mode, schema validation |
 | URL substitution | LLM generates malicious URLs | High | URL allowlist enforcement |
-| Checksum bypass | LLM hallucinated checksums | High | Schema excludes checksums; GHCR provides at runtime |
-| Third-party tap attack | Typosquatting, compromised maintainer | High | homebrew-core only for MVP |
-| Ruby code execution | Formula `install` method | Critical | Never execute Ruby; use JSON API only |
+| Checksum bypass | LLM hallucinated checksums | High | Schema excludes checksums; obtained from trusted source at runtime |
+| Third-party tap attack | Typosquatting, compromised maintainer | High | homebrew-core only |
+| Ruby code execution | Formula `install` method | Critical | LLM reads but never executes; builds use tsuku actions |
+| Malicious build commands | LLM generates dangerous shell commands | High | Action allowlist, no raw shell execution |
 
 ### Security Controls
 
-#### 1. Never Execute Formula Ruby
+#### 1. LLM Reads Ruby, Never Executes
 
-The builder uses Homebrew JSON API (`formulae.brew.sh/api/formula/{name}.json`) exclusively. We never:
-- Parse Ruby formula files
-- Execute `def install` blocks
-- Run Homebrew's build process
+**Phase 1 (Bottles):** Uses only Homebrew JSON API. Ruby formulas not accessed.
 
-This eliminates the primary attack vector of arbitrary code execution in formulas.
+**Phase 2 (Source Builds):** LLM reads Ruby formula to understand build steps, but:
+- Ruby code is **never executed** by tsuku
+- LLM translates Ruby patterns to **tsuku actions** (not shell commands)
+- Generated recipes use **structured actions** (`configure_make`, `cmake_build`, `cargo_install`)
+- No `run_command` action with arbitrary shell allowed in LLM output schema
 
-#### 2. Bottles Only (No Source Builds)
+Example transformation:
+```ruby
+# Homebrew Ruby (read by LLM, never executed)
+def install
+  system "./configure", "--prefix=#{prefix}"
+  system "make", "install"
+end
+```
 
-MVP generates recipes using `homebrew_bottle` action exclusively. Benefits:
-- Bottles are pre-built by Homebrew's trusted CI
+```toml
+# Generated tsuku recipe (structured actions)
+[[steps]]
+action = "configure_make"
+configure_args = ["--prefix={{.InstallDir}}"]
+```
+
+#### 2. Trusted Binary Sources
+
+**Phase 1 (Bottles):** Uses pre-built binaries from Homebrew's trusted CI:
 - SHA256 verification via GHCR manifest annotations
-- No need to trust formula build logic
+- Bottles signed by Homebrew infrastructure
+- No build logic executed
+
+**Phase 2 (Source Builds):** Downloads source from URLs in Homebrew formulas:
+- Source URLs must be from allowlisted domains (GitHub, official project sites)
+- SHA256 checksums from formula (not LLM-generated)
+- Builds happen in isolated containers with no network access
 
 #### 3. URL Allowlist
 
@@ -907,22 +1144,32 @@ Third-party tap support requires explicit opt-in with security warnings.
 | LLM hallucinated checksums | High | Medium | **Low** (schema excludes) |
 | URL substitution attack | High | Low | **Low** (allowlist) |
 | Prompt injection | High | Medium | **Medium** (sanitization + schema) |
-| Third-party tap attack | High | Medium | **None** (MVP excludes) |
-| Ruby code execution | Critical | N/A | **None** (never executed) |
+| Third-party tap attack | High | Medium | **None** (excluded) |
+| Ruby code execution | Critical | N/A | **None** (read-only, translated to actions) |
+| Malicious build commands | High | Medium | **Low** (action allowlist, no raw shell) |
 
 ### Implementation Checklist
 
-Required for PR approval:
+**Phase 1 (Bottles):**
 
 - [ ] LLM output schema excludes checksum fields
 - [ ] URL allowlist validation (GHCR, GitHub, formulae.brew.sh only)
 - [ ] Formula metadata sanitization (control chars, template syntax, max lengths)
 - [ ] Tool-use enforcement (no free-text LLM responses)
-- [ ] `homebrew_bottle` action for all generated recipes
+- [ ] `homebrew_bottle` action for bottle-based recipes
 - [ ] Container validation with `--network=none` mandatory
 - [ ] Tap source validation (reject non-homebrew-core formulas)
 - [ ] Prompt injection test cases in CI
 - [ ] API key leak audit (no secrets in logs)
+
+**Phase 2 (Source Builds):**
+
+- [ ] Source URL allowlist (GitHub, official project domains)
+- [ ] SHA256 extraction from formula (not LLM-generated)
+- [ ] Action allowlist enforcement (no raw `run_command`)
+- [ ] Build action schema validation (`configure_make`, `cmake_build`, etc.)
+- [ ] Container-based build with `--network=none`
+- [ ] Platform conditional handling (`on_macos`, `on_linux`)
 
 ## Consequences
 
@@ -940,15 +1187,15 @@ Required for PR approval:
 
 ### Negative
 
-1. **LLM cost**: Each recipe generation costs ~$0.05. For high-volume usage, this adds up.
+1. **LLM cost**: Each recipe generation costs ~$0.05-0.15 depending on complexity. For high-volume usage, this adds up.
 
 2. **API key requirement**: Users need Claude or Gemini API key for recipe generation (not for installation).
 
-3. **Slower generation**: LLM-based generation (~15s) is slower than deterministic approaches (~1s).
+3. **Slower generation**: LLM-based generation (~15-30s) is slower than deterministic approaches (~1s).
 
-4. **Success rate ceiling**: ~75-85% success rate means ~15-25% of formulas may not generate working recipes.
-
-5. **Bottle-only limitation**: Formulas without bottles (rare) cannot be supported in MVP.
+4. **Success rate varies by phase**:
+   - Phase 1 (Bottles): ~75-85% success rate
+   - Phase 2 (Source): ~50-70% success rate due to build complexity
 
 ### Risks
 
@@ -968,7 +1215,7 @@ Design accommodates future work:
 
 2. **Third-party taps**: Add tap allowlist configuration, security warnings, same builder pattern.
 
-3. **Source builds**: Add source build tools to LLM toolkit, container-based builds with Homebrew environment.
+3. **Historical versions**: Support generating recipes for specific formula versions (requires Git history traversal).
 
 4. **Cross-platform validation**: Add macOS CI runners for macOS-only formula validation.
 
