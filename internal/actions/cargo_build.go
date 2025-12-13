@@ -10,7 +10,7 @@ import (
 
 // CargoBuildAction builds Rust crates with deterministic configuration.
 // This is an ecosystem primitive that cannot be decomposed further.
-// It achieves determinism through cargo's --locked flag and environment variables.
+// It achieves determinism through cargo's --locked --offline flags and environment variables.
 type CargoBuildAction struct{}
 
 // Name returns the action name
@@ -26,13 +26,22 @@ func (a *CargoBuildAction) Name() string {
 //   - target (optional): Build target triple (defaults to host)
 //   - features (optional): Cargo features to enable
 //   - locked (optional): Use Cargo.lock for reproducibility (default: true)
-//   - output_binary (optional): Expected output binary path (relative to target dir)
+//   - offline (optional): Build without network access after pre-fetch (default: true)
+//   - no_default_features (optional): Disable default features (default: false)
+//   - all_features (optional): Enable all features (default: false)
+//   - rust_version (optional): Required Rust compiler version (e.g., "1.76.0")
 //
 // Deterministic Configuration:
-//   - SOURCE_DATE_EPOCH: Set to recipe timestamp for reproducible embedded timestamps
+//   - SOURCE_DATE_EPOCH: Set to Unix epoch (0) for reproducible embedded timestamps
 //   - CARGO_INCREMENTAL=0: Disable incremental compilation for deterministic builds
 //   - RUSTFLAGS="-C embed-bitcode=no": Smaller, more reproducible builds
 //   - --locked: Require Cargo.lock to exist and be up-to-date
+//   - --offline: Prevent network access during build (after pre-fetch)
+//
+// Security:
+//   - Pre-fetches dependencies with cargo fetch --locked
+//   - Builds with --offline to prevent network access (MITM protection)
+//   - Uses isolated CARGO_HOME per build
 //
 // Directory Structure Created:
 //
@@ -73,12 +82,38 @@ func (a *CargoBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 	// Get optional parameters
 	target, _ := GetString(params, "target")
 	features, _ := GetStringSlice(params, "features")
-	locked := true // Default to locked builds
+
+	// Boolean parameters with defaults
+	locked := true // Default to locked builds for reproducibility
 	if lockedVal, ok := params["locked"]; ok {
 		if b, ok := lockedVal.(bool); ok {
 			locked = b
 		}
 	}
+
+	offline := true // Default to offline builds for security (prevents MITM)
+	if offlineVal, ok := params["offline"]; ok {
+		if b, ok := offlineVal.(bool); ok {
+			offline = b
+		}
+	}
+
+	noDefaultFeatures := false
+	if val, ok := params["no_default_features"]; ok {
+		if b, ok := val.(bool); ok {
+			noDefaultFeatures = b
+		}
+	}
+
+	allFeatures := false
+	if val, ok := params["all_features"]; ok {
+		if b, ok := val.(bool); ok {
+			allFeatures = b
+		}
+	}
+
+	// Optional Rust version validation
+	rustVersion, _ := GetString(params, "rust_version")
 
 	// Get cargo path
 	cargoPath, _ := GetString(params, "cargo_path")
@@ -97,41 +132,91 @@ func (a *CargoBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 	if len(features) > 0 {
 		fmt.Printf("   Features: %v\n", features)
 	}
+	if noDefaultFeatures {
+		fmt.Printf("   No default features: true\n")
+	}
+	if allFeatures {
+		fmt.Printf("   All features: true\n")
+	}
 	fmt.Printf("   Locked: %v\n", locked)
+	fmt.Printf("   Offline: %v\n", offline)
 	fmt.Printf("   Using cargo: %s\n", cargoPath)
+
+	// Set up deterministic environment with isolated CARGO_HOME
+	env := buildDeterministicCargoEnv(cargoPath, ctx.WorkDir)
+
+	// Validate Rust version if specified
+	if rustVersion != "" {
+		if err := validateRustVersion(ctx, cargoPath, rustVersion, env); err != nil {
+			return err
+		}
+	}
+
+	// Verify Cargo.lock exists when locked build is requested
+	if locked {
+		cargoLock := filepath.Join(sourceDir, "Cargo.lock")
+		if _, err := os.Stat(cargoLock); err != nil {
+			return fmt.Errorf("locked build requested but Cargo.lock not found in %s", sourceDir)
+		}
+	}
+
+	// SECURITY: Validate target triple before any command execution
+	if target != "" && !isValidTargetTriple(target) {
+		return fmt.Errorf("invalid target triple '%s'", target)
+	}
+
+	// SECURITY: Validate feature names before any command execution
+	for _, feature := range features {
+		if !isValidFeatureName(feature) {
+			return fmt.Errorf("invalid feature name '%s'", feature)
+		}
+	}
+
+	// Pre-fetch dependencies if offline build is requested
+	// This populates CARGO_HOME/registry with all required crates
+	if offline && locked {
+		fmt.Printf("   Pre-fetching dependencies...\n")
+		fetchArgs := []string{"fetch", "--locked", "--manifest-path", filepath.Join(sourceDir, "Cargo.toml")}
+		if target != "" {
+			fetchArgs = append(fetchArgs, "--target", target)
+		}
+
+		fetchCmd := exec.CommandContext(ctx.Context, cargoPath, fetchArgs...)
+		fetchCmd.Dir = sourceDir
+		fetchCmd.Env = env
+		fetchOutput, err := fetchCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("cargo fetch failed: %w\nOutput: %s", err, string(fetchOutput))
+		}
+	}
 
 	// Build arguments
 	args := []string{"build", "--release"}
 
 	if locked {
-		// Verify Cargo.lock exists when locked build is requested
-		cargoLock := filepath.Join(sourceDir, "Cargo.lock")
-		if _, err := os.Stat(cargoLock); err != nil {
-			return fmt.Errorf("locked build requested but Cargo.lock not found in %s", sourceDir)
-		}
 		args = append(args, "--locked")
 	}
 
+	if offline {
+		args = append(args, "--offline")
+	}
+
 	if target != "" {
-		// SECURITY: Validate target triple
-		if !isValidTargetTriple(target) {
-			return fmt.Errorf("invalid target triple '%s'", target)
-		}
 		args = append(args, "--target", target)
 	}
 
+	// Feature flags
+	if noDefaultFeatures {
+		args = append(args, "--no-default-features")
+	}
+	if allFeatures {
+		args = append(args, "--all-features")
+	}
 	for _, feature := range features {
-		// SECURITY: Validate feature name
-		if !isValidFeatureName(feature) {
-			return fmt.Errorf("invalid feature name '%s'", feature)
-		}
 		args = append(args, "--features", feature)
 	}
 
 	fmt.Printf("   Building: cargo %s\n", strings.Join(args, " "))
-
-	// Set up deterministic environment with isolated CARGO_HOME
-	env := buildDeterministicCargoEnv(cargoPath, ctx.WorkDir)
 
 	// Create bin directory in install dir
 	binDir := filepath.Join(ctx.InstallDir, "bin")
@@ -309,4 +394,40 @@ func isValidFeatureName(feature string) bool {
 	}
 
 	return true
+}
+
+// validateRustVersion verifies the installed Rust compiler matches the required version.
+// Version format: major.minor.patch (e.g., "1.76.0")
+func validateRustVersion(ctx *ExecutionContext, cargoPath, requiredVersion string, env []string) error {
+	// Get rustc path from same directory as cargo
+	rustcPath := filepath.Join(filepath.Dir(cargoPath), "rustc")
+	if _, err := os.Stat(rustcPath); err != nil {
+		// Fall back to PATH lookup
+		rustcPath = "rustc"
+	}
+
+	cmd := exec.CommandContext(ctx.Context, rustcPath, "--version")
+	cmd.Env = env
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get rustc version: %w", err)
+	}
+
+	// Parse version from output like "rustc 1.76.0 (07dca489a 2024-02-04)"
+	versionOutput := strings.TrimSpace(string(output))
+	parts := strings.Fields(versionOutput)
+	if len(parts) < 2 {
+		return fmt.Errorf("unexpected rustc version output: %s", versionOutput)
+	}
+
+	installedVersion := parts[1]
+
+	// Check if installed version matches required version
+	if !strings.HasPrefix(installedVersion, requiredVersion) {
+		return fmt.Errorf("Rust compiler version mismatch\n  Required: rustc %s\n  Found:    rustc %s\n\n  Install the required version:\n    rustup install %s\n    rustup default %s",
+			requiredVersion, installedVersion, requiredVersion, requiredVersion)
+	}
+
+	fmt.Printf("   Rust version: %s (matches required %s)\n", installedVersion, requiredVersion)
+	return nil
 }
