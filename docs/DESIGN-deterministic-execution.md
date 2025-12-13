@@ -1,6 +1,6 @@
 # Design: Deterministic Execution (Plan-Based Installation)
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Milestone**: Deterministic Recipe Execution
 - **Author**: @dangazineu
 - **Created**: 2025-12-13
