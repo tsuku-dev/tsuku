@@ -14,13 +14,13 @@ func TestDownloadArchiveAction_Decompose(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		params         map[string]interface{}
-		wantSteps      int
-		wantActions    []string
-		wantErr        bool
-		checkDownload  func(t *testing.T, params map[string]interface{})
-		checkBinaries  func(t *testing.T, params map[string]interface{})
+		name          string
+		params        map[string]interface{}
+		wantSteps     int
+		wantActions   []string
+		wantErr       bool
+		checkDownload func(t *testing.T, params map[string]interface{})
+		checkBinaries func(t *testing.T, params map[string]interface{})
 	}{
 		{
 			name: "basic tar.gz archive",
@@ -132,12 +132,12 @@ func TestGitHubFileAction_Decompose(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		params         map[string]interface{}
-		wantSteps      int
-		wantActions    []string
-		wantErr        bool
-		checkDownload  func(t *testing.T, params map[string]interface{})
+		name          string
+		params        map[string]interface{}
+		wantSteps     int
+		wantActions   []string
+		wantErr       bool
+		checkDownload func(t *testing.T, params map[string]interface{})
 	}{
 		{
 			name: "basic github file download with binary param",
@@ -251,13 +251,13 @@ func TestHashiCorpReleaseAction_Decompose(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		params         map[string]interface{}
-		wantSteps      int
-		wantActions    []string
-		wantErr        bool
-		checkDownload  func(t *testing.T, params map[string]interface{})
-		checkBinary    func(t *testing.T, steps []Step)
+		name          string
+		params        map[string]interface{}
+		wantSteps     int
+		wantActions   []string
+		wantErr       bool
+		checkDownload func(t *testing.T, params map[string]interface{})
+		checkBinary   func(t *testing.T, steps []Step)
 	}{
 		{
 			name: "terraform download",
