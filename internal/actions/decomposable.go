@@ -105,6 +105,7 @@ var deterministicActions = map[string]bool{
 	"cpan_install":   false,
 	"gem_exec":       false,
 	"go_build":       false,
+	"nix_realize":    false,
 	"npm_exec":       false,
 	"pip_install":    false,
 }
