@@ -32,14 +32,14 @@ The approach extends the existing `Executor.Validate()` method with a source-bui
 
 ## Implementation Steps
 
-- [ ] Add SourceBuildValidationImage constant for build-tool image
-- [ ] Create ValidateSourceBuild method on Executor with source-specific options
-- [ ] Implement buildSourceBuildScript() to generate build validation script
-- [ ] Add SourceBuildLimits with longer timeout (15 min vs 5 min)
+- [x] Add SourceBuildValidationImage constant for build-tool image
+- [x] Create ValidateSourceBuild method on Executor with source-specific options
+- [x] Implement buildSourceBuildScript() to generate build validation script
+- [x] Add SourceBuildLimits with longer timeout (15 min vs 5 min)
 - [ ] Update buildFromSource() to call validation
-- [ ] Add unit tests for source build validation script generation
+- [x] Add unit tests for source build validation script generation
 - [ ] Add integration test with a simple autotools formula
-- [ ] Run full test suite and verify build
+- [x] Run full test suite and verify build
 
 Mark each step [x] after it is implemented and committed.
 
