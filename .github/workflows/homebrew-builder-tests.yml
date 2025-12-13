@@ -55,30 +55,9 @@ jobs:
       - name: Setup PATH
         run: echo "$HOME/.tsuku/bin" >> $GITHUB_PATH
 
-      # Test installing a tool that uses homebrew_bottle action
+      # Test installing a tool that uses homebrew_bottle action via embedded recipe
       - name: Install libyaml via Homebrew bottle
-        run: |
-          # Create a minimal recipe that uses homebrew_bottle
-          mkdir -p ~/.tsuku/recipes
-          cat > ~/.tsuku/recipes/libyaml.toml << 'EOF'
-          [metadata]
-          name = "libyaml"
-          description = "YAML Parser"
-          homepage = "https://github.com/yaml/libyaml"
-
-          [version]
-          source = "homebrew"
-          formula = "libyaml"
-
-          [[steps]]
-          action = "homebrew_bottle"
-          params = { formula = "libyaml" }
-
-          [verify]
-          command = "test -f $TSUKU_HOME/tools/libyaml/lib/libyaml.dylib || test -f $TSUKU_HOME/tools/libyaml/lib/libyaml.so"
-          EOF
-
-          ./tsuku install --force libyaml
+        run: ./tsuku install --force libyaml
 
       - name: Verify installation
         run: |
