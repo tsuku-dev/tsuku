@@ -32,19 +32,19 @@ Extend the existing `extract_source_recipe` LLM tool and source recipe generatio
 - [x] Add Resource and Patch types to `internal/recipe/types.go`
 - [x] Extend ToTOML to serialize resources and patches
 - [x] Add tests for Resource and Patch serialization in `types_test.go`
-- [x] Extend `sourceRecipeData` struct in `homebrew.go` to include resources, patches, and inreplace
-- [x] Update `extract_source_recipe` tool definition to accept resources, patches, and inreplace
-- [x] Validate resource/patch data in `validateSourceRecipeData()`
-- [x] Add `resource_stage` action for downloading and staging resources
-- [x] Add tests for `resource_stage` action
-- [x] Add `apply_patch` action for applying patches
-- [x] Add tests for `apply_patch` action
-- [x] Add `text_replace` action for inreplace operations
-- [x] Add tests for `text_replace` action
-- [x] Update `buildSourceSteps()` to emit resource, patch, and inreplace steps
-- [x] Add unit tests for resource/patch extraction in `homebrew_test.go`
-- [x] Run full test suite and verify build
-- [x] Run golangci-lint to catch any issues
+- [ ] Extend `sourceRecipeData` struct in `homebrew.go` to include resources, patches, and inreplace
+- [ ] Update `extract_source_recipe` tool definition to accept resources, patches, and inreplace
+- [ ] Validate resource/patch data in `validateSourceRecipeData()`
+- [ ] Add `resource_stage` action for downloading and staging resources
+- [ ] Add tests for `resource_stage` action
+- [ ] Add `apply_patch` action for applying patches
+- [ ] Add tests for `apply_patch` action
+- [ ] Add `text_replace` action for inreplace operations
+- [ ] Add tests for `text_replace` action
+- [ ] Update `buildSourceSteps()` to emit resource, patch, and inreplace steps
+- [ ] Add unit tests for resource/patch extraction in `homebrew_test.go`
+- [ ] Run full test suite and verify build
+- [ ] Run golangci-lint to catch any issues
 
 Mark each step [x] after it is implemented and committed.
 
