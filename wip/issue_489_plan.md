@@ -27,15 +27,15 @@ None - all code goes in existing homebrew.go file per existing patterns.
 
 ## Implementation Steps
 
-- [ ] 1. Add `DependencyNode` struct and `RegistryChecker` interface
-- [ ] 2. Implement `DiscoverDependencyTree()` with visited set for diamond deps
-- [ ] 3. Implement `ToGenerationOrder()` for topological sort
-- [ ] 4. Add `WithRegistryChecker` option for dependency injection
-- [ ] 5. Implement helper functions for tree display and cost estimation
-- [ ] 6. Add `BuildWithDependencies()` method with user confirmation hook
-- [ ] 7. Unit tests for tree traversal with diamond dependencies
-- [ ] 8. Unit tests for topological sort correctness
-- [ ] 9. Integration-style test with mock server and multiple formulas
+- [x] 1. Add `DependencyNode` struct and `RegistryChecker` interface
+- [x] 2. Implement `DiscoverDependencyTree()` with visited set for diamond deps
+- [x] 3. Implement `ToGenerationOrder()` for topological sort
+- [x] 4. Add `WithRegistryChecker` option for dependency injection
+- [x] 5. Implement helper functions for tree display and cost estimation
+- [x] 6. Add `BuildWithDependencies()` method with user confirmation hook
+- [x] 7. Unit tests for tree traversal with diamond dependencies
+- [x] 8. Unit tests for topological sort correctness
+- [x] 9. Integration-style test with mock server and multiple formulas
 
 ## Testing Strategy
 
@@ -59,13 +59,13 @@ None - all code goes in existing homebrew.go file per existing patterns.
 
 ## Success Criteria
 
-- [ ] `DiscoverDependencyTree()` correctly builds tree from Homebrew API
-- [ ] Diamond dependencies handled (shared deps discovered once)
-- [ ] `ToGenerationOrder()` returns correct topological order (leaves first)
-- [ ] Registry check identifies which deps already have recipes
-- [ ] Progress reporting during tree discovery
-- [ ] All tests pass
-- [ ] No regressions in existing homebrew builder tests
+- [x] `DiscoverDependencyTree()` correctly builds tree from Homebrew API
+- [x] Diamond dependencies handled (shared deps discovered once)
+- [x] `ToGenerationOrder()` returns correct topological order (leaves first)
+- [x] Registry check identifies which deps already have recipes
+- [x] Progress reporting during tree discovery
+- [x] All tests pass
+- [x] No regressions in existing homebrew builder tests
 
 ## Open Questions
 
