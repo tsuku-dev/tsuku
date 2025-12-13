@@ -179,13 +179,12 @@ func (e *Executor) resolveStep(
 	onWarning func(string, string),
 	evalCtx *actions.EvalContext,
 ) ([]ResolvedStep, error) {
-	// Expand templates in all string parameters
-	expandedParams := expandParams(step.Params, vars)
-
 	// Check if this is a decomposable action
 	if actions.IsDecomposable(step.Action) {
-		// Decompose to primitives
-		primitiveSteps, err := actions.DecomposeToPrimitives(evalCtx, step.Action, expandedParams)
+		// For decomposable actions, pass raw params - the Decompose method
+		// handles template expansion with proper os_mapping/arch_mapping support.
+		// Expanding here would bake in raw GOOS/GOARCH values before mappings apply.
+		primitiveSteps, err := actions.DecomposeToPrimitives(evalCtx, step.Action, step.Params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompose %s: %w", step.Action, err)
 		}
@@ -229,7 +228,8 @@ func (e *Executor) resolveStep(
 		return resolved, nil
 	}
 
-	// Non-decomposable action: process as before
+	// Non-decomposable action: expand params and process as before
+	expandedParams := expandParams(step.Params, vars)
 	evaluable := IsActionEvaluable(step.Action)
 	deterministic := actions.IsDeterministic(step.Action)
 
