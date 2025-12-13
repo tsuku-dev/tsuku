@@ -82,38 +82,28 @@ func (a *CargoBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 	// Get optional parameters
 	target, _ := GetString(params, "target")
 	features, _ := GetStringSlice(params, "features")
+	rustVersion, _ := GetString(params, "rust_version")
 
-	// Boolean parameters with defaults
+	// Boolean parameters with defaults (using GetBool for consistency)
 	locked := true // Default to locked builds for reproducibility
-	if lockedVal, ok := params["locked"]; ok {
-		if b, ok := lockedVal.(bool); ok {
-			locked = b
-		}
+	if val, ok := GetBool(params, "locked"); ok {
+		locked = val
 	}
 
 	offline := true // Default to offline builds for security (prevents MITM)
-	if offlineVal, ok := params["offline"]; ok {
-		if b, ok := offlineVal.(bool); ok {
-			offline = b
-		}
+	if val, ok := GetBool(params, "offline"); ok {
+		offline = val
 	}
 
 	noDefaultFeatures := false
-	if val, ok := params["no_default_features"]; ok {
-		if b, ok := val.(bool); ok {
-			noDefaultFeatures = b
-		}
+	if val, ok := GetBool(params, "no_default_features"); ok {
+		noDefaultFeatures = val
 	}
 
 	allFeatures := false
-	if val, ok := params["all_features"]; ok {
-		if b, ok := val.(bool); ok {
-			allFeatures = b
-		}
+	if val, ok := GetBool(params, "all_features"); ok {
+		allFeatures = val
 	}
-
-	// Optional Rust version validation
-	rustVersion, _ := GetString(params, "rust_version")
 
 	// Get cargo path
 	cargoPath, _ := GetString(params, "cargo_path")
