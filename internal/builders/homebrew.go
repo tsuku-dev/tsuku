@@ -427,11 +427,11 @@ func (node *DependencyNode) EstimatedCost() float64 {
 
 // ConfirmationRequest holds information for user confirmation before generation.
 type ConfirmationRequest struct {
-	Tree           *DependencyNode
-	ToGenerate     []string
-	AlreadyHave    []string
-	EstimatedCost  float64
-	FormattedTree  string
+	Tree          *DependencyNode
+	ToGenerate    []string
+	AlreadyHave   []string
+	EstimatedCost float64
+	FormattedTree string
 }
 
 // NewConfirmationRequest creates a confirmation request from a dependency tree.
@@ -456,11 +456,11 @@ func NewConfirmationRequest(tree *DependencyNode) *ConfirmationRequest {
 	collectExisting(tree, make(map[string]bool))
 
 	return &ConfirmationRequest{
-		Tree:           tree,
-		ToGenerate:     toGenerate,
-		AlreadyHave:    alreadyHave,
-		EstimatedCost:  tree.EstimatedCost(),
-		FormattedTree:  tree.FormatTree(),
+		Tree:          tree,
+		ToGenerate:    toGenerate,
+		AlreadyHave:   alreadyHave,
+		EstimatedCost: tree.EstimatedCost(),
+		FormattedTree: tree.FormatTree(),
 	}
 }
 
