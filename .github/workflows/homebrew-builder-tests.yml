@@ -76,6 +76,9 @@ jobs:
           [[steps]]
           action = "install_binaries"
           pattern = "bin/*"
+
+          [verify]
+          command = "tree --version"
           RECIPE_EOF
           # Remove leading whitespace from TOML file (heredoc indentation artifact)
           sed -i '' 's/^          //' ~/.tsuku/recipes/tree.toml
