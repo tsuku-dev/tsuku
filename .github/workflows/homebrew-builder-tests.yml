@@ -66,7 +66,8 @@ jobs:
           homepage = "https://oldmanprogrammer.net/source.php?dir=projects/tree"
 
           [version]
-          default = "2.2.1"
+          source = "homebrew"
+          formula = "tree"
 
           [[steps]]
           action = "homebrew_bottle"
