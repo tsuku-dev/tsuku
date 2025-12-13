@@ -53,7 +53,15 @@ func (e *Executor) GeneratePlan(ctx context.Context, cfg PlanConfig) (*Installat
 	// Resolve version from recipe
 	versionInfo, err := e.resolveVersionWith(ctx, resolver)
 	if err != nil {
-		return nil, fmt.Errorf("version resolution failed: %w", err)
+		// Fall back to "dev" version for recipes without proper version sources
+		// This matches the behavior in Execute() for backward compatibility
+		if cfg.OnWarning != nil {
+			cfg.OnWarning("version", fmt.Sprintf("version resolution failed: %v, using 'dev'", err))
+		}
+		versionInfo = &version.VersionInfo{
+			Version: "dev",
+			Tag:     "dev",
+		}
 	}
 
 	// Store version for later use
@@ -228,8 +236,15 @@ func (e *Executor) resolveStep(
 		return resolved, nil
 	}
 
-	// Non-decomposable action: expand params and process as before
-	expandedParams := expandParams(step.Params, vars)
+	// Non-decomposable action: apply mappings first, then expand params
+	// Create a copy of vars to apply os_mapping and arch_mapping without mutating the original
+	mappedVars := make(map[string]string)
+	for k, v := range vars {
+		mappedVars[k] = v
+	}
+	ApplyOSMapping(mappedVars, step.Params)
+	ApplyArchMapping(mappedVars, step.Params)
+	expandedParams := expandParams(step.Params, mappedVars)
 	evaluable := IsActionEvaluable(step.Action)
 	deterministic := actions.IsDeterministic(step.Action)
 
@@ -248,7 +263,7 @@ func (e *Executor) resolveStep(
 
 	// For download actions, compute checksum
 	if isDownloadAction(step.Action) {
-		url, err := extractDownloadURL(step.Action, expandedParams, vars)
+		url, err := extractDownloadURL(step.Action, expandedParams, mappedVars)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract download URL: %w", err)
 		}
