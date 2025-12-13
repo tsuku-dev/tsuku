@@ -9,50 +9,61 @@
 ### Dependency Graph
 
 ```mermaid
-flowchart TD
+graph TD
     subgraph Phase1["Phase 1: Bottles"]
-        style Phase1 fill:#e1f5fe
-        A["#488: Core HomebrewBuilder"]
-        B["#489: Dependency Tree Discovery"]
-        C["#490: Cross-Platform Validation"]
-        A --> B
-        A --> C
+        A488["#488: Core HomebrewBuilder"]
+        A489["#489: Dependency Tree Discovery"]
+        A490["#490: Cross-Platform Validation"]
     end
 
     subgraph Phase2["Phase 2: Source Builds"]
-        style Phase2 fill:#fff3e0
-        D["#491: Ruby Formula Parsing"]
-        E["#492: Platform Conditionals"]
-        F["#493: Resources & Patches"]
-        G["#494: Source Build Validation"]
-        C --> D
-        D --> E
-        D --> F
-        D --> G
+        A491["#491: Ruby Formula Parsing"]
+        A492["#492: Platform Conditionals"]
+        A493["#493: Resources & Patches"]
+        A494["#494: Source Build Validation"]
     end
 
     subgraph Future["Future Work (needs-design)"]
-        style Future fill:#f3e5f5
-        H["#495: Cask Support"]
-        I["#496: Third-Party Taps"]
-        J["#497: Historical Versions"]
-        K["#498: Parallel Generation"]
+        A495["#495: Cask Support"]
+        A496["#496: Third-Party Taps"]
+        A497["#497: Historical Versions"]
+        A498["#498: Parallel Generation"]
     end
 
+    A488 --> A489
+    A488 --> A490
+    A490 --> A491
+    A491 --> A492
+    A491 --> A493
+    A491 --> A494
     Phase2 -.-> Future
+
+    style A488 fill:#c8e6c9
+    style A489 fill:#fff9c4
+    style A490 fill:#fff9c4
+    style A491 fill:#fff9c4
+    style A492 fill:#fff9c4
+    style A493 fill:#fff9c4
+    style A494 fill:#fff9c4
+    style A495 fill:#e1bee7
+    style A496 fill:#e1bee7
+    style A497 fill:#e1bee7
+    style A498 fill:#e1bee7
 ```
+
+**Legend**: Green = ready, Yellow = blocked, Purple = needs-design
 
 ### Implementation Issues
 
 | Issue | Title | Phase | Dependencies |
 |-------|-------|-------|--------------|
 | [#488](https://github.com/tsukumogami/tsuku/issues/488) | Core HomebrewBuilder with LLM bottle inspection | Phase 1 | None |
-| [#489](https://github.com/tsukumogami/tsuku/issues/489) | Dependency tree discovery for Homebrew formulas | Phase 1 | #488 |
-| [#490](https://github.com/tsukumogami/tsuku/issues/490) | Cross-platform validation for Homebrew recipes | Phase 1 | #488 |
-| [#491](https://github.com/tsukumogami/tsuku/issues/491) | Source build support with Ruby formula parsing | Phase 2 | #490 |
-| [#492](https://github.com/tsukumogami/tsuku/issues/492) | Platform conditional handling for source builds | Phase 2 | #491 |
-| [#493](https://github.com/tsukumogami/tsuku/issues/493) | Resource and patch support for source builds | Phase 2 | #491 |
-| [#494](https://github.com/tsukumogami/tsuku/issues/494) | Container-based source build validation | Phase 2 | #491 |
+| [#489](https://github.com/tsukumogami/tsuku/issues/489) | Dependency tree discovery for Homebrew formulas | Phase 1 | [#488](https://github.com/tsukumogami/tsuku/issues/488) |
+| [#490](https://github.com/tsukumogami/tsuku/issues/490) | Cross-platform validation for Homebrew recipes | Phase 1 | [#488](https://github.com/tsukumogami/tsuku/issues/488) |
+| [#491](https://github.com/tsukumogami/tsuku/issues/491) | Source build support with Ruby formula parsing | Phase 2 | [#490](https://github.com/tsukumogami/tsuku/issues/490) |
+| [#492](https://github.com/tsukumogami/tsuku/issues/492) | Platform conditional handling for source builds | Phase 2 | [#491](https://github.com/tsukumogami/tsuku/issues/491) |
+| [#493](https://github.com/tsukumogami/tsuku/issues/493) | Resource and patch support for source builds | Phase 2 | [#491](https://github.com/tsukumogami/tsuku/issues/491) |
+| [#494](https://github.com/tsukumogami/tsuku/issues/494) | Container-based source build validation | Phase 2 | [#491](https://github.com/tsukumogami/tsuku/issues/491) |
 
 ### Future Work Issues (needs-design)
 
