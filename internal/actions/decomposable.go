@@ -60,7 +60,7 @@ type EvalContext struct {
 // Includes both core primitives (download, extract, etc.) and
 // ecosystem primitives (go_build, cargo_build, etc.).
 var primitives = map[string]bool{
-	// Core primitives (Tier 1 - fully deterministic)
+	// Core primitives - fully deterministic
 	"download":          true,
 	"extract":           true,
 	"chmod":             true,
@@ -69,7 +69,7 @@ var primitives = map[string]bool{
 	"set_rpath":         true,
 	"link_dependencies": true,
 	"install_libraries": true,
-	// Ecosystem primitives (Tier 2 - have residual non-determinism)
+	// Ecosystem primitives - have residual non-determinism
 	"cargo_build":  true,
 	"cpan_install": true,
 	"gem_exec":     true,
@@ -79,11 +79,11 @@ var primitives = map[string]bool{
 }
 
 // deterministicActions classifies which primitives are fully deterministic.
-// Tier 1 (core) primitives are deterministic - they produce identical results
-// given identical inputs. Tier 2 (ecosystem) primitives have residual
-// non-determinism due to compiler versions, native extensions, etc.
+// Core primitives are deterministic - they produce identical results given
+// identical inputs. Ecosystem primitives have residual non-determinism due
+// to compiler versions, native extensions, etc.
 var deterministicActions = map[string]bool{
-	// Tier 1: Fully deterministic primitives
+	// Core primitives - fully deterministic
 	"download":          true,
 	"extract":           true,
 	"chmod":             true,
@@ -92,8 +92,7 @@ var deterministicActions = map[string]bool{
 	"set_rpath":         true,
 	"link_dependencies": true,
 	"install_libraries": true,
-	// Tier 2: Ecosystem primitives - NOT deterministic
-	// These have residual non-determinism from compiler versions,
+	// Ecosystem primitives - NOT deterministic due to compiler versions,
 	// native extensions, platform-specific behavior, etc.
 	"cargo_build":  false,
 	"cpan_install": false,
@@ -136,9 +135,9 @@ func Primitives() []string {
 }
 
 // IsDeterministic returns true if the action produces identical results given
-// identical inputs. Tier 1 (core) primitives are deterministic. Tier 2
-// (ecosystem) primitives have residual non-determinism and return false.
-// Unknown actions return false for safety.
+// identical inputs. Core primitives are deterministic. Ecosystem primitives
+// have residual non-determinism and return false. Unknown actions return
+// false for safety.
 func IsDeterministic(action string) bool {
 	deterministic, known := deterministicActions[action]
 	if !known {

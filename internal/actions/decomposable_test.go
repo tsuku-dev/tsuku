@@ -470,7 +470,7 @@ func TestComputeStepHash(t *testing.T) {
 }
 
 func TestIsDeterministic(t *testing.T) {
-	// Tier 1 (core) primitives should be deterministic
+	// Core primitives should be deterministic
 	deterministicActions := []string{
 		"download",
 		"extract",
@@ -484,11 +484,11 @@ func TestIsDeterministic(t *testing.T) {
 
 	for _, name := range deterministicActions {
 		if !IsDeterministic(name) {
-			t.Errorf("IsDeterministic(%q) = false, want true (Tier 1 primitive)", name)
+			t.Errorf("IsDeterministic(%q) = false, want true (core primitive)", name)
 		}
 	}
 
-	// Tier 2 (ecosystem) primitives should NOT be deterministic
+	// Ecosystem primitives should NOT be deterministic
 	nonDeterministicActions := []string{
 		"go_build",
 		"cargo_build",
@@ -500,7 +500,7 @@ func TestIsDeterministic(t *testing.T) {
 
 	for _, name := range nonDeterministicActions {
 		if IsDeterministic(name) {
-			t.Errorf("IsDeterministic(%q) = true, want false (Tier 2 ecosystem primitive)", name)
+			t.Errorf("IsDeterministic(%q) = true, want false (ecosystem primitive)", name)
 		}
 	}
 
