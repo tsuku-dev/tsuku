@@ -92,9 +92,9 @@ jobs:
       - name: Verify installation
         run: |
           # Check that tree binary exists and is executable
-          if [ -x ~/.tsuku/tools/current/bin/tree ]; then
+          if [ -x ~/.tsuku/tools/current/tree ]; then
             echo "tree binary installed successfully"
-            ~/.tsuku/tools/current/bin/tree --version
+            ~/.tsuku/tools/current/tree --version
           else
             echo "tree installation verification failed"
             ls -la ~/.tsuku/tools/current/ || true
