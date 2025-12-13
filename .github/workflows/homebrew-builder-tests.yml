@@ -55,17 +55,46 @@ jobs:
       - name: Setup PATH
         run: echo "$HOME/.tsuku/bin" >> $GITHUB_PATH
 
-      # Test installing a tool that uses homebrew_bottle action via embedded recipe
-      - name: Install libyaml via Homebrew bottle
-        run: ./tsuku install --force libyaml
+      # Create a test recipe that uses homebrew_bottle action
+      - name: Create test recipe
+        run: |
+          mkdir -p ~/.tsuku/recipes
+          cat > ~/.tsuku/recipes/tree.toml << 'RECIPE_EOF'
+          [metadata]
+          name = "tree"
+          description = "Display directories as trees"
+          homepage = "https://oldmanprogrammer.net/source.php?dir=projects/tree"
+
+          [version]
+          provider = "homebrew"
+          formula = "tree"
+
+          [[steps]]
+          action = "homebrew_bottle"
+          formula = "tree"
+
+          [[steps]]
+          action = "install_binaries"
+          pattern = "bin/*"
+          RECIPE_EOF
+          # Remove leading whitespace from TOML file (heredoc indentation artifact)
+          sed -i '' 's/^          //' ~/.tsuku/recipes/tree.toml
+          echo "Created recipe:"
+          cat ~/.tsuku/recipes/tree.toml
+
+      # Test installing a tool that uses homebrew_bottle action
+      - name: Install tree via Homebrew bottle
+        run: ./tsuku install --force tree
 
       - name: Verify installation
         run: |
-          ls -la ~/.tsuku/tools/libyaml/lib/ || true
-          # Check that library files exist
-          if [ -f ~/.tsuku/tools/libyaml/lib/libyaml.dylib ] || [ -f ~/.tsuku/tools/libyaml/lib/libyaml.so ]; then
-            echo "libyaml installed successfully"
+          # Check that tree binary exists and is executable
+          if [ -x ~/.tsuku/bin/tree ]; then
+            echo "tree binary installed successfully"
+            ~/.tsuku/bin/tree --version
           else
-            echo "libyaml installation verification failed"
+            echo "tree installation verification failed"
+            ls -la ~/.tsuku/bin/ || true
+            ls -la ~/.tsuku/tools/tree/ || true
             exit 1
           fi
