@@ -37,7 +37,7 @@ None required - tests will be added to existing test file.
   - Test with empty constraint (resolves to latest)
   - Test with specific version constraint
   - Test error handling for unknown version sources
-  - Test with mock version provider
+  - Test with no version source configured
 
 ## Testing Strategy
 
