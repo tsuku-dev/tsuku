@@ -51,6 +51,19 @@ The design covers full Homebrew formula support, but implementation is phased:
 
 This phasing allows validating the LLM infrastructure on the simpler bottle case before tackling source builds.
 
+### Builder Scope Boundary
+
+`--from=homebrew:<formula>` generates recipes using **Homebrew as the sole source**. The builder does not cross-reference other sources (GitHub releases, PyPI, etc.) even if they might be more efficient for certain platforms.
+
+**Example**: jq has pre-built Linux binaries on GitHub releases but requires Homebrew bottles (or source build) on macOS. The Homebrew builder will use Homebrew's approach for both platforms, not GitHub releases for Linux.
+
+**Rationale**: Mixing sources adds complexity (cross-builder knowledge, per-platform heuristics). Each builder has a single responsibility.
+
+**Alternatives for users wanting optimized cross-platform recipes**:
+- Use `--from=github:<repo>` for tools with good GitHub releases
+- Create custom recipes that use different actions per platform
+- Future: a "smart" orchestrator that picks the best source per platform
+
 ### Platform Strategy
 
 Generated recipes are **platform-agnostic**. The `homebrew_bottle` action handles platform detection at runtime:
