@@ -134,14 +134,16 @@ Composite actions implement the `Decomposable` interface:
 ```go
 // Decomposable indicates an action can be broken into primitive steps
 type Decomposable interface {
-    // Decompose returns the primitive steps this action expands to.
+    // Decompose returns the steps this action expands to.
+    // Steps may be primitives or other composites (recursive decomposition).
     // Called during plan generation, not execution.
-    Decompose(ctx *EvalContext, params map[string]interface{}) ([]PrimitiveStep, error)
+    Decompose(ctx *EvalContext, params map[string]interface{}) ([]Step, error)
 }
 
-// PrimitiveStep represents a single atomic operation in a plan
-type PrimitiveStep struct {
-    Action   string                 // Primitive action name
+// Step represents a single operation returned by Decompose.
+// It may be a primitive (terminal) or another composite (requires further decomposition).
+type Step struct {
+    Action   string                 // Action name (primitive or composite)
     Params   map[string]interface{} // Fully resolved parameters
     Checksum string                 // For download actions: expected SHA256
     Size     int64                  // For download actions: expected size
@@ -158,6 +160,60 @@ type EvalContext struct {
     Downloader *validate.PreDownloader // For checksum computation
 }
 ```
+
+#### Recursive Decomposition
+
+Composite actions may return other composite actions from `Decompose()`. The plan generator recursively decomposes until only primitives remain:
+
+```go
+// DecomposeToprimitives recursively decomposes an action until all steps are primitives.
+func DecomposeToPrimitives(ctx *EvalContext, action string, params map[string]interface{}) ([]PrimitiveStep, error) {
+    // Check if action is already a primitive
+    if IsPrimitive(action) {
+        return []PrimitiveStep{{Action: action, Params: params}}, nil
+    }
+
+    // Get the action and check if it's decomposable
+    act := actions.Get(action)
+    decomposable, ok := act.(Decomposable)
+    if !ok {
+        return nil, fmt.Errorf("action %s is neither primitive nor decomposable", action)
+    }
+
+    // Decompose and recursively process each resulting step
+    steps, err := decomposable.Decompose(ctx, params)
+    if err != nil {
+        return nil, fmt.Errorf("failed to decompose %s: %w", action, err)
+    }
+
+    var primitives []PrimitiveStep
+    for _, step := range steps {
+        // Recursive call - step.Action may be composite or primitive
+        subPrimitives, err := DecomposeToPrimitives(ctx, step.Action, step.Params)
+        if err != nil {
+            return nil, err
+        }
+        // Carry forward checksum/size from the step if present
+        if len(subPrimitives) == 1 && step.Checksum != "" {
+            subPrimitives[0].Checksum = step.Checksum
+            subPrimitives[0].Size = step.Size
+        }
+        primitives = append(primitives, subPrimitives...)
+    }
+
+    return primitives, nil
+}
+```
+
+This recursive approach enables:
+
+1. **Layered composition**: A high-level action like `install_from_github` could decompose to `github_archive`, which further decomposes to download/extract/chmod/install_binaries.
+
+2. **Reusable building blocks**: Mid-level composites (like `download_and_extract`) can be shared across multiple high-level composites.
+
+3. **Gradual migration**: Existing composite actions can initially decompose to other composites, with primitives introduced incrementally.
+
+**Cycle detection**: The plan generator must detect cycles to prevent infinite recursion. A simple visited set tracking `(action, params_hash)` tuples suffices.
 
 #### Example: github_archive Decomposition
 
