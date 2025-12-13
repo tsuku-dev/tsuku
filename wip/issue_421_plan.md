@@ -17,13 +17,13 @@ Add persistent flags to the root command, check environment variables as fallbac
 - None (all changes in existing file)
 
 ## Implementation Steps
-- [ ] Add `verboseFlag` and `debugFlag` variables alongside existing `quietFlag`
-- [ ] Update `init()` to register `--verbose` and `--debug` as persistent flags
-- [ ] Add `PersistentPreRun` to root command for logger initialization before any command runs
-- [ ] Implement environment variable checks (`TSUKU_QUIET`, `TSUKU_VERBOSE`, `TSUKU_DEBUG`) with flag precedence
-- [ ] Create and set the global logger using `log.NewCLIHandler` and `log.SetDefault`
-- [ ] Display debug warning banner when debug mode is enabled
-- [ ] Write unit tests for flag/env var precedence logic
+- [x] Add `verboseFlag` and `debugFlag` variables alongside existing `quietFlag`
+- [x] Update `init()` to register `--verbose` and `--debug` as persistent flags
+- [x] Add `PersistentPreRun` to root command for logger initialization before any command runs
+- [x] Implement environment variable checks (`TSUKU_QUIET`, `TSUKU_VERBOSE`, `TSUKU_DEBUG`) with flag precedence
+- [x] Create and set the global logger using `log.NewCLIHandler` and `log.SetDefault`
+- [x] Display debug warning banner when debug mode is enabled
+- [x] Write unit tests for flag/env var precedence logic
 
 ## Testing Strategy
 - Unit tests: Test helper function for log level determination (flag/env precedence)
