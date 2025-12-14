@@ -171,7 +171,7 @@ dependencies = ["system:docker", "zlib"]
 **Cons:**
 - Recipe authors must know tsuku internals to classify correctly
 - Cognitive burden: is it `docker` or `system:docker`?
-- LLMs will frequently misclassify (30-50% error rate per prompt engineer review)
+- LLMs will frequently misclassify (estimated 30-50% error rate without canonical lists)
 - No validation feedback if author uses wrong classification
 
 #### Option 2C: Unified Recipe Model (All Dependencies Are Recipes)
@@ -220,17 +220,18 @@ All dependencies are recipes. Provisionable tools (gcc, zlib) have recipes with 
 
 **For Decision 1 (provisionable deps):** Option 1B aligns with tsuku's "self-contained" philosophy. If tsuku can provide something, it should.
 
-**For Decision 2 (unprovisionable deps):** Option 2C (unified model) was chosen over 2B (annotation prefix) based on expert panel feedback:
+**For Decision 2 (unprovisionable deps):** Option 2C (unified model) was chosen over 2B (annotation prefix) because:
 
-- **UX Expert**: The `system:` prefix creates cognitive burden and leaky abstractions
-- **Prompt Engineer**: LLMs will misclassify 30-50% of dependencies without canonical lists
-- **Systems Engineer**: Detection logic belongs in recipes, not hardcoded registry
+- The `system:` prefix creates cognitive burden - recipe authors must understand tsuku internals to classify correctly
+- LLMs will misclassify 30-50% of dependencies without canonical lists embedded in prompts
+- Detection logic belongs in recipes (data), not hardcoded registries (code)
 
-The unified model solves all these problems:
+The unified model solves these problems:
 - Recipe authors don't need to classify - just list dependencies
 - LLMs generate correct recipes without understanding tsuku internals
 - Adding new system deps is adding a recipe file, not modifying code
 - Each recipe is self-documenting about its provisioning strategy
+- Validation is simple: unknown dependency = recipe doesn't exist
 
 ## Build Essentials Inventory
 
@@ -513,6 +514,37 @@ To install Docker:
 
 After installing, run: tsuku install my-docker-tool
 ```
+
+**Error message requirements:**
+- Show full dependency chain (e.g., "my-tool → docker-compose → docker")
+- Batch multiple missing dependencies into single error
+- Distinguish between "not installed" vs "installed but version too old"
+- Suggest fuzzy matches for typos ("Did you mean: docker?")
+
+### Implementation Requirements
+
+The `require_system` action must address these concerns:
+
+**Detection Reliability:**
+- Binary existence check alone has high false positive rate (e.g., Docker installed but daemon not running)
+- Support hierarchical validation: binary exists → version check → runtime check (e.g., `docker info`)
+- Support multiple version regex patterns for compatibility (Docker vs Podman output formats)
+- Detect platform accurately: distro families (debian, rhel, arch), WSL2, containers
+- Optional runtime validation parameter for tools requiring daemon/service (docker, systemd)
+- Cache detection results with TTL to avoid repeated slow checks
+
+**Security:**
+- No shell execution for command detection - use `exec.Command()` directly
+- Validate command names (alphanumeric, dash, underscore only)
+- Use canonical PATH for detection (`/usr/local/bin:/usr/bin:/bin`)
+- Install guides must be templated, not free-form text
+- HTTPS-only URLs in install guides
+- Block dangerous patterns in install guides (`curl | bash`, `wget | sh`)
+
+**Discoverability:**
+- Recipe search and categorization (system-required vs provisionable)
+- `tsuku info <dep>` shows provisioning strategy and requirements
+- `tsuku check-deps <recipe>` validates all dependencies before install
 
 ### Installation Flow (Unified Model)
 
@@ -826,6 +858,14 @@ jobs:
 4. Start with macOS brew commands (no sudo required)
 5. **Gate**: User can opt-in to assisted Docker installation on macOS
 
+**Safety requirements for assisted installation:**
+- Explicit per-command user consent (not blanket approval)
+- Show exact command before execution
+- Log all assisted installation commands to audit file
+- Timeout on sudo prompts (no hanging)
+- No assisted commands that modify system files outside package managers
+- Require `--assist` flag; never auto-assist
+
 ## Security Considerations
 
 Build tools represent an elevated security concern because compilers and linkers are **trust anchors** - a compromised compiler affects ALL binaries it produces.
@@ -860,6 +900,23 @@ Build tools have elevated trust requirements:
 - Version pinning for build essentials (no automatic updates)
 - Explicit user consent before updating build tools
 - Future: SBOM generation for audit trail
+
+### System-Required Recipe Trust
+
+The `require_system` action introduces additional attack vectors:
+- Install guide commands could direct users to malicious URLs
+- Assisted installation commands run with user privileges
+
+**Mitigations (required for launch):**
+- System-required recipes must be signed (GPG or similar)
+- Install guides use templated commands, not arbitrary text
+- HTTPS-only URLs in install guides
+- Block dangerous patterns: `curl | bash`, `wget | sh`, `sudo rm -rf`
+- No shell expansion in command detection (use `exec.Command()` directly)
+
+**Future enhancements:**
+- Separate review process for system-required recipes
+- Rate limiting on recipe updates (prevent rapid malicious changes)
 
 ### Execution Isolation
 
