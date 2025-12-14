@@ -2,7 +2,35 @@
 
 ## Status
 
-Accepted
+Planned
+
+## Implementation Issues
+
+### Milestone: [Centralize Validation Logic](https://github.com/tsukumogami/tsuku/milestone/22)
+
+| Issue | Title | Dependencies |
+|-------|-------|--------------|
+| [#568](https://github.com/tsukumogami/tsuku/issues/568) | feat(actions): add NetworkValidator interface | None |
+| [#569](https://github.com/tsukumogami/tsuku/issues/569) | feat(actions): implement RequiresNetwork on actions | [#568](https://github.com/tsukumogami/tsuku/issues/568) |
+| [#570](https://github.com/tsukumogami/tsuku/issues/570) | feat(validate): add ValidationRequirements computation | [#569](https://github.com/tsukumogami/tsuku/issues/569) |
+| [#571](https://github.com/tsukumogami/tsuku/issues/571) | refactor(validate): unify Validate and ValidateSourceBuild | [#570](https://github.com/tsukumogami/tsuku/issues/570) |
+| [#572](https://github.com/tsukumogami/tsuku/issues/572) | refactor(builders): use centralized validation | [#571](https://github.com/tsukumogami/tsuku/issues/571) |
+| [#573](https://github.com/tsukumogami/tsuku/issues/573) | feat(cli): add --container and --recipe flags to install | [#571](https://github.com/tsukumogami/tsuku/issues/571) |
+
+### Dependency Graph
+
+```mermaid
+graph LR
+    classDef done fill:#90EE90,stroke:#333
+    classDef ready fill:#87CEEB,stroke:#333
+    classDef blocked fill:#FFB6C1,stroke:#333
+
+    I568[#568: Add NetworkValidator interface]:::ready --> I569[#569: Implement RequiresNetwork]:::blocked
+    I569 --> I570[#570: Add ValidationRequirements]:::blocked
+    I570 --> I571[#571: Unify Validate methods]:::blocked
+    I571 --> I572[#572: Update builders]:::blocked
+    I571 --> I573[#573: Add CLI flags]:::blocked
+```
 
 ## Context and Problem Statement
 
