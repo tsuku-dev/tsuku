@@ -396,6 +396,118 @@ func runCreate(cmd *cobra.Command, args []string) {
 	}
 	printInfof("Creating recipe for %s from %s...\n", toolName, sourceDisplay)
 
+	// Get recipes directory early (needed for both paths)
+	cfg, err := config.DefaultConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting config: %v\n", err)
+		exitWithCode(ExitGeneral)
+	}
+
+	// For Homebrew builder, use BuildWithDependencies to discover and generate all needed recipes
+	if llmType == LLMBuilderHomebrew {
+		hbBuilder, ok := builder.(*builders.HomebrewBuilder)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Error: unexpected builder type\n")
+			exitWithCode(ExitGeneral)
+		}
+
+		// Create confirmation function that respects --yes flag
+		confirmFunc := func(req *builders.ConfirmationRequest) bool {
+			return confirmDependencyTree(req, createAutoApprove)
+		}
+
+		results, err := hbBuilder.BuildWithDependencies(ctx, builders.BuildRequest{
+			Package:     toolName,
+			SourceArg:   sourceArg,
+			ForceSource: forceSource,
+		}, confirmFunc)
+
+		if err == builders.ErrUserCanceled {
+			printInfo("Canceled.")
+			return
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error building recipes: %v\n", err)
+			exitWithCode(ExitGeneral)
+		}
+
+		// Handle case where all recipes already exist
+		if len(results) == 0 {
+			printInfo("All recipes already exist. Nothing to generate.")
+			printInfo()
+			printInfo("To install, run:")
+			printInfof("  tsuku install %s\n", toolName)
+			return
+		}
+
+		// Write all generated recipes and track costs
+		var totalCost float64
+		for _, result := range results {
+			// Record LLM usage
+			if stateManager != nil {
+				cost := result.Cost
+				if cost == 0 {
+					cost = defaultLLMCostEstimate
+				}
+				totalCost += cost
+				if err := stateManager.RecordGeneration(cost); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to record LLM usage: %v\n", err)
+				}
+			}
+
+			// Add validation metadata if skipped
+			if result.ValidationSkipped {
+				result.Recipe.Metadata.LLMValidation = "skipped"
+			}
+
+			// Check if recipe already exists
+			recipePath := filepath.Join(cfg.RecipesDir, result.Recipe.Metadata.Name+".toml")
+			if _, err := os.Stat(recipePath); err == nil && !createForce {
+				fmt.Fprintf(os.Stderr, "Error: recipe already exists at %s\n", recipePath)
+				fmt.Fprintf(os.Stderr, "Use --force to overwrite\n")
+				exitWithCode(ExitGeneral)
+			}
+
+			// Write the recipe
+			if err := recipe.WriteRecipe(result.Recipe, recipePath); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing recipe: %v\n", err)
+				exitWithCode(ExitGeneral)
+			}
+
+			printInfof("Recipe created: %s\n", recipePath)
+		}
+
+		// Display total cost
+		if stateManager != nil && userCfg != nil {
+			dailySpent := stateManager.DailySpent()
+			dailyBudget := userCfg.LLMDailyBudget()
+
+			if dailyBudget > 0 {
+				printInfof("\nTotal cost: ~$%.2f (today: $%.2f of $%.2f budget)\n",
+					totalCost, dailySpent, dailyBudget)
+			} else {
+				printInfof("\nTotal cost: ~$%.2f (today: $%.2f)\n",
+					totalCost, dailySpent)
+			}
+		}
+
+		// Check for any validation-skipped recipes
+		for _, result := range results {
+			if result.ValidationSkipped {
+				printInfo()
+				fmt.Fprintln(os.Stderr, "WARNING: Some recipes were NOT validated in a container.")
+				fmt.Fprintln(os.Stderr, "The recipes may have errors. Review before installing.")
+				break
+			}
+		}
+
+		printInfo()
+		printInfo("To install, run:")
+		printInfof("  tsuku install %s\n", toolName)
+		return
+	}
+
+	// Non-Homebrew builders: use single Build call
 	result, err := builder.Build(ctx, builders.BuildRequest{
 		Package:     toolName,
 		SourceArg:   sourceArg,
@@ -422,13 +534,6 @@ func runCreate(cmd *cobra.Command, args []string) {
 	// Add llm_validation metadata if validation was skipped
 	if result.ValidationSkipped {
 		result.Recipe.Metadata.LLMValidation = "skipped"
-	}
-
-	// Get recipes directory
-	cfg, err := config.DefaultConfig()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting config: %v\n", err)
-		exitWithCode(ExitGeneral)
 	}
 
 	recipePath := filepath.Join(cfg.RecipesDir, toolName+".toml")
@@ -586,6 +691,43 @@ func promptForApproval(r *recipe.Recipe) (bool, error) {
 			fmt.Println("Invalid input. Please enter 'v', 'i', or 'c'.")
 		}
 	}
+}
+
+// confirmDependencyTree displays the dependency tree and asks for confirmation.
+// Returns true if the user approves, false if canceled.
+// If autoApprove is true, shows the tree but skips the prompt.
+func confirmDependencyTree(req *builders.ConfirmationRequest, autoApprove bool) bool {
+	fmt.Println()
+	fmt.Println("Dependency tree:")
+	fmt.Println(req.FormattedTree)
+	fmt.Println()
+
+	if len(req.AlreadyHave) > 0 {
+		fmt.Printf("Already have recipes for: %s\n", strings.Join(req.AlreadyHave, ", "))
+	}
+
+	if len(req.ToGenerate) == 0 {
+		fmt.Println("All recipes already exist. Nothing to generate.")
+		return true
+	}
+
+	fmt.Printf("Will generate %d recipe(s): %s\n", len(req.ToGenerate), strings.Join(req.ToGenerate, ", "))
+	fmt.Printf("Estimated cost: $%.2f\n", req.EstimatedCost)
+	fmt.Println()
+
+	if autoApprove {
+		return true
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Proceed? [y/n] ")
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	input = strings.TrimSpace(strings.ToLower(input))
+	return input == "y" || input == "yes"
 }
 
 // extractDownloadURLs returns download URLs from the recipe.

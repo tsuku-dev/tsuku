@@ -251,6 +251,13 @@ type homebrewFormulaInfo struct {
 	BuildDependencies    []string `json:"build_dependencies"`
 	TestDependencies     []string `json:"test_dependencies"`
 	OptionalDependencies []string `json:"optional_dependencies"`
+	// Source URLs for building from source
+	URLs struct {
+		Stable struct {
+			URL      string `json:"url"`
+			Checksum string `json:"checksum"`
+		} `json:"stable"`
+	} `json:"urls"`
 }
 
 // HomebrewFormulaNotFoundError indicates a formula doesn't exist.
@@ -478,9 +485,15 @@ func (b *HomebrewBuilder) BuildWithDependencies(
 	req BuildRequest,
 	confirm ConfirmFunc,
 ) ([]*BuildResult, error) {
+	// Extract formula name (strip :source suffix for API lookups)
+	formulaName := req.Package
+	if strings.HasSuffix(strings.ToLower(req.Package), ":source") {
+		formulaName = req.Package[:len(req.Package)-7]
+	}
+
 	// 1. Discover full dependency tree (no LLM, just API calls)
 	b.reportStart("Discovering dependencies")
-	tree, err := b.DiscoverDependencyTree(ctx, req.Package)
+	tree, err := b.DiscoverDependencyTree(ctx, formulaName)
 	if err != nil {
 		b.reportFailed()
 		return nil, fmt.Errorf("failed to discover dependencies: %w", err)
@@ -505,9 +518,13 @@ func (b *HomebrewBuilder) BuildWithDependencies(
 	for i, formula := range toGenerate {
 		b.reportStart(fmt.Sprintf("Generating recipe %d/%d: %s", i+1, len(toGenerate), formula))
 
+		// Only apply ForceSource to the root package, not dependencies
+		forceSource := req.ForceSource && formula == formulaName
+
 		result, err := b.Build(ctx, BuildRequest{
-			Package:   formula,
-			SourceArg: formula,
+			Package:     formula,
+			SourceArg:   formula,
+			ForceSource: forceSource,
 		})
 		if err != nil {
 			b.reportFailed()
@@ -2272,15 +2289,19 @@ func (b *HomebrewBuilder) generateSourceRecipeOutput(packageName string, info *h
 	}
 
 	// Build the steps based on build system (includes inreplace as text_replace steps)
-	steps, err := b.buildSourceSteps(data)
+	steps, err := b.buildSourceSteps(data, info.Name)
 	if err != nil {
 		return nil, err
 	}
 	r.Steps = steps
 
-	// Add build dependencies as install-time dependencies
-	if len(data.BuildDependencies) > 0 {
-		r.Metadata.Dependencies = data.BuildDependencies
+	// Add dependencies from formula info (deterministic, not LLM-derived)
+	// Combine build and runtime dependencies since source builds need both
+	var allDeps []string
+	allDeps = append(allDeps, info.BuildDependencies...)
+	allDeps = append(allDeps, info.Dependencies...)
+	if len(allDeps) > 0 {
+		r.Metadata.Dependencies = allDeps
 	}
 
 	return r, nil
@@ -2289,16 +2310,16 @@ func (b *HomebrewBuilder) generateSourceRecipeOutput(packageName string, info *h
 // buildSourceSteps generates the recipe steps for a source build.
 // Resources and patches are stored in the recipe's Resources/Patches fields.
 // Inreplace operations are emitted as text_replace steps before the build.
-func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData) ([]recipe.Step, error) {
+func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData, formula string) ([]recipe.Step, error) {
 	var steps []recipe.Step
 
-	// All source builds start with download and extract
-	// The version templating will be handled by the recipe system
+	// Use homebrew_source action which fetches URL/checksum from Homebrew API at plan time.
+	// This enables version-aware source builds where the URL and checksum are resolved
+	// dynamically when the recipe is installed, not when it's generated.
 	steps = append(steps, recipe.Step{
-		Action: "github_archive",
+		Action: "homebrew_source",
 		Params: map[string]interface{}{
-			"owner": "{{.owner}}", // Will be filled in from formula
-			"repo":  "{{.repo}}",
+			"formula": formula,
 		},
 	})
 
@@ -2320,10 +2341,11 @@ func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData) ([]recipe.Ste
 	}
 
 	// Add build step based on build system
+	// source_dir is "." because we use strip_dirs=1 during extraction
 	switch data.BuildSystem {
 	case BuildSystemAutotools:
 		params := map[string]interface{}{
-			"source_dir":  "{{.extract_dir}}",
+			"source_dir":  ".",
 			"executables": data.Executables,
 		}
 		if len(data.ConfigureArgs) > 0 {
@@ -2336,7 +2358,7 @@ func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData) ([]recipe.Ste
 
 	case BuildSystemCMake:
 		params := map[string]interface{}{
-			"source_dir":  "{{.extract_dir}}",
+			"source_dir":  ".",
 			"executables": data.Executables,
 		}
 		if len(data.CMakeArgs) > 0 {
@@ -2351,7 +2373,7 @@ func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData) ([]recipe.Ste
 		steps = append(steps, recipe.Step{
 			Action: "cargo_build",
 			Params: map[string]interface{}{
-				"source_dir":  "{{.extract_dir}}",
+				"source_dir":  ".",
 				"executables": data.Executables,
 			},
 		})
@@ -2360,7 +2382,7 @@ func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData) ([]recipe.Ste
 		steps = append(steps, recipe.Step{
 			Action: "go_build",
 			Params: map[string]interface{}{
-				"source_dir":  "{{.extract_dir}}",
+				"source_dir":  ".",
 				"executables": data.Executables,
 			},
 		})
@@ -2370,7 +2392,7 @@ func (b *HomebrewBuilder) buildSourceSteps(data *sourceRecipeData) ([]recipe.Ste
 		steps = append(steps, recipe.Step{
 			Action: "configure_make",
 			Params: map[string]interface{}{
-				"source_dir":     "{{.extract_dir}}",
+				"source_dir":     ".",
 				"executables":    data.Executables,
 				"skip_configure": true,
 			},
