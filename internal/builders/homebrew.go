@@ -578,6 +578,23 @@ func isValidHomebrewFormula(name string) bool {
 	return true
 }
 
+// getStringArg extracts a string argument from LLM tool call arguments.
+// If the key is missing, returns defaultVal. If the value is not a string, returns an error.
+func getStringArg(args map[string]interface{}, key string, defaultVal string) (string, error) {
+	val, ok := args[key]
+	if !ok {
+		return defaultVal, nil
+	}
+	str, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("argument %q must be a string, got %T", key, val)
+	}
+	if str == "" {
+		return defaultVal, nil
+	}
+	return str, nil
+}
+
 // parseSourceArg parses the builder-specific SourceArg for Homebrew.
 // It extracts the formula name and whether source build is requested.
 // Examples:
@@ -1331,9 +1348,9 @@ func (b *HomebrewBuilder) runConversationLoop(
 func (b *HomebrewBuilder) executeToolCall(ctx context.Context, genCtx *homebrewGenContext, tc llm.ToolCall) (string, *homebrewRecipeData, error) {
 	switch tc.Name {
 	case ToolFetchFormulaJSON:
-		formula, _ := tc.Arguments["formula"].(string)
-		if formula == "" {
-			formula = genCtx.formula // Default to current formula
+		formula, err := getStringArg(tc.Arguments, "formula", genCtx.formula)
+		if err != nil {
+			return "", nil, fmt.Errorf("fetch_formula_json: %w", err)
 		}
 		// Validate formula name for security
 		if !isValidHomebrewFormula(formula) {
@@ -1346,13 +1363,13 @@ func (b *HomebrewBuilder) executeToolCall(ctx context.Context, genCtx *homebrewG
 		return content, nil, nil
 
 	case ToolInspectBottle:
-		formula, _ := tc.Arguments["formula"].(string)
-		if formula == "" {
-			formula = genCtx.formula
+		formula, err := getStringArg(tc.Arguments, "formula", genCtx.formula)
+		if err != nil {
+			return "", nil, fmt.Errorf("inspect_bottle: %w", err)
 		}
-		platform, _ := tc.Arguments["platform"].(string)
-		if platform == "" {
-			platform = "x86_64_linux" // Default to Linux for inspection
+		platform, err := getStringArg(tc.Arguments, "platform", "x86_64_linux")
+		if err != nil {
+			return "", nil, fmt.Errorf("inspect_bottle: %w", err)
 		}
 		// Validate inputs
 		if !isValidHomebrewFormula(formula) {
@@ -1368,9 +1385,9 @@ func (b *HomebrewBuilder) executeToolCall(ctx context.Context, genCtx *homebrewG
 		return listing, nil, nil
 
 	case ToolFetchFormulaRuby:
-		formula, _ := tc.Arguments["formula"].(string)
-		if formula == "" {
-			formula = genCtx.formula
+		formula, err := getStringArg(tc.Arguments, "formula", genCtx.formula)
+		if err != nil {
+			return "", nil, fmt.Errorf("fetch_formula_ruby: %w", err)
 		}
 		if !isValidHomebrewFormula(formula) {
 			return "", nil, fmt.Errorf("invalid formula name: %s", formula)
