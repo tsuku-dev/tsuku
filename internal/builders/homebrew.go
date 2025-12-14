@@ -635,11 +635,13 @@ func parseSourceArg(sourceArg string) (formula string, forceSource bool, err err
 		return "", false, fmt.Errorf("source argument is required (use --from homebrew:formula)")
 	}
 
-	if strings.HasSuffix(strings.ToLower(sourceArg), ":source") {
-		formula = sourceArg[:len(sourceArg)-7]
+	// Normalize to lowercase for case-insensitive matching
+	lowerArg := strings.ToLower(sourceArg)
+	if strings.HasSuffix(lowerArg, ":source") {
+		formula = lowerArg[:len(lowerArg)-7]
 		forceSource = true
 	} else {
-		formula = sourceArg
+		formula = lowerArg
 		forceSource = false
 	}
 
