@@ -1,4 +1,4 @@
-# Build Essentials Provisioning
+# Dependency Provisioning
 
 ## Status
 
@@ -6,28 +6,58 @@ Proposed
 
 ## Context and Problem Statement
 
-Source builds require baseline tools and libraries: compilers, build systems, and common libraries. Traditionally, these are assumed to come from the "system" - users must pre-install them via apt, brew, or similar.
+Tsuku recipes need to declare dependencies on external tools and libraries. These dependencies fall into two categories:
+
+1. **Provisionable dependencies**: Tools tsuku CAN provide (compilers, libraries, build tools)
+2. **System dependencies**: Tools tsuku CANNOT provide (Docker, kernel modules, privileged daemons)
+
+Currently, tsuku has no way to:
+- Declare dependencies on things it cannot provide
+- Give users clear guidance when system dependencies are missing
+- Proactively provide build essentials that users assume come from the "system"
 
 This creates friction:
-- Users must manually install prerequisites before tsuku can build from source
-- Different platforms have different packages available
 - Builds fail with cryptic errors when prerequisites are missing
+- Users don't know what to install or how
+- Recipe authors can't express "this needs Docker installed"
 - No consistency across environments (CI vs local, macOS vs Linux)
 
 ### Key Insight
 
-**Tsuku can provide most "system" dependencies.** Homebrew bottles exist for gcc, make, zlib, and other build essentials. If tsuku proactively provides these, source builds "just work" without requiring users to pre-install anything.
+**Tsuku can provide most "system" dependencies** - but not all. The design must handle both cases:
 
-### What Tsuku Genuinely Cannot Provide
+1. For things tsuku CAN provide (gcc, zlib, openssl): proactively install them
+2. For things tsuku CANNOT provide (Docker, GPU drivers): declare them and fail clearly
 
-Only truly fundamental OS components:
-- **libc / libSystem** - The C runtime library. Everything links against it. Cannot be relocated.
-- **Kernel interfaces** - System calls, /dev, /proc
-- **Hardware drivers** - GPU, network, etc.
+### What Tsuku CAN Provide
 
-Everything else - compilers, build tools, libraries - can potentially be provided by tsuku.
+Most traditional "system" dependencies can be provided via Homebrew bottles:
+- **Compilers**: gcc, clang, binutils
+- **Build tools**: make, cmake, autoconf, meson
+- **Libraries**: zlib, openssl, libffi, ncurses
 
-**This assumption must be validated.** We need recipes and cross-platform tests to prove these tools work when relocated.
+These work when relocated to `$TSUKU_HOME` (validated per-platform).
+
+### What Tsuku CANNOT Provide
+
+Some dependencies fundamentally cannot be relocated or installed without system privileges:
+
+| Category | Examples | Why Tsuku Cannot Provide |
+|----------|----------|--------------------------|
+| **C Runtime** | libc, libSystem | Everything links against it; cannot be relocated |
+| **Kernel Interfaces** | /dev, /proc, system calls | OS-level, not user-space |
+| **Privileged Daemons** | Docker, systemd services | Require root, kernel features (cgroups, namespaces) |
+| **Kernel Modules** | GPU drivers, filesystem drivers | Must be loaded into kernel |
+| **System Services** | D-Bus, launchd agents | Require system-wide integration |
+| **Hardware Access** | Direct GPU, USB, network drivers | Require kernel-level permissions |
+
+**Docker example**: Docker requires:
+- Kernel features (cgroups, namespaces) - not user-space
+- A privileged daemon (dockerd runs as root) - tsuku is unprivileged
+- System service integration (systemd/launchd) - outside tsuku's scope
+- Cannot be "relocated" - it's fundamentally a system-level component
+
+These dependencies must be declared so tsuku can check for them and provide clear installation guidance when missing.
 
 ### Relationship to Existing Dependency Model
 
@@ -52,15 +82,21 @@ This design extends that model:
 ### Scope
 
 **In scope:**
-- Identify all baseline dependencies needed for source builds
-- Create recipes for each baseline dependency
-- Validate cross-platform functionality via test matrix
-- Design auto-provisioning mechanism for build actions
-- Integration tests proving source builds work with only tsuku-provided deps
+- **Part 1 - Build Essentials**: Proactively provide compilers, build tools, and libraries
+  - Identify all baseline dependencies needed for source builds
+  - Create recipes for each baseline dependency
+  - Validate cross-platform functionality via test matrix
+  - Design auto-provisioning mechanism for build actions
+- **Part 2 - System Dependencies**: Declare dependencies tsuku cannot provide
+  - Define `system:` annotation syntax for unprovisionable dependencies
+  - Detection mechanism to check if system deps are present
+  - Clear error messages with installation guidance
+  - Platform-specific system dependency declarations
 
 **Out of scope:**
-- Truly system-only deps (libc) - these are assumed present
-- The `system:` annotation concept - eliminated by this design
+- Automatic installation of system dependencies (requires root)
+- System dependency version management
+- Fallback mechanisms (if system dep missing, fail clearly)
 
 ## Decision Drivers
 
@@ -72,90 +108,116 @@ This design extends that model:
 
 ## Considered Options
 
-### Option A: System Dependency Annotation
+### Decision 1: How to handle provisionable dependencies (gcc, zlib, etc.)
 
-Add a `system:` prefix annotation to mark dependencies expected from the system:
+#### Option 1A: Require System Installation
 
-```toml
-[[steps]]
-action = "configure_make"
-dependencies = ["system:zlib", "system:openssl"]
-```
+Require users to pre-install build tools via apt/brew before using tsuku.
 
 **Pros:**
-- Explicit about what comes from where
-- Recipe author decides system vs tsuku
-- Works with existing dependency model
+- No additional work for tsuku
+- Smaller disk footprint
 
 **Cons:**
-- Ambiguous behavior when system dep is missing
-- Platform differences require additional complexity
-- Shifts responsibility to recipe authors
-- Doesn't solve the underlying problem (missing deps cause build failures)
+- Friction for users (must install prerequisites)
+- Cryptic errors when deps missing
+- Inconsistent across platforms
+- Violates "self-contained" philosophy
 
-### Option B: Tsuku Provides All Build Essentials
+#### Option 1B: Tsuku Provides All Build Essentials
 
-Tsuku proactively provides compilers, build tools, and common libraries via Homebrew bottles:
-
-```toml
-[[steps]]
-action = "configure_make"
-# Implicit: tsuku ensures gcc, make, pkg-config are installed
-dependencies = ["openssl", "zlib"]
-# Also provided by tsuku, not system
-```
+Tsuku proactively provides compilers, build tools, and common libraries via Homebrew bottles.
 
 **Pros:**
 - Zero prerequisites for users
 - Consistent behavior across platforms
-- No annotation needed - everything comes from tsuku
 - Solves the actual problem (missing deps)
 
 **Cons:**
 - Larger disk footprint
 - More recipes to maintain
 - Bootstrap complexity (need pre-built bottles)
-- Elevated security responsibility
 
-### Option C: Hybrid with System Fallback
+#### Option 1C: Hybrid with System Fallback
 
-Prefer system dependencies when available, install via tsuku if missing:
-
-```toml
-[[steps]]
-action = "configure_make"
-dependencies = ["zlib", "openssl"]
-# Tsuku checks: system has it? Use system. Missing? Install via tsuku.
-```
+Prefer system dependencies when available, install via tsuku if missing.
 
 **Pros:**
 - Smaller footprint when system has deps
 - Still works when system lacks deps
-- Flexible
 
 **Cons:**
 - Non-deterministic behavior
 - Different binaries depending on environment
-- Complex detection logic
 - Harder to reproduce builds
+
+### Decision 2: How to handle unprovisionable dependencies (Docker, etc.)
+
+#### Option 2A: No Declaration (Status Quo)
+
+Don't declare system dependencies; let tools fail with their own error messages.
+
+**Pros:**
+- No additional work
+
+**Cons:**
+- Cryptic error messages
+- Users don't know what to install
+- No way for recipes to express requirements
+
+#### Option 2B: System Dependency Annotation
+
+Add a `system:` prefix to declare dependencies tsuku cannot provide:
+
+```toml
+[[steps]]
+action = "docker_build"
+dependencies = ["system:docker"]
+```
+
+**Pros:**
+- Explicit declaration of requirements
+- Tsuku can check before running
+- Clear error messages with installation guidance
+- Works with existing dependency model
+
+**Cons:**
+- New syntax to learn
+- Must maintain detection logic per dependency
+
+#### Option 2C: Separate System Requirements Section
+
+Add a dedicated section for system requirements:
+
+```toml
+[system_requirements]
+docker = { min_version = "20.0", install_url = "https://docs.docker.com/install" }
+```
+
+**Pros:**
+- Rich metadata (versions, install URLs)
+- Clear separation from tsuku deps
+
+**Cons:**
+- New recipe structure
+- More complex than needed for basic cases
+- Overkill for most recipes
 
 ## Decision Outcome
 
-**Chosen: Option B (Tsuku Provides All Build Essentials)**
+**Chosen: 1B + 2B**
 
 ### Summary
 
-Tsuku will provide all build tools (gcc, make, cmake) and common libraries (zlib, openssl) via Homebrew bottles. Build actions declare implicit dependencies on these tools. No `system:` annotation is needed because tsuku provides everything.
+Tsuku will provide all provisionable dependencies (gcc, make, zlib) via Homebrew bottles, eliminating the need for `system:` annotations on things tsuku CAN provide. For things tsuku genuinely CANNOT provide (Docker, GPU drivers), recipes use the `system:` annotation to declare them explicitly.
 
 ### Rationale
 
-The core insight is that tsuku CAN provide most "system" dependencies. Only truly fundamental OS components (libc, kernel interfaces) cannot be relocated. Everything else - compilers, build tools, libraries - can be provided via Homebrew bottles.
+**For Decision 1 (provisionable deps):** Option 1B aligns with tsuku's "self-contained" philosophy. If tsuku can provide something, it should - making users pre-install gcc or zlib creates unnecessary friction. Option 1C was rejected because non-deterministic builds are worse than larger disk footprint.
 
-Option A (annotation) was rejected because it doesn't solve the problem - if someone lacks zlib, marking it `system:zlib` just makes the build fail with a slightly better error message. Option C (fallback) was rejected because non-deterministic builds are worse than larger disk footprint.
+**For Decision 2 (unprovisionable deps):** Option 2B provides a clean way to declare system requirements without overcomplicating recipes. The `system:` prefix makes intent clear: "this is something tsuku cannot provide, check if it exists." Option 2C was rejected as overkill - version requirements and install URLs can be added later if needed.
 
-Option B aligns with tsuku's "self-contained" philosophy: users only need tsuku, nothing else. The trade-off is disk space and security responsibility, which are acceptable given the user experience benefits.
-
-**Key assumption requiring validation:** Homebrew bottles are relocatable and work from `$TSUKU_HOME`. The validation plan tests this assumption before implementation.
+**Combined effect:** The `system:` annotation is reserved for things tsuku genuinely cannot provide. If a recipe author writes `system:zlib`, that's likely a mistake - zlib should just be `zlib` and tsuku will provide it. The annotation is for Docker, CUDA, system services, etc.
 
 ## Build Essentials Inventory
 
@@ -278,61 +340,152 @@ func (a *SetupBuildEnvAction) Execute(ctx *ExecutionContext) error {
 }
 ```
 
-### No `system:` Annotation Needed
+### When `system:` Annotation IS Needed
 
-Since tsuku provides all build essentials:
-- No need to distinguish "system" vs "tsuku" dependencies
-- No need for `system:` prefix annotation
-- Platform differences only needed when behavior genuinely differs (rare)
+The `system:` annotation is reserved for dependencies tsuku genuinely cannot provide:
 
-### Installation Flow
+```toml
+# Docker-based build - tsuku cannot provide Docker
+[[steps]]
+action = "docker_build"
+dependencies = ["system:docker"]
+
+# GPU-accelerated tool - tsuku cannot provide CUDA
+[[steps]]
+action = "cmake_build"
+dependencies = ["system:cuda", "zlib"]  # zlib from tsuku, cuda from system
+```
+
+For provisionable dependencies (gcc, zlib, openssl), do NOT use the `system:` prefix - just declare them normally and tsuku will provide them.
+
+## System Dependency Declaration
+
+### Syntax
+
+System dependencies use the `system:` prefix in `dependencies` or `runtime_dependencies`:
+
+```toml
+dependencies = ["system:docker", "system:cuda"]
+runtime_dependencies = ["system:docker"]
+```
+
+### Known System Dependencies
+
+Tsuku maintains a registry of known system dependencies with detection and installation guidance:
+
+```go
+var SystemDependencies = map[string]SystemDep{
+    "docker": {
+        Detection: DetectDocker,  // func() (bool, string)
+        InstallGuide: map[string]string{
+            "darwin": "brew install --cask docker",
+            "linux":  "See https://docs.docker.com/engine/install/",
+        },
+    },
+    "cuda": {
+        Detection: DetectCUDA,
+        InstallGuide: map[string]string{
+            "darwin": "CUDA not available on macOS",
+            "linux":  "See https://developer.nvidia.com/cuda-downloads",
+        },
+    },
+    "systemd": {
+        Detection: DetectSystemd,
+        InstallGuide: map[string]string{
+            "darwin": "Not applicable (macOS uses launchd)",
+            "linux":  "Usually pre-installed; see your distro documentation",
+        },
+    },
+}
+```
+
+### Detection Functions
+
+Each system dependency has a detection function:
+
+```go
+func DetectDocker() (found bool, version string) {
+    cmd := exec.Command("docker", "--version")
+    output, err := cmd.Output()
+    if err != nil {
+        return false, ""
+    }
+    // Parse version from "Docker version 24.0.5, build ..."
+    return true, parseDockerVersion(string(output))
+}
+```
+
+### Error Messages
+
+When a system dependency is missing, tsuku provides clear guidance:
 
 ```
-tsuku install curl (source build)
+Error: Missing system dependency: docker
+
+This recipe requires Docker, which tsuku cannot provide.
+Docker requires system-level installation with root privileges.
+
+To install Docker:
+  macOS: brew install --cask docker
+  Linux: See https://docs.docker.com/engine/install/
+
+After installing, run: tsuku install <tool> --retry
+```
+
+### Platform-Specific System Dependencies
+
+Use the `when` clause for platform-specific system requirements:
+
+```toml
+# Only needed on Linux
+[[steps]]
+action = "run_service"
+dependencies = ["system:systemd"]
+[steps.when]
+os = "linux"
+
+# Only needed on macOS
+[[steps]]
+action = "run_service"
+dependencies = ["system:launchd"]
+[steps.when]
+os = "darwin"
+```
+
+### Installation Flow with System Dependencies
+
+```
+tsuku install my-docker-tool
         │
         ▼
 ┌─────────────────────────────────────────┐
 │ 1. Load recipe                          │
-│    - Action: configure_make             │
-│    - Deps: [openssl, zlib, nghttp2]     │
+│    - Deps: [system:docker, curl]        │
 └─────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────┐
-│ 2. Resolve dependencies                 │
-│    - Action implicit: [make, gcc,       │
-│      pkg-config, autoconf]              │
-│    - Recipe explicit: [openssl, zlib,   │
-│      nghttp2]                           │
-│    - Combined: [make, gcc, pkg-config,  │
-│      autoconf, openssl, zlib, nghttp2]  │
+│ 2. Check system dependencies            │
+│    - docker: Run DetectDocker()         │
+│    - Found? Continue                    │
+│    - Missing? Show install guide, FAIL  │
 └─────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────┐
-│ 3. Install all dependencies             │
-│    - tsuku install make (if needed)     │
-│    - tsuku install gcc (if needed)      │
-│    - tsuku install openssl (if needed)  │
-│    - ... etc                            │
+│ 3. Install tsuku dependencies           │
+│    - tsuku install curl (if needed)     │
 └─────────────────────────────────────────┘
         │
         ▼
 ┌─────────────────────────────────────────┐
 │ 4. Execute build steps                  │
-│    - setup_build_env sets CC, CFLAGS... │
-│    - configure_make runs with env       │
-└─────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────┐
-│ 5. Record state                         │
-│    - curl installed                     │
-│    - Dependencies tracked               │
 └─────────────────────────────────────────┘
 ```
 
 ### Component Changes
+
+#### Part 1: Build Essentials
 
 | Component | Change |
 |-----------|--------|
@@ -343,6 +496,16 @@ tsuku install curl (source build)
 | `recipes/make.toml` | NEW: GNU Make recipe |
 | `recipes/zlib.toml` | NEW: zlib library recipe |
 | ... | Additional build essential recipes |
+
+#### Part 2: System Dependencies
+
+| Component | Change |
+|-----------|--------|
+| `internal/deps/system.go` | NEW: System dependency registry and detection |
+| `internal/deps/detect_docker.go` | NEW: Docker detection function |
+| `internal/deps/detect_cuda.go` | NEW: CUDA detection function |
+| `internal/executor/resolver.go` | Parse `system:` prefix, check system deps before install |
+| `internal/executor/errors.go` | NEW: User-friendly error messages with install guidance |
 
 ## Validation Plan
 
@@ -566,6 +729,28 @@ jobs:
 4. Expand test matrix
 5. Build python from source as final validation
 
+### Phase 5: System Dependency Infrastructure
+
+**Goal**: Enable declaration of dependencies tsuku cannot provide.
+
+1. Implement `system:` prefix parsing in dependency resolver
+2. Create `internal/deps/system.go` with registry structure
+3. Implement Docker detection function
+4. Implement CUDA detection function
+5. Add user-friendly error messages with install guidance
+6. **Gate**: Unit tests for system dependency detection
+
+### Phase 6: System Dependency Integration
+
+**Goal**: Integrate system dependencies into installation flow.
+
+1. Add system dependency check before tsuku dependency installation
+2. Fail fast with clear guidance when system deps missing
+3. Add `tsuku check-deps <recipe>` command to verify prerequisites
+4. Document system dependency declaration in recipe authoring guide
+5. Create example recipe using `system:docker`
+6. **Gate**: Integration test with docker-dependent recipe
+
 ## Security Considerations
 
 Build tools represent an elevated security concern because compilers and linkers are **trust anchors** - a compromised compiler affects ALL binaries it produces.
@@ -645,11 +830,17 @@ Hidden dependencies (build tools not shown in `tsuku list`) reduce user awarenes
 
 ### Positive
 
+#### Part 1: Build Essentials
 - Source builds work without manual prerequisite installation
 - Consistent behavior across platforms
 - Clear validation that relocated tools actually work
-- Eliminates "system dependency" complexity entirely
-- No `system:` annotation needed
+- `system:` annotation not needed for things tsuku can provide (gcc, zlib, etc.)
+
+#### Part 2: System Dependencies
+- Clear declaration of unprovisionable requirements (Docker, CUDA, etc.)
+- User-friendly error messages with installation guidance
+- Platform-specific system requirements supported via `when` clause
+- Recipe authors can express "this needs Docker" without workarounds
 
 ### Negative
 
@@ -658,6 +849,7 @@ Hidden dependencies (build tools not shown in `tsuku list`) reduce user awarenes
 - Initial setup takes longer (must install build tools)
 - Bootstrap complexity (requires pre-built Homebrew bottles)
 - Elevated security responsibility (compilers are trust anchors)
+- Must maintain detection functions for each system dependency
 
 ### Mitigations
 
@@ -665,9 +857,10 @@ Hidden dependencies (build tools not shown in `tsuku list`) reduce user awarenes
 - Lazy installation (only when a source build is attempted)
 - Share build tools across multiple source builds
 - Use Homebrew bottles (pre-built) to avoid bootstrap problem
+- Start with small set of system dependencies (docker, cuda), expand as needed
 
 ### Neutral
 
-- Removes `system:` annotation concept entirely
-- Shifts complexity from recipe authors to tsuku maintainers
-- Aligns with tsuku's "self-contained" philosophy
+- `system:` annotation reserved for truly unprovisionable dependencies only
+- Shifts build tool complexity from recipe authors to tsuku maintainers
+- Aligns with tsuku's "self-contained" philosophy while acknowledging limits
