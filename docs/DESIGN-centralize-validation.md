@@ -85,11 +85,12 @@ Bottle validation failures trigger the LLM repair loop, but source validation fa
 ## Success Criteria
 
 A successful solution will:
-1. Enable `tsuku validate recipe.toml` to work without any builder context
+1. Enable `tsuku install <tool> --container` to work without any builder context
 2. Derive validation requirements (network, build tools, image) from plan content alone
 3. Require updating only one location when adding a new action's requirements
 4. Surface network requirements explicitly so validation can configure containers appropriately
 5. Work with existing plans (no forced regeneration)
+6. Support `tsuku eval <tool> | tsuku install --plan - --container` workflow
 
 ## Implementation Context
 
@@ -680,25 +681,45 @@ func (e *Executor) Validate(ctx context.Context, plan *executor.InstallationPlan
 func GetActionValidationMetadata(action string) ActionValidationMetadata
 ```
 
-#### CLI Command
+#### CLI Interface
+
+Rather than creating a new command, container-based validation is integrated into `tsuku install` with a `--container` flag:
 
 ```
-tsuku validate <recipe|plan.json> [--network] [--verbose]
+tsuku install <tool> --container                    # Generate plan, run in container
+tsuku install --recipe recipe.toml --container      # Test recipe file in container (new)
+tsuku install --plan plan.json --container          # Execute existing plan in container
+tsuku install --plan - --container                  # Read plan from stdin (pipe from eval)
 ```
 
-The command:
-1. Loads recipe (if .toml) or plan (if .json)
-2. Generates plan (if recipe)
-3. Computes validation requirements
-4. Runs validation in container
-5. Reports success/failure
+This mirrors the existing `tsuku install` interface:
+- Accepts tool name or plan (via `--plan` flag)
+- Works with `tsuku eval <tool> | tsuku install --plan - --container`
+
+**Note:** Currently `tsuku install` only accepts tool names (looked up from registry) or plans. To enable direct recipe file testing, this work should also add `--recipe` flag support:
+
+```
+tsuku install --recipe path/to/recipe.toml --container
+tsuku eval --recipe path/to/recipe.toml | tsuku install --plan - --container
+```
+
+This allows recipe authors to test local recipe files before submitting to the registry.
+
+The `--container` flag:
+1. Generates plan (if tool name provided) or loads plan (if --plan)
+2. Computes validation requirements from plan
+3. Runs `tsuku install --plan` inside an isolated container
+4. Reports success/failure based on exit code and verification
+
+Note: The existing `tsuku validate` command performs static recipe validation (TOML syntax, required fields). Container-based execution testing is a different concern, handled by `tsuku install --container`.
 
 ### Data Flow
 
 ```
-1. User invokes: tsuku validate recipe.toml
+1. User invokes: tsuku install rg --container
+   Or: tsuku eval rg | tsuku install --plan - --container
 
-2. CLI loads recipe, creates Executor, generates plan:
+2. CLI generates plan (or loads from --plan):
    plan, err := exec.GeneratePlan(ctx, PlanConfig{...})
 
 3. CLI computes requirements from plan:
@@ -716,9 +737,9 @@ The command:
 6. Container executes:
    - Install build tools (if any)
    - Run tsuku install --plan
-   - Execute verify command
+   - Execute verify command (from recipe)
 
-7. Result returned to CLI
+7. Result returned to CLI (exit code, stdout/stderr)
 ```
 
 ## Implementation Approach
@@ -774,25 +795,29 @@ The command:
 - Updated builders using centralized validation
 - Consistent validation behavior across all builders
 
-### Phase 5: Add CLI Command
+### Phase 5: Add --container and --recipe Flags to Install
 
-**Goal**: Enable standalone validation via `tsuku validate`.
+**Goal**: Enable container-based validation via `tsuku install --container` and direct recipe file testing.
 
-- Add `cmd/tsuku/validate.go` command
-- Support recipe (.toml) and plan (.json) inputs
-- Add `--verbose` flag for detailed output
-- Document in help text
+- Add `--container` flag to `tsuku install` command
+- Add `--recipe` flag to support direct recipe file paths
+- Integrate with existing `--plan` flag flow
+- Compute validation requirements from plan
+- Run `tsuku install --plan` in container with computed configuration
+- Add `--verbose` flag for detailed container output
 
 **Deliverables**:
-- New `tsuku validate` command
-- User documentation
+- `--container` flag for `tsuku install`
+- `--recipe` flag for direct recipe file testing
+- Integration with `tsuku eval <tool> | tsuku install --plan - --container`
+- Updated help text
 
 ## Consequences
 
 ### Positive
 
 - **Single source of truth**: Validation requirements live in one place (metadata registry)
-- **Independent validation**: Users can run `tsuku validate recipe.toml` standalone
+- **Independent validation**: Users can run `tsuku install <tool> --container` or pipe from eval
 - **Reduced duplication**: No more `detectRequiredBuildTools()` switch statement
 - **Consistent behavior**: All builders use the same validation logic
 - **Extensible**: Adding new metadata dimensions just adds fields to the struct
