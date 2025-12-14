@@ -88,6 +88,9 @@ jobs:
           go-version-file: 'go.mod'
           cache-dependency-path: go.sum
 
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory /__w/tsuku/tsuku
+
       - name: Build tsuku
         run: go build -o tsuku ./cmd/tsuku
 
