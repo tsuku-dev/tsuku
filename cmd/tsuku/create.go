@@ -204,6 +204,13 @@ func runCreate(cmd *cobra.Command, args []string) {
 
 	// Parse the --from flag
 	builderName, sourceArg := parseFromFlag(createFrom)
+
+	// Normalize ecosystem names (e.g., "cargo" -> "crates.io", "pip" -> "pypi")
+	// Only normalize if not an LLM builder (github/homebrew pass through unchanged)
+	if builderName != "github" && builderName != "homebrew" {
+		builderName = normalizeEcosystem(builderName)
+	}
+
 	isLLMBuilder := builderName == "github" || builderName == "homebrew"
 
 	// Handle --skip-validation flag (only applies to LLM builders)
