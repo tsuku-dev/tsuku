@@ -266,9 +266,9 @@ Each phase is self-contained - tsuku should build and pass tests after each phas
 5. Update all recipes using `homebrew_bottle` to use `homebrew`
 6. Update all tests
 
-### Phase 2: Migrate HashiCorp Recipes
+### Phase 2: Migrate HashiCorp Recipes to Primitives
 
-Replace `hashicorp_release` action usage with explicit primitives in all 6 recipes:
+Convert all 6 recipes from `hashicorp_release` to explicit primitive actions:
 - terraform.toml
 - vault.toml
 - nomad.toml
@@ -276,27 +276,38 @@ Replace `hashicorp_release` action usage with explicit primitives in all 6 recip
 - boundary.toml
 - waypoint.toml
 
+Each recipe conversion:
+1. Replace `hashicorp_release` with `download` + `extract` + `chmod` + `install_binaries`
+2. Verify recipe still works (tests pass)
+
 ### Phase 3: Remove hashicorp_release Action
 
+After all recipes are migrated (Phase 2 complete):
 1. Remove `HashiCorpReleaseAction` from composites.go
 2. Remove related tests
-3. Update validator to reject `hashicorp_release`
+3. Remove `hashicorp_release` from action registry
+4. Update validator to reject `hashicorp_release`
 
-### Phase 4: Move Source Build Test Fixtures
+### Phase 4: Move and Convert Source Build Test Fixtures
 
 1. Create `testdata/homebrew-source-fixtures/` directory
 2. Move test fixtures from registry:
    - `internal/recipe/recipes/b/bash.toml` → `testdata/homebrew-source-fixtures/bash.toml`
    - `internal/recipe/recipes/p/python.toml` → `testdata/homebrew-source-fixtures/python.toml`
    - `internal/recipe/recipes/r/readline.toml` → `testdata/homebrew-source-fixtures/readline.toml`
-3. Update `llm-test-matrix.json` to reference new locations
-4. Update any test code referencing these fixtures
+3. Convert fixtures from `homebrew_source` to primitive actions:
+   - Replace `homebrew_source` with `download` + `extract`
+   - Keep the existing `configure_make` / build steps
+   - Keep patch definitions
+4. Update `llm-test-matrix.json` to reference new locations
+5. Update any test code referencing these fixtures
 
 ### Phase 5: Remove homebrew_source Action
 
+After all fixtures are converted (Phase 4 complete):
 1. Remove `homebrew_source.go` and `homebrew_source_test.go`
-2. Update validator to reject `homebrew_source`
-3. Update action registry
+2. Remove `homebrew_source` from action registry
+3. Update validator to reject `homebrew_source`
 
 ### Phase 6: Remove HomebrewBuilder Source Build Code
 
