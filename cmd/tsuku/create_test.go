@@ -103,6 +103,56 @@ func TestParseFromFlag(t *testing.T) {
 			wantBuilder:   "homebrew",
 			wantRemainder: "PostgreSQL@17:source",
 		},
+		// Edge cases - PFF-1 through PFF-6
+		{
+			name:          "github trailing colon (empty sourceArg)",
+			from:          "github:",
+			wantBuilder:   "github",
+			wantSourceArg: "",
+			wantLLMType:   LLMBuilderGitHub,
+		},
+		{
+			name:          "homebrew trailing colon (empty sourceArg)",
+			from:          "homebrew:",
+			wantBuilder:   "homebrew",
+			wantSourceArg: "",
+			wantLLMType:   LLMBuilderHomebrew,
+		},
+		{
+			name:          "colon only treated as ecosystem",
+			from:          ":",
+			wantBuilder:   ":",
+			wantSourceArg: "",
+			wantLLMType:   LLMBuilderNone,
+		},
+		{
+			name:          "github double colon",
+			from:          "github::cli",
+			wantBuilder:   "github",
+			wantSourceArg: ":cli",
+			wantLLMType:   LLMBuilderGitHub,
+		},
+		{
+			name:          "homebrew multiple colons",
+			from:          "homebrew:pg@15:source",
+			wantBuilder:   "homebrew",
+			wantSourceArg: "pg@15:source",
+			wantLLMType:   LLMBuilderHomebrew,
+		},
+		{
+			name:          "homebrew versioned formula",
+			from:          "homebrew:postgresql@15",
+			wantBuilder:   "homebrew",
+			wantSourceArg: "postgresql@15",
+			wantLLMType:   LLMBuilderHomebrew,
+		},
+		{
+			name:          "empty string treated as ecosystem",
+			from:          "",
+			wantBuilder:   "",
+			wantSourceArg: "",
+			wantLLMType:   LLMBuilderNone,
+		},
 	}
 
 	for _, tt := range tests {
