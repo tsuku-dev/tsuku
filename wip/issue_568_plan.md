@@ -34,11 +34,11 @@ Actions needing RequiresNetwork() = true:
 - `internal/actions/action_test.go` - Add tests for NetworkValidator (extend existing file)
 
 ## Implementation Steps
-- [ ] Add NetworkValidator interface and BaseAction.RequiresNetwork() to action.go
-- [ ] Add RequiresNetwork() = true to ecosystem actions (cargo, go, npm, pip, gem, cpan)
-- [ ] Add RequiresNetwork() = true to system package managers (apt, yum, brew)
-- [ ] Add RequiresNetwork() = true to nix actions and run_command
-- [ ] Add unit tests verifying network requirements for all actions
+- [x] Add NetworkValidator interface and BaseAction.RequiresNetwork() to action.go
+- [x] Add RequiresNetwork() = true to ecosystem actions (cargo, go, npm, pip, gem, cpan)
+- [x] Add RequiresNetwork() = true to system package managers (apt, yum, brew)
+- [x] Add RequiresNetwork() = true to nix actions and run_command
+- [x] Add unit tests verifying network requirements for all actions
 
 ## Testing Strategy
 - Unit tests: Verify each action returns correct RequiresNetwork() value
