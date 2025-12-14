@@ -1,31 +1,22 @@
-# Ground truth recipe for python (source build with patch)
-# Used by LLM integration tests (S2)
-
 [metadata]
 name = "python"
 description = "Python programming language"
 homepage = "https://www.python.org/"
-dependencies = ["make"]
+binaries = ["bin/python3.13", "bin/python3", "bin/pip3.13", "bin/pip3"]
 
 [version]
 source = "homebrew"
 formula = "python@3.13"
 
 [[steps]]
-action = "homebrew_source"
+action = "homebrew_bottle"
 formula = "python@3.13"
 
 [[steps]]
-action = "configure_make"
-source_dir = "."
-executables = ["python3.13"]
-
-# Single patch from Homebrew patches repo
-[[patches]]
-url = "https://raw.githubusercontent.com/Homebrew/homebrew-core/1cf441a0/Patches/python/3.13-sysconfig.diff"
-checksum = "9f2eae1d08720b06ac3d9ef1999c09388b9db39dfb52687fc261ff820bff20c3"
-strip = 1
+action = "install_binaries"
+install_mode = "directory"
+binaries = ["bin/python3.13", "bin/python3", "bin/pip3.13", "bin/pip3"]
 
 [verify]
-command = "python3.13 --version"
+command = "python3 --version"
 pattern = "Python {version}"
