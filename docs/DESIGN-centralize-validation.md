@@ -550,15 +550,24 @@ var actionValidationMetadata = map[string]ActionValidationMetadata{
 }
 
 // GetActionValidationMetadata returns validation metadata for an action.
-// Returns zero value if action is not found (defaults to no network requirement).
-// Unknown actions default to not requiring network - validation will fail if
-// the action actually needed network, providing clear feedback.
 func GetActionValidationMetadata(action string) ActionValidationMetadata {
     return actionValidationMetadata[action]
 }
 ```
 
-**Note on conservative vs permissive defaults:** Unknown actions default to `RequiresNetwork: false`. This is intentional - if an action actually needs network but isn't registered, validation will fail with a clear error (network timeout/DNS failure), prompting the developer to add the action to the registry. This is better than silently enabling network for all unknown actions.
+**Unknown Action Handling**: Actions not in the registry return the zero value (`RequiresNetwork: false`). This "fail-closed" design means:
+
+1. **Unknown actions run without network**: If validation fails due to missing network, the error clearly indicates the action needs to be added to the registry
+2. **Safe default**: Unknown actions can't unexpectedly get network access
+3. **Clear feedback**: Network timeout errors are obvious ("connection refused", "DNS lookup failed")
+
+This is preferable to "fail-open" (defaulting to `RequiresNetwork: true`) which would:
+- Silently grant network to actions that don't need it
+- Mask potential security issues
+- Allow data exfiltration from validation containers
+
+A CI test should verify all registered actions have metadata entries to catch missing entries at PR time rather than runtime.
+
 
 #### 2. ValidationRequirements Struct
 
@@ -739,6 +748,20 @@ tsuku eval --recipe path/to/recipe.toml | tsuku install --plan - --container
 
 This allows recipe authors to test local recipe files before submitting to the registry.
 
+**User Awareness for Untrusted Recipes**: When using `--recipe` with a local file, the CLI should display what permissions will be granted before execution:
+
+```
+$ tsuku install --recipe ./my-recipe.toml --container
+Validating recipe: ./my-recipe.toml
+  Network access: required (cargo_build action)
+  Container image: ubuntu:22.04
+  Resource limits: 4GB memory, 4 CPUs, 15m timeout
+
+Proceed with validation? [y/N]
+```
+
+This confirmation can be bypassed with `--yes` for CI/automation, but ensures users understand what network-enabled validation entails for untrusted recipes.
+
 The `--container` flag:
 1. Generates plan (if tool name provided) or loads plan (if --plan)
 2. Computes validation requirements from plan
@@ -750,31 +773,70 @@ Note: The existing `tsuku validate` command performs static recipe validation (T
 ### Data Flow
 
 ```
-1. User invokes: tsuku install rg --container
-   Or: tsuku eval rg | tsuku install --plan - --container
+User Input                    Processing                      Output
+─────────────────────────────────────────────────────────────────────────
 
-2. CLI generates plan (or loads from --plan):
-   plan, err := exec.GeneratePlan(ctx, PlanConfig{...})
-
-3. CLI computes requirements from plan:
-   reqs := validate.ComputeValidationRequirements(plan)
-
-4. CLI creates validator and runs:
-   result, err := validator.Validate(ctx, plan, reqs)
-
-5. Validator uses reqs to configure container:
-   - reqs.Image → container image
-   - reqs.RequiresNetwork → network mode
-   - reqs.BuildTools → apt-get install in script
-   - reqs.Resources → memory/CPU limits
-
-6. Container executes:
-   - Install build tools (if any)
-   - Run tsuku install --plan
-   - Execute verify command (from recipe)
-
-7. Result returned to CLI (exit code, stdout/stderr)
+tsuku install rg --container
+        │
+        ▼
+┌─────────────────┐
+│ CLI: Parse Args │
+└────────┬────────┘
+        │
+        ▼
+┌─────────────────────────────┐
+│ GeneratePlan()              │◄──── Downloads cached to ~/.tsuku/cache
+│ (internal/executor)         │
+└────────┬────────────────────┘
+        │
+        │ InstallationPlan
+        ▼
+┌─────────────────────────────┐
+│ ComputeValidationRequirements│◄──── Iterates plan.Steps
+│ (internal/validate)         │      Looks up ActionValidationMetadata
+└────────┬────────────────────┘      Aggregates network/image/resources
+        │
+        │ ValidationRequirements
+        │   .RequiresNetwork: bool
+        │   .Image: string
+        │   .Resources: ResourceLimits
+        ▼
+┌─────────────────────────────┐
+│ Validator.Validate()        │
+│ (internal/validate)         │
+│   ├─ Build container opts   │
+│   │    from requirements    │
+│   ├─ Generate validate.sh   │
+│   └─ Run container          │────► Container with:
+└────────┬────────────────────┘        - Network: none|host
+        │                             - Image: debian|ubuntu
+        │                             - Mounts: workspace, cache
+        │                             - Limits: memory, CPU, timeout
+        │
+        ▼
+┌─────────────────────────────┐
+│ Container Execution         │
+│   ├─ tsuku install --plan   │◄──── Uses cached downloads
+│   │    (handles deps via    │      Build tools from ActionDependencies
+│   │     ActionDependencies) │
+│   └─ Verify command         │
+└────────┬────────────────────┘
+        │
+        ▼
+┌─────────────────────────────┐
+│ ValidationResult            │────► Success/Failure + stdout/stderr
+└─────────────────────────────┘
 ```
+
+**Key Integration Points:**
+
+| Step | Component | Data In | Data Out |
+|------|-----------|---------|----------|
+| 1 | CLI | User args | Tool name or plan path |
+| 2 | GeneratePlan | Recipe | InstallationPlan (with cached downloads) |
+| 3 | ComputeValidationRequirements | InstallationPlan | ValidationRequirements |
+| 4 | Validator.Validate | Plan + Requirements | Container config + script |
+| 5 | Container | validate.sh + plan.json | Exit code + output |
 
 ## Implementation Approach
 
