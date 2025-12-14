@@ -55,11 +55,11 @@ jobs:
 
       - name: "Verify ${{ matrix.tool }}"
         run: |
-          # Use absolute path since GITHUB_PATH may not propagate reliably
+          # Symlinks are in $HOME/.tsuku/tools/current/, not $HOME/.tsuku/bin/
           if [ "${{ matrix.tool }}" = "make" ]; then
-            $HOME/.tsuku/bin/make --version
+            $HOME/.tsuku/tools/current/make --version
           elif [ "${{ matrix.tool }}" = "gdbm" ]; then
-            $HOME/.tsuku/bin/gdbmtool --version
+            $HOME/.tsuku/tools/current/gdbmtool --version
           fi
 
   # Test in clean container with no system build tools
@@ -117,9 +117,9 @@ jobs:
 
       - name: "Verify ${{ matrix.tool }}"
         run: |
-          # Use absolute path since GITHUB_PATH may not propagate reliably
+          # Symlinks are in $HOME/.tsuku/tools/current/, not $HOME/.tsuku/bin/
           if [ "${{ matrix.tool }}" = "make" ]; then
-            $HOME/.tsuku/bin/make --version
+            $HOME/.tsuku/tools/current/make --version
           elif [ "${{ matrix.tool }}" = "gdbm" ]; then
-            $HOME/.tsuku/bin/gdbmtool --version
+            $HOME/.tsuku/tools/current/gdbmtool --version
           fi
