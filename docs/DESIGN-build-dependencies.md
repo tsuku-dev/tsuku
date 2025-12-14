@@ -280,6 +280,20 @@ We extend the recipe format with explicit `build_dependencies` and `system_depen
 
 **Option 3C (link_build_deps Action)** makes the environment setup explicit in recipes while avoiding boilerplate. Users can see that build environment setup happens, but don't need to manually specify PKG_CONFIG_PATH for every dependency. This also allows the action to be omitted for builds that don't need it.
 
+### Trade-offs Accepted
+
+By choosing this approach, we accept:
+
+1. **Recipe verbosity**: Source build recipes will have more fields than binary-only recipes. This reflects genuine complexity rather than unnecessary overhead.
+
+2. **pkg-config dependency**: System dependency verification relies on pkg-config being available. Without it, verification degrades to documentation-only behavior.
+
+3. **No hermetic builds**: This feature improves reliability without guaranteeing reproducibility. Tools requiring hermetic builds should use `nix_realize` instead.
+
+4. **Metadata-step coupling**: The `link_build_deps` action reads from recipe metadata, creating implicit coupling. This trade-off keeps recipes concise while maintaining explicit action visibility.
+
+These trade-offs are acceptable because the primary goal is improving source build reliability for the common case, not achieving perfect build isolation.
+
 ## Solution Architecture
 
 ### Recipe Schema Changes
