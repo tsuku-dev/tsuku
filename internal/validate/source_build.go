@@ -86,9 +86,9 @@ func (e *Executor) ValidateSourceBuild(ctx context.Context, r *recipe.Recipe) (*
 	}
 	defer os.RemoveAll(workspaceDir)
 
-	// Create download cache directory within workspace
+	// Create download cache directory within workspace with secure permissions (0700)
 	cacheDir := filepath.Join(workspaceDir, "cache", "downloads")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 

@@ -815,10 +815,14 @@ func TestResolveStep_WithDownload(t *testing.T) {
 
 		ctx := context.Background()
 
+		// Create a test downloader with a real HTTP client for this network test
+		downloader := newTestDownloader(http.DefaultClient)
+
 		plan, err := exec.GeneratePlan(ctx, PlanConfig{
 			OS:           "linux",
 			Arch:         "amd64",
 			RecipeSource: "test",
+			Downloader:   downloader,
 		})
 
 		if err != nil {

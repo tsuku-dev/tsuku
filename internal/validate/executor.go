@@ -170,9 +170,9 @@ func (e *Executor) Validate(ctx context.Context, r *recipe.Recipe, assetURL stri
 	}
 	defer os.RemoveAll(workspaceDir)
 
-	// Create download cache directory within workspace
+	// Create download cache directory within workspace with secure permissions (0700)
 	cacheDir := filepath.Join(workspaceDir, "cache", "downloads")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -291,44 +291,6 @@ func (e *Executor) Validate(ctx context.Context, r *recipe.Recipe, assetURL stri
 		Stdout:   result.Stdout,
 		Stderr:   result.Stderr,
 	}, nil
-}
-
-// buildTsukuInstallScript creates a shell script that runs tsuku install with the recipe.
-// This is the legacy method - see buildPlanInstallScript for the preferred approach.
-func (e *Executor) buildTsukuInstallScript(r *recipe.Recipe) string {
-	var sb strings.Builder
-
-	sb.WriteString("#!/bin/sh\n")
-	sb.WriteString("set -e\n\n")
-
-	// Install ca-certificates for HTTPS downloads
-	sb.WriteString("# Install required packages\n")
-	sb.WriteString("apt-get update -qq && apt-get install -qq -y ca-certificates >/dev/null 2>&1 || true\n\n")
-
-	// Setup tsuku home directory
-	sb.WriteString("# Setup TSUKU_HOME\n")
-	sb.WriteString("mkdir -p /workspace/tsuku/recipes\n")
-	sb.WriteString("mkdir -p /workspace/tsuku/bin\n")
-	sb.WriteString("mkdir -p /workspace/tsuku/tools\n\n")
-
-	// Copy recipe to tsuku recipes directory
-	sb.WriteString("# Copy recipe to tsuku recipes\n")
-	sb.WriteString(fmt.Sprintf("cp /workspace/recipe.toml /workspace/tsuku/recipes/%s.toml\n\n", r.Metadata.Name))
-
-	// Run tsuku install
-	sb.WriteString("# Run tsuku install\n")
-	sb.WriteString(fmt.Sprintf("tsuku install %s --force\n\n", r.Metadata.Name))
-
-	// Run the verify command explicitly to capture its output for pattern matching.
-	// The install command doesn't print verify output, so we need to run it separately.
-	// Binaries are symlinked to $TSUKU_HOME/tools/current (/workspace/tsuku/tools/current).
-	if r.Verify.Command != "" {
-		sb.WriteString("# Run verify command to capture output for pattern matching\n")
-		sb.WriteString("export PATH=\"/workspace/tsuku/tools/current:$PATH\"\n")
-		sb.WriteString(fmt.Sprintf("%s\n", r.Verify.Command))
-	}
-
-	return sb.String()
 }
 
 // buildPlanInstallScript creates a shell script that runs tsuku install --plan.
