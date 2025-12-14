@@ -59,7 +59,7 @@ jobs:
           fi
 
       - name: Run tests
-        run: go test -race -coverprofile=coverage.out ./...
+        run: go test -short -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -67,6 +67,29 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out
           fail_ci_if_error: true
+
+  lint-tests:
+    name: Lint Tests
+    needs: matrix
+    # Skip when only documentation files changed
+    if: ${{ needs.matrix.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run lint tests
+        run: go test -v -run 'Test(GolangCILint|GoFmt|GoModTidy|GoVet|Govulncheck)' .
 
   # Detect changes and generate test matrices
   # Skip integration tests when only documentation files change
