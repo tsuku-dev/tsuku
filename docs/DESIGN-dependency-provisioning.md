@@ -776,95 +776,288 @@ jobs:
 
 ## Implementation Approach
 
-### Phase 0: Bootstrap Validation
+Each phase delivers ONE build essential end-to-end: recipe creation, CI validation on all platforms, and a test tool that exercises it. This incremental approach validates the full stack before adding complexity.
 
-**Goal**: Prove Homebrew bottles work before building infrastructure.
+### Platform Test Matrix
 
-1. Create `scripts/validate-bottle-availability.sh`
-2. Run validation for all P0 tools on all platforms
-3. Document any gaps or fallback requirements
-4. **Gate**: Do not proceed until all P0 tools pass on at least 2 platforms
+All phases test on these 4 platform combinations:
 
-### Phase 1: Infrastructure (Dependencies and Environment)
+| Platform | GitHub Runner | Architecture | Notes |
+|----------|---------------|--------------|-------|
+| Linux x86_64 | `ubuntu-latest` | amd64 | Primary Linux target |
+| Linux arm64 | `ubuntu-24.04-arm` | arm64 | 37% cheaper than x86_64 |
+| macOS Intel | `macos-13` | x86_64 | Intel Mac support |
+| macOS Apple Silicon | `macos-14` | arm64 | Primary macOS target |
 
-**Goal**: Build the infrastructure that recipes depend on.
+### Validation Criteria (Every Phase)
 
-1. Update `ActionDependencies` registry with build tool requirements
-2. Update resolver to combine action + recipe dependencies
-3. Implement `setup_build_env` action
-4. Set CC, CXX, PKG_CONFIG_PATH, CPPFLAGS, LDFLAGS
-5. Add `--build-deps` flag to `tsuku list` for visibility
-6. **Gate**: Unit tests pass for dependency resolution
+Each build essential must pass these tests on all 4 platforms:
 
-### Phase 2: P0 Recipes
+1. **Bottle available**: Homebrew bottle exists for platform
+2. **Relocatable**: No hardcoded paths (`/usr/local`, `/opt/homebrew`, `/home/linuxbrew`)
+3. **Functional**: Tool/library works from `$TSUKU_HOME/tools/<name>/`
+4. **Consumer works**: A real tool using this essential builds and runs correctly
+5. **Clean environment**: Works in minimal container with NO system dev tools
 
-**Goal**: Create and validate P0 build essential recipes.
+### Phase 1: zlib (Foundation Library)
 
-1. Create recipes for P0 tools: gcc, make, cmake, pkg-config
-2. Create recipes for P0 libraries: zlib, openssl
-3. Run relocation validation on each
-4. Test each on all 4 platform variants
-5. **Gate**: All P0 recipes pass relocation validation
+**Goal**: Validate simplest library installation and relocation.
 
-### Phase 3: Integration Testing
+**Build Essential**: `zlib` (compression library, zero dependencies)
 
-**Goal**: Prove the full toolchain works together.
+**Test Tool**: `expat` (XML parser, depends only on zlib)
 
-1. Create integration test matrix in CI
-2. Build sqlite, zlib, ncurses from source (simpler tools first)
-3. Build curl, git with complex dependencies
-4. Verify on all platform variants in clean containers
-5. **Gate**: All integration tests pass
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/zlib.toml` using `homebrew_bottle` action |
+| 2 | Validate bottle availability on all 4 platforms |
+| 3 | Test relocation: verify no hardcoded paths in `libz.so`/`libz.dylib` |
+| 4 | Create `recipes/expat.toml` that declares `dependencies = ["zlib"]` |
+| 5 | CI: Install zlib, build expat, verify `xmlwf --version` works |
+| 6 | CI: Run in minimal container (ubuntu:22.04) with no system zlib |
 
-### Phase 4: P1/P2 Tools
+**Gate**: expat builds and runs on all 4 platforms using only tsuku-provided zlib.
 
-**Goal**: Expand coverage to additional build tools.
+### Phase 2: make (Build Runner)
 
-1. Add autoconf, automake, libtool recipes
-2. Add ncurses, readline, libffi recipes
-3. Add meson, ninja for alternative build systems
-4. Expand test matrix
-5. Build python from source as final validation
+**Goal**: Validate GNU Make installation; enable configure/make builds.
 
-### Phase 5: System-Required Action
+**Build Essential**: `make` (GNU Make, minimal dependencies)
 
-**Goal**: Implement the `require_system` action for system dependencies.
+**Test Tool**: `gdbm` (key-value database, uses configure/make, no library deps)
 
-1. Implement `require_system` action in `internal/actions/require_system.go`
-2. Add command detection with version parsing
-3. Add platform-specific install guide rendering
-4. Add min_version checking support
-5. Register action in action registry
-6. **Gate**: Unit tests for require_system action
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/make.toml` using `homebrew_bottle` action |
+| 2 | Validate make executable works from relocated path |
+| 3 | Create `recipes/gdbm.toml` using `configure_make` action |
+| 4 | Implement basic `configure_make` action (uses system gcc temporarily) |
+| 5 | CI: Install make, build gdbm from source, verify `gdbmtool --version` |
 
-### Phase 6: System-Required Recipes
+**Gate**: gdbm builds from source using tsuku-provided make on all 4 platforms.
+
+### Phase 3: gcc (Compiler)
+
+**Goal**: Validate GCC installation; enable compilation without system compiler.
+
+**Build Essential**: `gcc` (GNU Compiler Collection)
+
+**Test Tool**: `m4` (macro processor, simple C program)
+
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/gcc.toml` using `homebrew_bottle` action |
+| 2 | Validate gcc bottle includes bundled deps (gmp, mpfr, libmpc, isl) |
+| 3 | Test relocation: verify gcc works from `$TSUKU_HOME/tools/gcc/bin/gcc` |
+| 4 | Implement `setup_build_env` action (sets CC, CXX, CPPFLAGS, LDFLAGS) |
+| 5 | Update `configure_make` to use tsuku gcc instead of system gcc |
+| 6 | Create `recipes/m4.toml` using `configure_make` with `dependencies = ["gcc", "make"]` |
+| 7 | CI: Build m4 from source using ONLY tsuku gcc/make |
+| 8 | CI: Run in minimal container with NO system gcc |
+
+**Gate**: m4 compiles and runs on all 4 platforms using only tsuku-provided gcc and make.
+
+### Phase 4: pkg-config (Library Discovery)
+
+**Goal**: Validate pkg-config; enable library detection in configure scripts.
+
+**Build Essential**: `pkg-config` (library discovery tool)
+
+**Test Tool**: `ncurses` (terminal library, uses pkg-config for detection)
+
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/pkg-config.toml` using `homebrew_bottle` action |
+| 2 | Validate pkg-config finds `.pc` files in `$TSUKU_HOME/tools/*/lib/pkgconfig` |
+| 3 | Update `setup_build_env` to set `PKG_CONFIG_PATH` |
+| 4 | Create `recipes/ncurses.toml` using `configure_make` |
+| 5 | CI: Build ncurses using tsuku gcc/make/pkg-config |
+
+**Gate**: ncurses builds and pkg-config correctly reports its flags on all 4 platforms.
+
+### Phase 5: openssl (Security Library)
+
+**Goal**: Validate OpenSSL; enable TLS-capable tools.
+
+**Build Essential**: `openssl` (TLS/crypto library)
+
+**Test Tool**: `curl` (HTTP client, requires openssl + zlib)
+
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/openssl.toml` using `homebrew_bottle` action |
+| 2 | Validate openssl libraries relocate correctly (complex RPATH) |
+| 3 | Create `recipes/curl.toml` with `dependencies = ["openssl", "zlib"]` |
+| 4 | CI: Build curl from source, verify `curl --version` shows OpenSSL |
+| 5 | CI: Verify `curl https://example.com` works (TLS functional) |
+
+**Gate**: curl builds with TLS support and makes HTTPS requests on all 4 platforms.
+
+### Phase 6: cmake (Modern Build System)
+
+**Goal**: Validate CMake; enable cmake-based projects.
+
+**Build Essential**: `cmake` (CMake build system)
+
+**Test Tool**: `ninja` (fast build tool, uses cmake to build)
+
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/cmake.toml` using `homebrew_bottle` action |
+| 2 | Implement `cmake_build` action |
+| 3 | Create `recipes/ninja.toml` using `cmake_build` action |
+| 4 | CI: Build ninja from source using tsuku cmake/gcc/make |
+
+**Gate**: ninja builds using cmake on all 4 platforms.
+
+### Phase 7: Full Integration (Complex Tools)
+
+**Goal**: Validate complete toolchain with real-world complex tools.
+
+**Test Tools**: `git` (complex deps), `sqlite` (embedded database)
+
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/readline.toml` (depends on ncurses) |
+| 2 | Create `recipes/sqlite.toml` (depends on readline) |
+| 3 | Create `recipes/git.toml` (depends on curl, openssl, zlib, expat) |
+| 4 | CI: Build git from source, verify `git --version` |
+| 5 | CI: Verify git can clone a repository (full functional test) |
+| 6 | CI: Build sqlite, verify `sqlite3 --version` |
+
+**Gate**: git and sqlite build and function correctly on all 4 platforms.
+
+### Phase 8: System-Required Action
+
+**Goal**: Implement `require_system` action for unprovisionable dependencies.
+
+| Step | Description |
+|------|-------------|
+| 1 | Implement `require_system` action in `internal/actions/require_system.go` |
+| 2 | Add command detection with version parsing |
+| 3 | Add hierarchical validation (binary → version → runtime check) |
+| 4 | Add platform-specific install guide rendering |
+| 5 | Register action in action registry as primitive |
+| 6 | Unit tests for detection, version parsing, guide rendering |
+
+**Gate**: Unit tests pass; `require_system` correctly detects installed commands.
+
+### Phase 9: System-Required Recipes
 
 **Goal**: Create recipes for common system dependencies.
 
-1. Create `recipes/docker.toml` with require_system action
-2. Create `recipes/cuda.toml` with require_system action
-3. Create `recipes/systemd.toml` (Linux-only via `when` clause)
-4. Add `tsuku check-deps <recipe>` command to verify prerequisites
-5. Document system-required recipe authoring in guide
-6. **Gate**: Integration test installing a docker-dependent recipe
+| Step | Description |
+|------|-------------|
+| 1 | Create `recipes/docker.toml` with `require_system` action |
+| 2 | Create `recipes/cuda.toml` with `require_system` action |
+| 3 | Add `tsuku check-deps <recipe>` command |
+| 4 | CI: Test error messages when docker is missing |
+| 5 | CI: Test success path when docker is present (use docker runner) |
 
-### Phase 7: Assisted Installation (Future)
+**Gate**: Installing a docker-dependent tool shows clear guidance when docker is missing.
+
+### Phase 10: Assisted Installation (Future)
 
 **Goal**: Enable optional assisted installation with user consent.
 
-1. Add `assisted_install` parameter support to require_system
-2. Implement privilege escalation flow with explicit user consent
-3. Add `--assist` flag to `tsuku install` command
-4. Start with macOS brew commands (no sudo required)
-5. **Gate**: User can opt-in to assisted Docker installation on macOS
+| Step | Description |
+|------|-------------|
+| 1 | Add `assisted_install` parameter to `require_system` |
+| 2 | Implement privilege escalation with explicit user consent |
+| 3 | Add `--assist` flag to `tsuku install` |
+| 4 | Start with macOS brew commands (no sudo required) |
 
-**Safety requirements for assisted installation:**
+**Safety requirements:**
 - Explicit per-command user consent (not blanket approval)
 - Show exact command before execution
 - Log all assisted installation commands to audit file
 - Timeout on sudo prompts (no hanging)
 - No assisted commands that modify system files outside package managers
 - Require `--assist` flag; never auto-assist
+
+**Gate**: User can opt-in to assisted Docker installation on macOS.
+
+### Dependency Chain Summary
+
+```
+Phase 1: zlib ──────────────────────────────────────────┐
+Phase 2: make ──────────────────────────────────────────┤
+Phase 3: gcc ───────────────────────────────────────────┤
+Phase 4: pkg-config ────────────────────────────────────┤
+         ncurses (test) ← gcc, make, pkg-config         │
+Phase 5: openssl ← zlib ────────────────────────────────┤
+         curl (test) ← gcc, make, zlib, openssl         │
+Phase 6: cmake ─────────────────────────────────────────┤
+         ninja (test) ← gcc, make, cmake                │
+Phase 7: readline ← ncurses ────────────────────────────┤
+         sqlite ← readline                              │
+         git ← curl, zlib, openssl, expat ──────────────┘
+```
+
+### CI Workflow Structure
+
+Each phase adds to a cumulative test workflow:
+
+```yaml
+# .github/workflows/build-essentials.yml
+name: Build Essentials
+
+on:
+  push:
+    paths: ['recipes/gcc.toml', 'recipes/make.toml', ...]
+  schedule:
+    - cron: '0 4 * * *'  # Nightly full validation
+
+jobs:
+  test-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { runner: ubuntu-latest, os: linux, arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, os: linux, arch: arm64 }
+          - { runner: macos-13, os: macos, arch: x86_64 }
+          - { runner: macos-14, os: macos, arch: arm64 }
+        test:
+          - { essential: zlib, consumer: expat }
+          - { essential: make, consumer: gdbm }
+          - { essential: gcc, consumer: m4 }
+          - { essential: pkg-config, consumer: ncurses }
+          - { essential: openssl, consumer: curl }
+          - { essential: cmake, consumer: ninja }
+    runs-on: ${{ matrix.platform.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tsuku
+        run: go build -o tsuku ./cmd/tsuku
+      - name: Install essential
+        run: ./tsuku install ${{ matrix.test.essential }}
+      - name: Build consumer from source
+        run: ./tsuku install ${{ matrix.test.consumer }}
+      - name: Verify consumer works
+        run: ./scripts/verify-tool.sh ${{ matrix.test.consumer }}
+      - name: Verify no system deps
+        run: ./scripts/verify-no-system-deps.sh ${{ matrix.test.consumer }}
+
+  clean-container-test:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04  # No gcc, make, or dev tools
+    strategy:
+      matrix:
+        test: [expat, gdbm, m4, ncurses, curl, ninja]
+    steps:
+      - name: Install minimal deps (git only)
+        run: apt-get update && apt-get install -y git ca-certificates
+      - uses: actions/checkout@v4
+      - name: Bootstrap Go
+        run: # Download Go binary
+      - name: Build and test
+        run: |
+          go build -o tsuku ./cmd/tsuku
+          ./tsuku install ${{ matrix.test }}
+          ./scripts/verify-tool.sh ${{ matrix.test }}
+```
 
 ## Security Considerations
 
