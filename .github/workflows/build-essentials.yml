@@ -39,6 +39,11 @@ jobs:
           - make
           - gdbm
           - pngcrush  # Tests dependency chain: pngcrush -> libpng -> zlib
+        exclude:
+          # gdbm bottles on macOS have unrelocated paths and gdbmtool crashes
+          # See: https://github.com/tsukumogami/tsuku/issues/605
+          - platform: { os: macos }
+            tool: gdbm
 
     steps:
       - uses: actions/checkout@v4
