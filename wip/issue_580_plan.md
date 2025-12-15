@@ -53,16 +53,16 @@ This is a mechanical rename with no behavioral changes. The approach is a system
 - `.github/workflows/homebrew-builder-tests.yml` - update action name if present
 
 ## Implementation Steps
-- [ ] Rename `homebrew_bottle.go` to `homebrew.go` and update struct/method names
-- [ ] Rename `homebrew_bottle_test.go` to `homebrew_test.go` and update references
-- [ ] Update action registration in `action.go`
-- [ ] Update all recipe TOML files to use `action = "homebrew"`
-- [ ] Update validator, types, and plan_generator
-- [ ] Update cmd/tsuku/create.go
-- [ ] Update all test files
-- [ ] Update documentation (design docs)
-- [ ] Update CI workflows
-- [ ] Build and test
+- [x] Rename `homebrew_bottle.go` to `homebrew.go` and update struct/method names
+- [x] Rename `homebrew_bottle_test.go` to `homebrew_test.go` and update references
+- [x] Update action registration in `action.go`
+- [x] Update all recipe TOML files to use `action = "homebrew"`
+- [x] Update validator, types, and plan_generator
+- [x] Update cmd/tsuku/create.go
+- [x] Update all test files
+- [x] Update documentation (design docs)
+- [x] Update CI workflows
+- [x] Build and test
 
 ## Testing Strategy
 - Unit tests: Run `go test ./...` to verify all tests pass
@@ -73,10 +73,10 @@ This is a mechanical rename with no behavioral changes. The approach is a system
   - **Mitigation**: Comprehensive grep search, build and test verification
 
 ## Success Criteria
-- [ ] `go build ./...` passes
-- [ ] `go test ./...` passes (excluding pre-existing LLM failures)
-- [ ] All recipes validate successfully
-- [ ] No references to `homebrew_bottle` remain in code (except documentation history)
+- [x] `go build ./...` passes
+- [x] `go test ./...` passes (excluding pre-existing LLM failures)
+- [x] All recipes validate successfully
+- [x] No references to `homebrew_bottle` remain in code (except documentation history)
 
 ## Open Questions
 None - this is a straightforward rename.
