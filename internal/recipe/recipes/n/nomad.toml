@@ -8,10 +8,20 @@ version_format = "semver"
 github_repo = "hashicorp/nomad"
 
 [[steps]]
-action = "hashicorp_release"
-product = "nomad"
-binary = "nomad"
-verify_signature = false
+action = "download"
+url = "https://releases.hashicorp.com/nomad/{{.Version}}/nomad_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
+
+[[steps]]
+action = "extract"
+format = "zip"
+
+[[steps]]
+action = "chmod"
+files = ["nomad"]
+
+[[steps]]
+action = "install_binaries"
+binaries = ["nomad"]
 
 [verify]
 command = "nomad version"

@@ -8,10 +8,20 @@ version_format = "semver"
 github_repo = "hashicorp/vault"
 
 [[steps]]
-action = "hashicorp_release"
-product = "vault"
-binary = "vault"
-verify_signature = false
+action = "download"
+url = "https://releases.hashicorp.com/vault/{{.Version}}/vault_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
+
+[[steps]]
+action = "extract"
+format = "zip"
+
+[[steps]]
+action = "chmod"
+files = ["vault"]
+
+[[steps]]
+action = "install_binaries"
+binaries = ["vault"]
 
 [verify]
 command = "vault version"

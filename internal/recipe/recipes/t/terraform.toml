@@ -8,10 +8,20 @@ version_format = "semver"
 github_repo = "hashicorp/terraform"
 
 [[steps]]
-action = "hashicorp_release"
-product = "terraform"
-binary = "terraform"
-verify_signature = false
+action = "download"
+url = "https://releases.hashicorp.com/terraform/{{.Version}}/terraform_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
+
+[[steps]]
+action = "extract"
+format = "zip"
+
+[[steps]]
+action = "chmod"
+files = ["terraform"]
+
+[[steps]]
+action = "install_binaries"
+binaries = ["terraform"]
 
 [verify]
 command = "terraform version"

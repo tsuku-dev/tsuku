@@ -8,10 +8,20 @@ version_format = "semver"
 github_repo = "hashicorp/boundary"
 
 [[steps]]
-action = "hashicorp_release"
-product = "boundary"
-binary = "boundary"
-verify_signature = false
+action = "download"
+url = "https://releases.hashicorp.com/boundary/{{.Version}}/boundary_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
+
+[[steps]]
+action = "extract"
+format = "zip"
+
+[[steps]]
+action = "chmod"
+files = ["boundary"]
+
+[[steps]]
+action = "install_binaries"
+binaries = ["boundary"]
 
 [verify]
 command = "boundary version"
