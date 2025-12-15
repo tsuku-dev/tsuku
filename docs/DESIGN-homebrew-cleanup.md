@@ -16,6 +16,7 @@
 | [#587](https://github.com/tsukumogami/tsuku/issues/587) | Remove HomebrewBuilder source build code | [#586](https://github.com/tsukumogami/tsuku/issues/586) |
 | [#588](https://github.com/tsukumogami/tsuku/issues/588) | Close obsolete source build issues | [#587](https://github.com/tsukumogami/tsuku/issues/587) |
 | [#589](https://github.com/tsukumogami/tsuku/issues/589) | Consolidate Homebrew design documentation | [#588](https://github.com/tsukumogami/tsuku/issues/588) |
+| [#590](https://github.com/tsukumogami/tsuku/issues/590) | Deterministic bottle inspection with LLM fallback | None |
 
 ### Dependency Graph
 
@@ -41,6 +42,10 @@ graph TD
         I589["#589: Consolidate docs"]
     end
 
+    subgraph Track5["Track 5: Builder Enhancement"]
+        I590["#590: Deterministic bottle inspection"]
+    end
+
     I582 --> I584
     I583 --> I586
     I586 --> I587
@@ -52,7 +57,7 @@ graph TD
     classDef blocked fill:#fff9c4
     classDef needsDesign fill:#e1bee7
 
-    class I580,I582,I583 ready
+    class I580,I582,I583,I590 ready
     class I584,I586,I587,I588,I589 blocked
 ```
 
