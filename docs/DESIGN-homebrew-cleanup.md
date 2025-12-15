@@ -23,7 +23,7 @@
 ```mermaid
 graph TD
     subgraph Track1["Track 1: Homebrew Rename"]
-        I580["#580: Rename to homebrew"]
+        I580["#580: Rename homebrew_bottle"]
     end
 
     subgraph Track2["Track 2: HashiCorp Cleanup"]
