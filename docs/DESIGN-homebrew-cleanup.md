@@ -8,7 +8,7 @@
 
 | Issue | Title | Dependencies | Status |
 |-------|-------|--------------|--------|
-| [#580](https://github.com/tsukumogami/tsuku/issues/580) | Rename homebrew_bottle to homebrew | None | Ready |
+| [#580](https://github.com/tsukumogami/tsuku/issues/580) | Rename homebrew_bottle to homebrew | None | Done |
 | [#582](https://github.com/tsukumogami/tsuku/issues/582) | Migrate HashiCorp recipes to primitives | None | Done |
 | [#583](https://github.com/tsukumogami/tsuku/issues/583) | Move and convert source build fixtures | None | Ready |
 | [#584](https://github.com/tsukumogami/tsuku/issues/584) | Remove hashicorp_release action | [#582](https://github.com/tsukumogami/tsuku/issues/582) | Done |
@@ -57,8 +57,8 @@ graph TD
     classDef blocked fill:#fff9c4
     classDef needsDesign fill:#e1bee7
 
-    class I582,I584 done
-    class I580,I583,I590 ready
+    class I580,I582,I584 done
+    class I583,I590 ready
     class I586,I587,I588,I589 blocked
 ```
 
