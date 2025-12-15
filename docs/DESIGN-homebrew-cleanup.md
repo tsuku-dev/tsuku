@@ -1,6 +1,62 @@
 # Design: Homebrew and Legacy Action Cleanup
 
-**Status**: Accepted
+**Status**: Planned
+
+## Implementation Issues
+
+### Milestone: [Homebrew and Legacy Action Cleanup](https://github.com/tsukumogami/tsuku/milestone/23)
+
+| Issue | Title | Dependencies |
+|-------|-------|--------------|
+| [#580](https://github.com/tsukumogami/tsuku/issues/580) | Rename homebrew_bottle to homebrew | None |
+| [#582](https://github.com/tsukumogami/tsuku/issues/582) | Migrate HashiCorp recipes to primitives | None |
+| [#583](https://github.com/tsukumogami/tsuku/issues/583) | Move and convert source build fixtures | None |
+| [#584](https://github.com/tsukumogami/tsuku/issues/584) | Remove hashicorp_release action | [#582](https://github.com/tsukumogami/tsuku/issues/582) |
+| [#586](https://github.com/tsukumogami/tsuku/issues/586) | Remove homebrew_source action | [#583](https://github.com/tsukumogami/tsuku/issues/583) |
+| [#587](https://github.com/tsukumogami/tsuku/issues/587) | Remove HomebrewBuilder source build code | [#586](https://github.com/tsukumogami/tsuku/issues/586) |
+| [#588](https://github.com/tsukumogami/tsuku/issues/588) | Close obsolete source build issues | [#587](https://github.com/tsukumogami/tsuku/issues/587) |
+| [#589](https://github.com/tsukumogami/tsuku/issues/589) | Consolidate Homebrew design documentation | [#588](https://github.com/tsukumogami/tsuku/issues/588) |
+
+### Dependency Graph
+
+```mermaid
+graph TD
+    subgraph Track1["Track 1: Homebrew Rename"]
+        I580["#580: Rename homebrew_bottle"]
+    end
+
+    subgraph Track2["Track 2: HashiCorp Cleanup"]
+        I582["#582: Migrate HashiCorp recipes"]
+        I584["#584: Remove hashicorp_release"]
+    end
+
+    subgraph Track3["Track 3: Source Build Removal"]
+        I583["#583: Move/convert fixtures"]
+        I586["#586: Remove homebrew_source"]
+        I587["#587: Remove builder source code"]
+    end
+
+    subgraph Track4["Track 4: Finalization"]
+        I588["#588: Close obsolete issues"]
+        I589["#589: Consolidate docs"]
+    end
+
+    I582 --> I584
+    I583 --> I586
+    I586 --> I587
+    I587 --> I588
+    I588 --> I589
+
+    classDef done fill:#c8e6c9
+    classDef ready fill:#bbdefb
+    classDef blocked fill:#fff9c4
+    classDef needsDesign fill:#e1bee7
+
+    class I580,I582,I583 ready
+    class I584,I586,I587,I588,I589 blocked
+```
+
+**Legend**: Green = done, Blue = ready, Yellow = blocked, Purple = needs-design
 
 ## Context and Problem Statement
 
