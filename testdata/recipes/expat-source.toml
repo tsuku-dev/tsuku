@@ -2,9 +2,8 @@
 # This tests the configure_make action with library dependencies
 [metadata]
 name = "expat-source"
-description = "XML parser library (built from source, for testing)"
+description = "XML parser with xmlwf tool (source build for testing)"
 homepage = "https://libexpat.github.io/"
-type = "library"
 dependencies = ["zlib"]
 
 [version]
@@ -17,13 +16,8 @@ formula = "expat"
 
 [[steps]]
 action = "configure_make"
-
-[[steps]]
-action = "install_binaries"
-install_mode = "directory"
-binaries = ["lib/libexpat.a", "include/expat.h", "include/expat_external.h"]
+executables = ["xmlwf"]
 
 [verify]
-command = "ls lib/libexpat.a"
-pattern = "libexpat"
-mode = "output"
+command = "xmlwf -v"
+pattern = "expat library version {version}"
