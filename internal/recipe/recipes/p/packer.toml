@@ -13,6 +13,7 @@ url = "https://releases.hashicorp.com/packer/{{.Version}}/packer_{{.Version}}_{{
 
 [[steps]]
 action = "extract"
+archive = "packer_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
 format = "zip"
 
 [[steps]]

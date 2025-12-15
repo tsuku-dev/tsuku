@@ -13,6 +13,7 @@ url = "https://releases.hashicorp.com/nomad/{{.Version}}/nomad_{{.Version}}_{{.O
 
 [[steps]]
 action = "extract"
+archive = "nomad_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
 format = "zip"
 
 [[steps]]

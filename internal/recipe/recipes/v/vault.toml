@@ -13,6 +13,7 @@ url = "https://releases.hashicorp.com/vault/{{.Version}}/vault_{{.Version}}_{{.O
 
 [[steps]]
 action = "extract"
+archive = "vault_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
 format = "zip"
 
 [[steps]]

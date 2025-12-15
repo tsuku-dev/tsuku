@@ -13,6 +13,7 @@ url = "https://releases.hashicorp.com/terraform/{{.Version}}/terraform_{{.Versio
 
 [[steps]]
 action = "extract"
+archive = "terraform_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
 format = "zip"
 
 [[steps]]

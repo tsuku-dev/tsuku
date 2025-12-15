@@ -13,6 +13,7 @@ url = "https://releases.hashicorp.com/waypoint/{{.Version}}/waypoint_{{.Version}
 
 [[steps]]
 action = "extract"
+archive = "waypoint_{{.Version}}_{{.OS}}_{{.Arch}}.zip"
 format = "zip"
 
 [[steps]]
