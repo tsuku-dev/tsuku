@@ -9,7 +9,7 @@ on:
       - 'internal/actions/configure_make.go'
       - 'internal/actions/extract.go'
       - 'testdata/recipes/*.toml'
-      - 'scripts/verify-*.sh'
+      - 'test/scripts/verify-*.sh'
       - '.github/workflows/build-essentials.yml'
   pull_request:
     branches: [main]
@@ -19,7 +19,7 @@ on:
       - 'internal/actions/configure_make.go'
       - 'internal/actions/extract.go'
       - 'testdata/recipes/*.toml'
-      - 'scripts/verify-*.sh'
+      - 'test/scripts/verify-*.sh'
       - '.github/workflows/build-essentials.yml'
 
 jobs:
@@ -58,13 +58,13 @@ jobs:
         run: ./tsuku install --force ${{ matrix.tool }}
 
       - name: "Verify tool functionality"
-        run: ./scripts/verify-tool.sh ${{ matrix.tool }}
+        run: ./test/scripts/verify-tool.sh ${{ matrix.tool }}
 
       - name: "Verify relocation"
-        run: ./scripts/verify-relocation.sh ${{ matrix.tool }}
+        run: ./test/scripts/verify-relocation.sh ${{ matrix.tool }}
 
       - name: "Verify no system deps"
-        run: ./scripts/verify-no-system-deps.sh ${{ matrix.tool }}
+        run: ./test/scripts/verify-no-system-deps.sh ${{ matrix.tool }}
 
   # Test configure_make action with gdbm-source (source build)
   test-configure-make:
@@ -101,7 +101,7 @@ jobs:
         run: ./tsuku install --force gdbm-source
 
       - name: "Verify tool functionality"
-        run: ./scripts/verify-tool.sh gdbm-source
+        run: ./test/scripts/verify-tool.sh gdbm-source
 
   # Test zig installation
   test-zig:
@@ -134,10 +134,10 @@ jobs:
         run: ./tsuku install --force zig
 
       - name: "Verify tool functionality"
-        run: ./scripts/verify-tool.sh zig
+        run: ./test/scripts/verify-tool.sh zig
 
       - name: "Verify relocation"
-        run: ./scripts/verify-relocation.sh zig
+        run: ./test/scripts/verify-relocation.sh zig
 
       - name: "Verify no system deps"
-        run: ./scripts/verify-no-system-deps.sh zig
+        run: ./test/scripts/verify-no-system-deps.sh zig
