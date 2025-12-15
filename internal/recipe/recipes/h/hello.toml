@@ -1,0 +1,28 @@
+[metadata]
+name = "hello"
+description = "GNU hello - sample program for testing build systems"
+homepage = "https://www.gnu.org/software/hello/"
+dependencies = ["make", "zig"]
+
+[version]
+source = "homebrew"
+formula = "hello"
+
+[[steps]]
+action = "homebrew_source"
+formula = "hello"
+
+# Fix autotools timestamp issue
+[[steps]]
+action = "run_command"
+command = "find . -type f -exec touch {} +"
+
+[[steps]]
+action = "configure_make"
+source_dir = "."
+executables = ["hello"]
+configure_args = ["--disable-silent-rules", "--disable-nls"]
+
+[verify]
+command = "hello --version"
+pattern = "hello (GNU Hello) {version}"

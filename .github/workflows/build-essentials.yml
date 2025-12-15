@@ -89,9 +89,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./tsuku install --force gdbm-source
 
-  # Test zig as C compiler with m4 source build
+  # Test zig as C compiler with hello source build
   test-zig-cc:
-    name: "${{ matrix.platform.name }}: m4 (zig cc)"
+    name: "${{ matrix.platform.name }}: hello (zig cc)"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       fail-fast: false
@@ -114,7 +114,7 @@ jobs:
       - name: Build tsuku
         run: go build -o tsuku ./cmd/tsuku
 
-      - name: Install m4 (tests zig cc as C compiler)
+      - name: Install hello (tests zig cc as C compiler)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./tsuku install --force m4
+        run: ./tsuku install --force hello
