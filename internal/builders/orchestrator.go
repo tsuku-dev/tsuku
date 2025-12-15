@@ -110,7 +110,7 @@ func (o *Orchestrator) Create(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create build session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Generate initial recipe
 	result, err := session.Generate(ctx)
