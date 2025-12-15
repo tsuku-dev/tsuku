@@ -1,6 +1,6 @@
 # Design: Homebrew and Legacy Action Cleanup
 
-**Status**: Proposed
+**Status**: Accepted
 
 ## Context and Problem Statement
 
