@@ -17,6 +17,5 @@ action = "install_binaries"
 binaries = ["bin/pngcrush"]
 
 [verify]
-command = "ls bin/pngcrush"
-pattern = "pngcrush"
-mode = "output"
+command = "pngcrush -version"
+pattern = "pngcrush {version}"
