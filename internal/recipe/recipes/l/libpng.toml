@@ -1,7 +1,7 @@
 [metadata]
 name = "libpng"
 description = "Library for manipulating PNG images"
-homepage = "http://www.libpng.org/pub/png/libpng.html"
+homepage = "https://libpng.sourceforge.io/"
 type = "library"
 dependencies = ["zlib"]
 
