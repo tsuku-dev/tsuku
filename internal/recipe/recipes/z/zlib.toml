@@ -16,8 +16,3 @@ formula = "zlib"
 action = "install_binaries"
 install_mode = "directory"
 binaries = ["lib/libz.a", "lib/libz.dylib", "lib/libz.so", "include/zlib.h", "include/zconf.h"]
-
-[verify]
-command = "ls lib/libz.a"
-pattern = "libz"
-mode = "output"

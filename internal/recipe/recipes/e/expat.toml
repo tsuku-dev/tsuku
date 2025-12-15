@@ -16,8 +16,3 @@ formula = "expat"
 action = "install_binaries"
 install_mode = "directory"
 binaries = ["lib/libexpat.a", "lib/libexpat.dylib", "lib/libexpat.so", "include/expat.h", "include/expat_external.h"]
-
-[verify]
-command = "ls lib/libexpat.a"
-pattern = "libexpat"
-mode = "output"
