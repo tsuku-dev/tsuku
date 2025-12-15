@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 )
 
@@ -145,6 +146,8 @@ func (a *ExtractAction) Execute(ctx *ExecutionContext, params map[string]interfa
 		return a.extractTarXz(archivePath, destPath, stripDirs, files)
 	case "tar.bz2", "tbz2", "tbz":
 		return a.extractTarBz2(archivePath, destPath, stripDirs, files)
+	case "tar.zst", "tzst":
+		return a.extractTarZst(archivePath, destPath, stripDirs, files)
 	case "tar":
 		return a.extractTar(archivePath, destPath, stripDirs, files)
 	case "zip":
@@ -164,6 +167,8 @@ func (a *ExtractAction) detectFormat(filename string) string {
 		return "tar.xz"
 	case strings.HasSuffix(lower, ".tar.bz2"), strings.HasSuffix(lower, ".tbz2"), strings.HasSuffix(lower, ".tbz"):
 		return "tar.bz2"
+	case strings.HasSuffix(lower, ".tar.zst"), strings.HasSuffix(lower, ".tzst"):
+		return "tar.zst"
 	case strings.HasSuffix(lower, ".tar"):
 		return "tar"
 	case strings.HasSuffix(lower, ".zip"):
@@ -216,6 +221,23 @@ func (a *ExtractAction) extractTarBz2(archivePath, destPath string, stripDirs in
 
 	bzr := bzip2.NewReader(file)
 	return a.extractTarReader(tar.NewReader(bzr), destPath, stripDirs, files)
+}
+
+// extractTarZst extracts a tar.zst archive
+func (a *ExtractAction) extractTarZst(archivePath, destPath string, stripDirs int, files []string) error {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
+	}
+	defer file.Close()
+
+	zr, err := zstd.NewReader(file)
+	if err != nil {
+		return fmt.Errorf("failed to create zstd reader: %w", err)
+	}
+	defer zr.Close()
+
+	return a.extractTarReader(tar.NewReader(zr), destPath, stripDirs, files)
 }
 
 // extractTar extracts a plain tar archive

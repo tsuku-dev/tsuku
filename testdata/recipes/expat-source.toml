@@ -1,0 +1,29 @@
+# Test recipe: expat built from source with zlib dependency
+# This tests the configure_make action with library dependencies
+[metadata]
+name = "expat-source"
+description = "XML parser library (built from source, for testing)"
+homepage = "https://libexpat.github.io/"
+type = "library"
+dependencies = ["zlib"]
+
+[version]
+source = "homebrew"
+formula = "expat"
+
+[[steps]]
+action = "homebrew_source"
+formula = "expat"
+
+[[steps]]
+action = "configure_make"
+
+[[steps]]
+action = "install_binaries"
+install_mode = "directory"
+binaries = ["lib/libexpat.a", "include/expat.h", "include/expat_external.h"]
+
+[verify]
+command = "ls lib/libexpat.a"
+pattern = "libexpat"
+mode = "output"

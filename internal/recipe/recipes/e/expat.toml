@@ -1,0 +1,23 @@
+[metadata]
+name = "expat"
+description = "XML parser library written in C"
+homepage = "https://libexpat.github.io/"
+type = "library"
+
+[version]
+source = "homebrew"
+formula = "expat"
+
+[[steps]]
+action = "homebrew_bottle"
+formula = "expat"
+
+[[steps]]
+action = "install_binaries"
+install_mode = "directory"
+binaries = ["lib/libexpat.a", "lib/libexpat.dylib", "lib/libexpat.so", "include/expat.h", "include/expat_external.h"]
+
+[verify]
+command = "ls lib/libexpat.a"
+pattern = "libexpat"
+mode = "output"
