@@ -125,7 +125,7 @@ func TestLLMGroundTruth(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create session: %v", err)
 			}
-			defer session.Close()
+			defer func() { _ = session.Close() }()
 
 			result, err = session.Generate(ctx)
 			if err != nil {

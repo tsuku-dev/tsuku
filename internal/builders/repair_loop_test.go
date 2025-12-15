@@ -136,7 +136,7 @@ func TestRepairLoop_FixesBrokenRecipe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSession error: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	result, err := session.Generate(ctx)
 	if err != nil {
@@ -223,7 +223,7 @@ func TestRepairLoop_GeneratesRecipeWithoutValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSession error: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	result, err := session.Generate(ctx)
 	if err != nil {
@@ -293,7 +293,7 @@ func TestRepairLoop_MultipleToolCalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSession error: %v", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	result, err := session.Generate(ctx)
 	if err != nil {

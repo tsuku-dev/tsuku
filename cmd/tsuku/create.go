@@ -316,7 +316,7 @@ func runCreate(cmd *cobra.Command, args []string) {
 			exitWithCode(ExitDependencyFailed)
 		}
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Generate the recipe
 	result, err := session.Generate(ctx)

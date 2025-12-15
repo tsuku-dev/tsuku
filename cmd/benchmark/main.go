@@ -140,7 +140,7 @@ func benchmarkRepo(ctx context.Context, builder *builders.GitHubReleaseBuilder, 
 			Error:  err.Error(),
 		}
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Generate recipe
 	result, err := session.Generate(ctx)
