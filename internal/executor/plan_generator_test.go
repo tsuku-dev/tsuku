@@ -822,8 +822,8 @@ func TestResolveStep_WithDownload(t *testing.T) {
 		}
 
 		step := plan.Steps[0]
-		if step.Action != "download" {
-			t.Errorf("step.Action = %q, want %q", step.Action, "download")
+		if step.Action != "download_file" {
+			t.Errorf("step.Action = %q, want %q", step.Action, "download_file")
 		}
 
 		// If we got here with a successful plan, the checksum should be computed
