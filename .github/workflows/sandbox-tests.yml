@@ -1,0 +1,39 @@
+name: Sandbox Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sandbox-tests:
+    name: "Sandbox: ${{ matrix.tool }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test recipes that use evaluable actions (github_archive, github_file)
+        # These can run offline in the sandbox using pre-cached downloads
+        tool:
+          - actionlint   # T1: github_archive with version pattern
+          - btop         # T2: github_archive without version pattern
+          - argo-cd      # T3: github_file with binary field
+          - duf          # github_archive simple
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache-dependency-path: go.sum
+
+      - name: Build tsuku
+        run: go build -o tsuku ./cmd/tsuku
+
+      - name: "Sandbox test: ${{ matrix.tool }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./tsuku install --sandbox --force ${{ matrix.tool }}
