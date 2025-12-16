@@ -1,0 +1,27 @@
+# GCC Runtime Libraries - libstdc++ and libgcc_s
+# These are needed by binaries compiled with GCC (like nodejs)
+# Extracted from Homebrew's gcc bottle
+# Only needed on Linux - macOS provides these via system frameworks
+
+[metadata]
+name = "gcc-libs"
+description = "GCC runtime libraries (libstdc++, libgcc_s)"
+homepage = "https://gcc.gnu.org/"
+type = "library"
+
+[version]
+source = "homebrew"
+formula = "gcc"
+
+# Linux: download gcc bottle and extract runtime libraries
+[[steps]]
+action = "homebrew"
+formula = "gcc"
+[steps.when]
+os = "linux"
+
+[[steps]]
+action = "install_libraries"
+patterns = ["lib/gcc/*/libstdc++.so*", "lib/gcc/*/libgcc_s.so*", "lib64/libstdc++.so*", "lib64/libgcc_s.so*"]
+[steps.when]
+os = "linux"
