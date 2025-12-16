@@ -33,7 +33,10 @@ jobs:
       - name: Build tsuku
         run: go build -o tsuku ./cmd/tsuku
 
-      - name: "Sandbox test: ${{ matrix.tool }}"
+      - name: "Generate plan: ${{ matrix.tool }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./tsuku install --sandbox --force ${{ matrix.tool }}
+        run: ./tsuku eval ${{ matrix.tool }} > plan.json
+
+      - name: "Run sandbox: ${{ matrix.tool }}"
+        run: ./tsuku install --plan plan.json --sandbox --force
