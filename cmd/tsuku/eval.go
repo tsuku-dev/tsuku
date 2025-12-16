@@ -216,7 +216,14 @@ func installEvalDeps(deps []string, autoAccept bool) error {
 }
 
 // runInstallTool installs a tool using the existing install infrastructure.
+// It redirects stdout to stderr to avoid corrupting plan JSON output.
 func runInstallTool(toolName string) error {
+	// Redirect stdout to stderr during installation to prevent
+	// install progress from corrupting the plan JSON on stdout
+	origStdout := os.Stdout
+	os.Stdout = os.Stderr
+	defer func() { os.Stdout = origStdout }()
+
 	// Use the same install mechanism as the install command
 	// Pass nil for telemetry client since this is an internal operation
 	return runInstallWithTelemetry(toolName, "", "", false, "", nil)
