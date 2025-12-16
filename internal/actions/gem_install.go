@@ -325,6 +325,14 @@ func (a *GemInstallAction) Decompose(ctx *EvalContext, params map[string]interfa
 		return nil, fmt.Errorf("invalid version format '%s'", version)
 	}
 
+	// Special case: bundler cannot install itself via bundle install
+	// Use direct gem install instead. This is a known architectural limitation
+	// where bundler's self-referential nature prevents decomposition.
+	// See issue #XXX for further investigation.
+	if gemName == "bundler" {
+		return a.decomposeBundlerDirectInstall(ctx, version, executables)
+	}
+
 	// Find bundler from ruby installation
 	bundlerPath := findBundlerForEval()
 	if bundlerPath == "" {
@@ -510,6 +518,23 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 	}
 
 	return string(lockData), nil
+}
+
+// decomposeBundlerDirectInstall handles bundler self-installation using gem install.
+// Bundler cannot install itself via bundle install, so we use gem install directly.
+func (a *GemInstallAction) decomposeBundlerDirectInstall(ctx *EvalContext, version string, executables []string) ([]Step, error) {
+	// Use install_gem_direct primitive which runs: gem install bundler -v VERSION
+	// Then creates symlinks for the executables
+	return []Step{
+		{
+			Action: "install_gem_direct",
+			Params: map[string]interface{}{
+				"gem":         "bundler",
+				"version":     version,
+				"executables": executables,
+			},
+		},
+	}, nil
 }
 
 // getRubyVersionForGem returns the Ruby version for metadata.
