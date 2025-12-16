@@ -104,7 +104,7 @@ type ResolvedStep struct {
 // - Package manager actions: External dependency resolution
 var ActionEvaluability = map[string]bool{
 	// Primitive actions - evaluable (direct execution with deterministic outcomes)
-	"download":          true,
+	"download_file":     true, // Primitive: requires checksum, used in plans
 	"extract":           true,
 	"chmod":             true,
 	"install_binaries":  true,
@@ -235,13 +235,33 @@ func ValidatePlan(plan *InstallationPlan) error {
 			}
 		}
 
-		// Check checksum for download actions
-		if step.Action == "download" && step.Checksum == "" {
+		// Reject composite download action in plans - should be decomposed to download_file
+		if step.Action == "download" {
 			errors = append(errors, ValidationError{
 				Step:    i,
 				Action:  step.Action,
-				Message: "download action missing checksum (security requirement)",
+				Message: "download action should not appear in plans (use download_file primitive)",
 			})
+		}
+
+		// Check checksum for download_file actions
+		if step.Action == "download_file" {
+			hasChecksum := step.Checksum != ""
+			if !hasChecksum {
+				// Also check params for checksum
+				if params := step.Params; params != nil {
+					if cs, ok := params["checksum"].(string); ok && cs != "" {
+						hasChecksum = true
+					}
+				}
+			}
+			if !hasChecksum {
+				errors = append(errors, ValidationError{
+					Step:    i,
+					Action:  step.Action,
+					Message: "download_file action missing checksum (security requirement)",
+				})
+			}
 		}
 	}
 

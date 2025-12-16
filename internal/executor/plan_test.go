@@ -269,7 +269,7 @@ func TestIsActionEvaluable(t *testing.T) {
 		expected bool
 	}{
 		// Primitive actions - evaluable
-		{"download", true},
+		{"download_file", true}, // Primitive download action (requires checksum)
 		{"extract", true},
 		{"install_binaries", true},
 		{"chmod", true},
@@ -282,6 +282,7 @@ func TestIsActionEvaluable(t *testing.T) {
 
 		// Composite actions - not in evaluability map (decomposed at plan time)
 		// These return false because they're not in the map (unknown action behavior)
+		{"download", false}, // Composite download (decomposes to download_file)
 		{"download_archive", false},
 		{"github_archive", false},
 		{"github_file", false},
@@ -332,8 +333,8 @@ func TestValidatePlan_AllPrimitives(t *testing.T) {
 		Platform:      Platform{OS: runtime.GOOS, Arch: runtime.GOARCH},
 		Steps: []ResolvedStep{
 			{
-				Action:    "download",
-				Params:    map[string]interface{}{"url": "https://example.com/file.tar.gz"},
+				Action:    "download_file",
+				Params:    map[string]interface{}{"url": "https://example.com/file.tar.gz", "checksum": "abc123"},
 				Evaluable: true,
 				URL:       "https://example.com/file.tar.gz",
 				Checksum:  "sha256:abc123",
@@ -425,7 +426,7 @@ func TestValidatePlan_UnknownAction(t *testing.T) {
 }
 
 func TestValidatePlan_MissingChecksum(t *testing.T) {
-	// Download action without checksum should fail (security requirement)
+	// download_file action without checksum should fail (security requirement)
 	plan := &InstallationPlan{
 		FormatVersion: 2,
 		Tool:          "test-tool",
@@ -433,18 +434,18 @@ func TestValidatePlan_MissingChecksum(t *testing.T) {
 		Platform:      Platform{OS: runtime.GOOS, Arch: runtime.GOARCH},
 		Steps: []ResolvedStep{
 			{
-				Action:    "download",
+				Action:    "download_file",
 				Params:    map[string]interface{}{"url": "https://example.com/file.tar.gz"},
 				Evaluable: true,
 				URL:       "https://example.com/file.tar.gz",
-				// Missing Checksum field - should fail
+				// Missing Checksum field and no checksum in params - should fail
 			},
 		},
 	}
 
 	err := ValidatePlan(plan)
 	if err == nil {
-		t.Error("ValidatePlan() should return error for download without checksum")
+		t.Error("ValidatePlan() should return error for download_file without checksum")
 	}
 
 	errMsg := err.Error()
