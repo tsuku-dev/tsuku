@@ -164,6 +164,9 @@ jobs:
         run: |
           apt-get update
           apt-get install -y wget curl ca-certificates git
+          # Some apt packages may pull in gcc as a dependency
+          # Remove or mask any system compilers to ensure zig is used
+          rm -f /usr/bin/gcc /usr/bin/cc /usr/bin/g++ /usr/bin/c++ 2>/dev/null || true
           # Verify no system compiler
           if command -v gcc &> /dev/null; then
             echo "ERROR: gcc found in container!"
