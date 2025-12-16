@@ -159,17 +159,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install only minimal deps - explicitly NO gcc/build-essential
+      # Install minimal deps: NO gcc, but YES make (from apt, not Homebrew)
+      # The test validates zig cc as compiler fallback, not tsuku make installation
       - name: Install minimal dependencies
         run: |
           apt-get update
-          apt-get install -y wget curl ca-certificates git
+          apt-get install -y wget curl ca-certificates git make
           # Some apt packages may pull in gcc as a dependency
           # Find and remove any system compilers to ensure zig is used
           echo "Checking for system compilers..."
           echo "which gcc: $(which gcc 2>/dev/null || echo 'not found')"
           echo "type gcc: $(type gcc 2>/dev/null || echo 'not found')"
-          echo "ls /usr/bin/gcc: $(ls -la /usr/bin/gcc* 2>/dev/null || echo 'not found')"
           # Remove gcc/cc from standard locations and alternatives
           apt-get remove -y gcc gcc-* g++ 2>/dev/null || true
           rm -f /usr/bin/gcc* /usr/bin/cc /usr/bin/g++* /usr/bin/c++ 2>/dev/null || true
@@ -184,6 +184,7 @@ jobs:
             exit 1
           fi
           echo "Verified: No system compiler binary present"
+          echo "System make: $(which make)"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -203,20 +204,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./tsuku install --force zig
 
-      - name: Install make (build tool)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./tsuku install --force make
-
       - name: Build gdbm from source (uses zig cc)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Add tsuku tools to PATH so make and zig are available
+          # Add tsuku tools to PATH so zig is available for the compiler fallback
           export PATH="$HOME/.tsuku/tools/current:$HOME/.tsuku/bin:$PATH"
           echo "Building gdbm-source - should use zig cc since no gcc exists"
-          echo "PATH contains: $(echo $PATH | tr ':' '\n' | head -5)"
           echo "make location: $(which make)"
+          echo "zig location: $(which zig 2>/dev/null || echo 'not in PATH directly')"
           ./tsuku install --force gdbm-source
 
       - name: "Verify gdbm-source functionality"
