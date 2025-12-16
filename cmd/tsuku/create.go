@@ -292,9 +292,16 @@ func runCreate(cmd *cobra.Command, args []string) {
 		exitWithCode(ExitGeneral)
 	}
 
+	// Determine if sandbox testing should be skipped
+	// - Explicitly requested via --skip-sandbox
+	// - Ecosystem builders (non-LLM) don't benefit from sandbox testing since:
+	//   1. Their recipes are deterministic (can't be repaired)
+	//   2. They require toolchains (cargo, pip, etc.) not available in base container
+	effectiveSkipSandbox := skipSandbox || !builder.RequiresLLM()
+
 	// Create sandbox executor (if not skipping sandbox)
 	var sandboxExec *sandbox.Executor
-	if !skipSandbox {
+	if !effectiveSkipSandbox {
 		// Ensure cache directories exist (needed for mounting into container)
 		if err := cfg.EnsureDirectories(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating directories: %v\n", err)
@@ -309,7 +316,7 @@ func runCreate(cmd *cobra.Command, args []string) {
 	orchestrator := builders.NewOrchestrator(
 		builders.WithSandboxExecutor(sandboxExec),
 		builders.WithOrchestratorConfig(builders.OrchestratorConfig{
-			SkipSandbox:      skipSandbox,
+			SkipSandbox:      effectiveSkipSandbox,
 			MaxRepairs:       builders.DefaultMaxRepairs,
 			ToolsDir:         cfg.ToolsDir,
 			DownloadCacheDir: cfg.DownloadCacheDir,
