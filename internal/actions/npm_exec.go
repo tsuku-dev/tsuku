@@ -250,6 +250,15 @@ func validateNodeVersion(constraint string, execPaths ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
+		// Debug: try to find node manually
+		for _, p := range execPaths {
+			nodePath := p + "/node"
+			if _, statErr := os.Stat(nodePath); statErr == nil {
+				fmt.Printf("   Debug: node found at %s but exec failed\n", nodePath)
+			} else {
+				fmt.Printf("   Debug: node NOT found at %s: %v\n", nodePath, statErr)
+			}
+		}
 		return fmt.Errorf("node.js not found: %w", err)
 	}
 

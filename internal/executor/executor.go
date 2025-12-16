@@ -362,6 +362,13 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 			if _, err := os.Stat(binDir); err == nil {
 				execCtx.ExecPaths = append(execCtx.ExecPaths, binDir)
 				fmt.Printf("   Added %s to ExecPaths\n", binDir)
+				// Debug: list files in bin directory
+				if entries, err := os.ReadDir(binDir); err == nil {
+					fmt.Printf("   Contents of %s:\n", binDir)
+					for _, e := range entries {
+						fmt.Printf("      - %s\n", e.Name())
+					}
+				}
 			} else {
 				fmt.Printf("   Warning: bin dir %s does not exist: %v\n", binDir, err)
 			}
