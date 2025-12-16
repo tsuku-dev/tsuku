@@ -295,6 +295,11 @@ func runCreate(cmd *cobra.Command, args []string) {
 	// Create sandbox executor (if not skipping sandbox)
 	var sandboxExec *sandbox.Executor
 	if !skipSandbox {
+		// Ensure cache directories exist (needed for mounting into container)
+		if err := cfg.EnsureDirectories(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating directories: %v\n", err)
+			exitWithCode(ExitGeneral)
+		}
 		detector := validate.NewRuntimeDetector()
 		sandboxExec = sandbox.NewExecutor(detector,
 			sandbox.WithDownloadCacheDir(cfg.DownloadCacheDir))
