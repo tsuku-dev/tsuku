@@ -409,6 +409,8 @@ func findBundlerForEval() string {
 }
 
 // generateGemfileLock generates a Gemfile.lock using bundle lock.
+// For bundler itself, ensures the target version is available since bundler uses
+// itself to generate lockfiles and older versions may not support newer versions.
 func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDir string) (string, error) {
 	// Write minimal Gemfile
 	gemfilePath := filepath.Join(tempDir, "Gemfile")
@@ -417,10 +419,65 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 		return "", fmt.Errorf("failed to write Gemfile: %w", err)
 	}
 
-	// Run bundle lock with checksums
-	args := []string{"lock", "--add-checksums"}
+	// When generating lockfile for bundler itself, ensure the target version is available.
+	// Bundler uses itself to generate lockfiles, and older bundler versions may not
+	// support resolving dependencies for newer bundler versions. This follows bundler's
+	// documented pattern: "gem install bundler:VERSION && bundle.rb _VERSION_ lock"
+	var bundlerCmd string
+	var args []string
 
-	cmd := exec.CommandContext(ctx.Context, bundlerPath, args...)
+	if gemName == "bundler" {
+		// Find gem command to install specific bundler version
+		gemPath, err := exec.LookPath("gem")
+		if err != nil {
+			// Try tsuku's ruby
+			tsukuHome := os.Getenv("TSUKU_HOME")
+			if tsukuHome == "" {
+				homeDir, _ := os.UserHomeDir()
+				tsukuHome = filepath.Join(homeDir, ".tsuku")
+			}
+			rubyGemPath := filepath.Join(tsukuHome, "tools", "ruby-*", "bin", "gem")
+			matches, _ := filepath.Glob(rubyGemPath)
+			if len(matches) > 0 {
+				gemPath = matches[0]
+			} else {
+				return "", fmt.Errorf("gem command not found, needed to install bundler %s", version)
+			}
+		}
+
+		// Install the specific bundler version
+		installCmd := exec.CommandContext(ctx.Context, gemPath, "install", "bundler", "--version", version, "--no-document")
+		installCmd.Dir = tempDir
+		installCmd.Env = os.Environ()
+		installOutput, installErr := installCmd.CombinedOutput()
+		if installErr != nil {
+			// Check if it's already installed
+			if !strings.Contains(string(installOutput), "already installed") {
+				return "", fmt.Errorf("failed to install bundler %s: %w\nOutput: %s", version, installErr, string(installOutput))
+			}
+		}
+
+		// Use bundle.rb with version selector to run the specific bundler version
+		rubyPath, err := exec.LookPath("ruby")
+		if err != nil {
+			return "", fmt.Errorf("ruby command not found")
+		}
+		bundleRbPath := filepath.Join(filepath.Dir(bundlerPath), "bundle.rb")
+		if _, err := os.Stat(bundleRbPath); err != nil {
+			// bundle.rb not found, try using bundler with _version_ prefix
+			bundlerCmd = bundlerPath
+			args = []string{"_" + version + "_", "lock", "--add-checksums"}
+		} else {
+			bundlerCmd = rubyPath
+			args = []string{bundleRbPath, "_" + version + "_", "lock", "--add-checksums"}
+		}
+	} else {
+		// Normal case: use bundler directly for non-bundler gems
+		bundlerCmd = bundlerPath
+		args = []string{"lock", "--add-checksums"}
+	}
+
+	cmd := exec.CommandContext(ctx.Context, bundlerCmd, args...)
 	cmd.Dir = tempDir
 	cmd.Env = os.Environ()
 
