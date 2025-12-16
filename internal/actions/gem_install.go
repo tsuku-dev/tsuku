@@ -446,23 +446,32 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 			}
 		}
 
-		// Install the specific bundler version to a temp directory (self-contained)
-		// Use GEM_HOME to control installation location without system permissions
-		evalGemHome = filepath.Join(tempDir, ".gem")
+		// Install bundler to tsuku's eval-deps directory for reuse
+		// This keeps it self-contained but persistent across evaluations
+		tsukuHome := os.Getenv("TSUKU_HOME")
+		if tsukuHome == "" {
+			homeDir, _ := os.UserHomeDir()
+			tsukuHome = filepath.Join(homeDir, ".tsuku")
+		}
+		evalGemHome = filepath.Join(tsukuHome, "eval-deps", "ruby-gems")
 		if err := os.MkdirAll(evalGemHome, 0755); err != nil {
 			return "", fmt.Errorf("failed to create eval gem home: %w", err)
 		}
 
-		installCmd := exec.CommandContext(ctx.Context, gemPath, "install", "bundler", "--version", version, "--no-document")
-		installCmd.Dir = tempDir
-		installCmd.Env = append(os.Environ(),
-			"GEM_HOME="+evalGemHome,
-			"GEM_PATH="+evalGemHome,
-		)
-		installOutput, installErr := installCmd.CombinedOutput()
-		if installErr != nil {
-			// Check if it's already installed
-			if !strings.Contains(string(installOutput), "already installed") {
+		// Check if bundler is already installed to avoid reinstalling
+		bundlerGemDir := filepath.Join(evalGemHome, "gems", "bundler-"+version)
+		if _, err := os.Stat(bundlerGemDir); err == nil {
+			// Already installed, skip
+		} else {
+			// Install bundler (omit --no-document for compatibility with older gem)
+			installCmd := exec.CommandContext(ctx.Context, gemPath, "install", "bundler", "--version", version)
+			installCmd.Dir = tempDir
+			installCmd.Env = append(os.Environ(),
+				"GEM_HOME="+evalGemHome,
+				"GEM_PATH="+evalGemHome,
+			)
+			installOutput, installErr := installCmd.CombinedOutput()
+			if installErr != nil {
 				return "", fmt.Errorf("failed to install bundler %s: %w\nOutput: %s", version, installErr, string(installOutput))
 			}
 		}
