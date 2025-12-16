@@ -167,6 +167,15 @@ func (o *Orchestrator) Create(
 		repairAttempts++
 		result, err = session.Repair(ctx, sandboxResult)
 		if err != nil {
+			// Check if this builder doesn't support repair (ecosystem builders)
+			var repairErr *RepairNotSupportedError
+			if errors.As(err, &repairErr) {
+				// Can't repair deterministic recipes - return validation failure
+				return nil, &ValidationFailedError{
+					SandboxResult:  sandboxResult,
+					RepairAttempts: repairAttempts,
+				}
+			}
 			return nil, fmt.Errorf("repair attempt %d failed: %w", repairAttempts, err)
 		}
 	}
