@@ -13,13 +13,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Test recipes that use evaluable actions (github_archive, github_file)
+        # Test recipes that use evaluable actions (github_archive, github_file, homebrew)
         # These can run offline in the sandbox using pre-cached downloads
         tool:
           - actionlint   # T1: github_archive with version pattern
           - btop         # T2: github_archive without version pattern
           - argo-cd      # T3: github_file with binary field
           - duf          # github_archive simple
+          - bash         # homebrew bottle
+          - make         # homebrew bottle
+          - readline     # homebrew bottle (library)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

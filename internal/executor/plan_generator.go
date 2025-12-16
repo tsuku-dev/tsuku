@@ -133,6 +133,15 @@ func (e *Executor) GeneratePlan(ctx context.Context, cfg PlanConfig) (*Installat
 		}
 	}
 
+	// Capture verify section from recipe for plan execution
+	var verify *PlanVerify
+	if e.recipe.Verify.Command != "" {
+		verify = &PlanVerify{
+			Command: e.recipe.Verify.Command,
+			Pattern: e.recipe.Verify.Pattern,
+		}
+	}
+
 	return &InstallationPlan{
 		FormatVersion: PlanFormatVersion,
 		Tool:          e.recipe.Metadata.Name,
@@ -146,6 +155,8 @@ func (e *Executor) GeneratePlan(ctx context.Context, cfg PlanConfig) (*Installat
 		RecipeSource:  recipeSource,
 		Deterministic: planDeterministic,
 		Steps:         steps,
+		Verify:        verify,
+		RecipeType:    string(e.recipe.Metadata.Type),
 	}, nil
 }
 

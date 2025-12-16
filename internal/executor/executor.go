@@ -284,6 +284,24 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 	// Store version for later use
 	e.version = plan.Version
 
+	// When executing from a plan file, the recipe may be nil or have empty Verify.
+	// If the plan has verify info, use it to create/update the recipe context.
+	recipeForContext := e.recipe
+	if plan.Verify != nil && plan.Verify.Command != "" {
+		if recipeForContext == nil || recipeForContext.Verify.Command == "" {
+			recipeForContext = &recipe.Recipe{
+				Metadata: recipe.MetadataSection{
+					Name: plan.Tool,
+					Type: plan.RecipeType,
+				},
+				Verify: recipe.VerifySection{
+					Command: plan.Verify.Command,
+					Pattern: plan.Verify.Pattern,
+				},
+			}
+		}
+	}
+
 	// Create execution context from plan
 	execCtx := &actions.ExecutionContext{
 		Context:          ctx,
@@ -296,7 +314,7 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 		VersionTag:       plan.Version, // Plan doesn't track tag separately
 		OS:               plan.Platform.OS,
 		Arch:             plan.Platform.Arch,
-		Recipe:           e.recipe,
+		Recipe:           recipeForContext,
 		ExecPaths:        e.execPaths,
 		Logger:           log.Default(),
 	}
