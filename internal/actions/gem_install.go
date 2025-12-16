@@ -425,6 +425,7 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 	// documented pattern: "gem install bundler:VERSION && bundle.rb _VERSION_ lock"
 	var bundlerCmd string
 	var args []string
+	var evalGemHome string
 
 	if gemName == "bundler" {
 		// Find gem command to install specific bundler version
@@ -445,10 +446,19 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 			}
 		}
 
-		// Install the specific bundler version to user directory to avoid permission issues
-		installCmd := exec.CommandContext(ctx.Context, gemPath, "install", "bundler", "--version", version, "--user-install", "--no-document")
+		// Install the specific bundler version to a temp directory (self-contained)
+		// Use GEM_HOME to control installation location without system permissions
+		evalGemHome = filepath.Join(tempDir, ".gem")
+		if err := os.MkdirAll(evalGemHome, 0755); err != nil {
+			return "", fmt.Errorf("failed to create eval gem home: %w", err)
+		}
+
+		installCmd := exec.CommandContext(ctx.Context, gemPath, "install", "bundler", "--version", version, "--no-document")
 		installCmd.Dir = tempDir
-		installCmd.Env = os.Environ()
+		installCmd.Env = append(os.Environ(),
+			"GEM_HOME="+evalGemHome,
+			"GEM_PATH="+evalGemHome,
+		)
 		installOutput, installErr := installCmd.CombinedOutput()
 		if installErr != nil {
 			// Check if it's already installed
@@ -457,8 +467,7 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 			}
 		}
 
-		// Use bundler with _version_ syntax to run the specific version
-		// This works with any bundler executable as long as the gem is installed
+		// Use bundler with _version_ syntax, pointing to the eval gem home
 		bundlerCmd = bundlerPath
 		args = []string{"_" + version + "_", "lock", "--add-checksums"}
 	} else {
@@ -469,7 +478,15 @@ func generateGemfileLock(ctx *EvalContext, bundlerPath, gemName, version, tempDi
 
 	cmd := exec.CommandContext(ctx.Context, bundlerCmd, args...)
 	cmd.Dir = tempDir
-	cmd.Env = os.Environ()
+	if evalGemHome != "" {
+		// When we installed bundler for evaluation, point to that gem home
+		cmd.Env = append(os.Environ(),
+			"GEM_HOME="+evalGemHome,
+			"GEM_PATH="+evalGemHome,
+		)
+	} else {
+		cmd.Env = os.Environ()
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
