@@ -233,6 +233,7 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 		"brew_install":      true,
 		"npm_install":       true,
 		"pipx_install":      true,
+		"pip_exec":          true,
 		"cargo_install":     true,
 		"go_install":        true,
 		"gem_install":       true,
