@@ -161,6 +161,7 @@ func runEval(cmd *cobra.Command, args []string) {
 		Downloader:         downloader,
 		DownloadCache:      downloadCache,
 		AutoAcceptEvalDeps: evalYes,
+		RecipeLoader:       loader,
 		OnWarning: func(action, message string) {
 			// Output warnings to stderr so they don't mix with JSON
 			fmt.Fprintf(os.Stderr, "Warning: %s\n", message)

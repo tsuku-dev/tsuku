@@ -39,6 +39,10 @@ type PlanConfig struct {
 	// It should install the dependencies and return nil on success.
 	// If nil and deps are missing, plan generation fails with an error.
 	OnEvalDepsNeeded func(deps []string, autoAccept bool) error
+	// RecipeLoader loads recipes for dependency resolution.
+	// If nil, plans will not include dependency installation steps.
+	// When set, plans become self-contained by including steps for all dependencies.
+	RecipeLoader actions.RecipeLoader
 }
 
 // GeneratePlan evaluates a recipe and produces an installation plan.
@@ -130,6 +134,20 @@ func (e *Executor) GeneratePlan(ctx context.Context, cfg PlanConfig) (*Installat
 	// Convert patches to apply_patch steps and insert after extraction
 	if len(e.recipe.Patches) > 0 {
 		steps = insertPatchSteps(steps, e.recipe.Patches)
+	}
+
+	// Generate dependency plans and prepend them
+	// This makes plans self-contained - they include all steps needed to install
+	// the tool and its dependencies in the correct order.
+	if cfg.RecipeLoader != nil {
+		depSteps, err := generateDependencySteps(ctx, e.recipe, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate dependency steps: %w", err)
+		}
+		if len(depSteps) > 0 {
+			// Prepend dependency steps - they must run before the main tool
+			steps = append(depSteps, steps...)
+		}
 	}
 
 	// Compute plan-level deterministic flag: true only if ALL steps are deterministic
@@ -542,4 +560,134 @@ func insertPatchSteps(steps []ResolvedStep, patches []recipe.Patch) []ResolvedSt
 	result = append(result, steps[insertIdx:]...)
 
 	return result
+}
+
+// generateDependencySteps generates installation steps for all install-time dependencies.
+// Dependencies are resolved from the recipe, then each dependency's plan is generated
+// in topological order (dependencies before dependents). Steps are collected and
+// de-duplicated to avoid installing the same dependency twice.
+//
+// The function recursively resolves transitive dependencies, so if A depends on B
+// and B depends on C, the returned steps will include C, then B (in that order).
+func generateDependencySteps(
+	ctx context.Context,
+	r *recipe.Recipe,
+	cfg PlanConfig,
+) ([]ResolvedStep, error) {
+	// Resolve direct dependencies from recipe
+	deps := actions.ResolveDependencies(r)
+
+	if len(deps.InstallTime) == 0 {
+		return nil, nil
+	}
+
+	// Collect all steps from dependencies in correct order
+	// Using a map to track which tools we've already processed (de-duplication)
+	processed := make(map[string]bool)
+	// Mark the root recipe as processed to avoid cycles
+	processed[r.Metadata.Name] = true
+
+	var allSteps []ResolvedStep
+
+	// Process dependencies in a deterministic order
+	depNames := make([]string, 0, len(deps.InstallTime))
+	for name := range deps.InstallTime {
+		depNames = append(depNames, name)
+	}
+	// Sort for deterministic ordering
+	sortStrings(depNames)
+
+	for _, depName := range depNames {
+		depSteps, err := generateStepsForDependency(ctx, depName, cfg, processed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate plan for dependency %s: %w", depName, err)
+		}
+		allSteps = append(allSteps, depSteps...)
+	}
+
+	return allSteps, nil
+}
+
+// generateStepsForDependency generates installation steps for a single dependency
+// and its transitive dependencies. It handles cycle detection and de-duplication.
+func generateStepsForDependency(
+	ctx context.Context,
+	depName string,
+	cfg PlanConfig,
+	processed map[string]bool,
+) ([]ResolvedStep, error) {
+	// Skip if already processed (handles both cycles and de-duplication)
+	if processed[depName] {
+		return nil, nil
+	}
+	processed[depName] = true
+
+	// Load the dependency recipe
+	depRecipe, err := cfg.RecipeLoader.GetWithContext(ctx, depName)
+	if err != nil {
+		// Dependency recipe not found - skip
+		// This could be a system dependency or something not in the registry
+		return nil, nil
+	}
+
+	// First, recursively process this dependency's own dependencies
+	// This ensures proper ordering: C before B before A
+	var transSteps []ResolvedStep
+	depDeps := actions.ResolveDependencies(depRecipe)
+	if len(depDeps.InstallTime) > 0 {
+		transDepNames := make([]string, 0, len(depDeps.InstallTime))
+		for name := range depDeps.InstallTime {
+			transDepNames = append(transDepNames, name)
+		}
+		sortStrings(transDepNames)
+
+		for _, transDepName := range transDepNames {
+			steps, err := generateStepsForDependency(ctx, transDepName, cfg, processed)
+			if err != nil {
+				return nil, err
+			}
+			transSteps = append(transSteps, steps...)
+		}
+	}
+
+	// Now generate steps for this dependency
+	exec, err := New(depRecipe)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create executor for %s: %w", depName, err)
+	}
+	defer exec.Cleanup()
+
+	// Generate plan for the dependency with the same config
+	// Use "dependency" as recipe source to distinguish from main tool
+	depCfg := PlanConfig{
+		OS:                 cfg.OS,
+		Arch:               cfg.Arch,
+		RecipeSource:       "dependency",
+		OnWarning:          cfg.OnWarning,
+		Downloader:         cfg.Downloader,
+		DownloadCache:      cfg.DownloadCache,
+		AutoAcceptEvalDeps: cfg.AutoAcceptEvalDeps,
+		OnEvalDepsNeeded:   cfg.OnEvalDepsNeeded,
+		// Don't pass RecipeLoader to avoid infinite recursion
+		// We handle transitive deps explicitly above
+		RecipeLoader: nil,
+	}
+
+	plan, err := exec.GeneratePlan(ctx, depCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate plan for %s: %w", depName, err)
+	}
+
+	// Combine: transitive dependency steps first, then this dependency's steps
+	result := append(transSteps, plan.Steps...)
+	return result, nil
+}
+
+// sortStrings sorts a slice of strings in place.
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j] < s[j-1]; j-- {
+			s[j], s[j-1] = s[j-1], s[j]
+		}
+	}
 }
