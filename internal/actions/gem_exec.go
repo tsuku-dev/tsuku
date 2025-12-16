@@ -401,6 +401,17 @@ func (a *GemExecAction) executeLockDataMode(ctx *ExecutionContext, params map[st
 	gemCount := countLockfileGems(lockData)
 	fmt.Printf("   Installing %d gem(s) with lockfile enforcement\n", gemCount)
 
+	// Extract bundler version from lockfile to prevent auto-upgrade
+	bundlerVersion := extractBundlerVersion(lockData)
+	if bundlerVersion != "" {
+		if environmentVars == nil {
+			environmentVars = make(map[string]string)
+		}
+		// Set BUNDLER_VERSION to prevent bundler from auto-installing different version
+		environmentVars["BUNDLER_VERSION"] = bundlerVersion
+		fmt.Printf("   Lockfile bundler version: %s\n", bundlerVersion)
+	}
+
 	// Build environment
 	env := a.buildEnvironment(installDir, installDir, true, environmentVars)
 
@@ -507,6 +518,23 @@ func (a *GemExecAction) findBundlerBinDir(installDir string) string {
 		}
 	}
 
+	return ""
+}
+
+// extractBundlerVersion extracts the bundler version from BUNDLED WITH section in lockfile
+func extractBundlerVersion(lockData string) string {
+	lines := strings.Split(lockData, "\n")
+	foundBundledWith := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "BUNDLED WITH" {
+			foundBundledWith = true
+			continue
+		}
+		if foundBundledWith && strings.TrimSpace(line) != "" {
+			// Next non-empty line after "BUNDLED WITH" is the version
+			return strings.TrimSpace(line)
+		}
+	}
 	return ""
 }
 
