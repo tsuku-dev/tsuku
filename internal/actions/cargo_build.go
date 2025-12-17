@@ -357,47 +357,7 @@ func (a *CargoBuildAction) executeLockDataMode(ctx *ExecutionContext, params map
 
 	fmt.Printf("   Using cargo: %s\n", cargoPath)
 
-	// Create temporary workspace for building
-	tempDir, err := os.MkdirTemp("", "tsuku-cargo-build-*")
-	if err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create src directory and minimal main.rs (required for valid Cargo package)
-	srcDir := filepath.Join(tempDir, "src")
-	if err := os.MkdirAll(srcDir, 0755); err != nil {
-		return fmt.Errorf("failed to create src directory: %w", err)
-	}
-
-	mainRsPath := filepath.Join(srcDir, "main.rs")
-	mainRsContent := "fn main() {}\n"
-	if err := os.WriteFile(mainRsPath, []byte(mainRsContent), 0644); err != nil {
-		return fmt.Errorf("failed to write main.rs: %w", err)
-	}
-
-	// Write minimal Cargo.toml
-	cargoTomlPath := filepath.Join(tempDir, "Cargo.toml")
-	cargoTomlContent := fmt.Sprintf(`[package]
-name = "tsuku-temp"
-version = "0.0.0"
-edition = "2021"
-
-[dependencies]
-%s = "=%s"
-`, crateName, version)
-
-	if err := os.WriteFile(cargoTomlPath, []byte(cargoTomlContent), 0644); err != nil {
-		return fmt.Errorf("failed to write Cargo.toml: %w", err)
-	}
-
-	// Write Cargo.lock
-	lockPath := filepath.Join(tempDir, "Cargo.lock")
-	if err := os.WriteFile(lockPath, []byte(lockData), 0644); err != nil {
-		return fmt.Errorf("failed to write Cargo.lock: %w", err)
-	}
-
-	// Verify Cargo.lock checksum
+	// Verify Cargo.lock checksum first
 	computedChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(lockData)))
 	if computedChecksum != lockChecksum {
 		return fmt.Errorf("Cargo.lock checksum mismatch\n  Expected: %s\n  Got:      %s\n\nThis may indicate plan file tampering",
@@ -406,6 +366,52 @@ edition = "2021"
 
 	fmt.Printf("   Building crate with lockfile enforcement\n")
 
+	// Create temporary directory for downloading and building crate
+	tempDir, err := os.MkdirTemp("", "tsuku-cargo-build-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Download the crate source from crates.io (same as Decompose does)
+	crateURL := fmt.Sprintf("https://crates.io/api/v1/crates/%s/%s/download", crateName, version)
+	crateTarball := filepath.Join(tempDir, fmt.Sprintf("%s-%s.crate", crateName, version))
+
+	fmt.Printf("   Downloading crate from crates.io...\n")
+	downloadCmd := exec.CommandContext(ctx.Context, "curl", "-L", "-o", crateTarball, crateURL)
+	downloadOutput, err := downloadCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to download crate from %s: %w\nOutput: %s", crateURL, err, string(downloadOutput))
+	}
+
+	// Extract the .crate file (it's a gzipped tar archive)
+	extractDir := filepath.Join(tempDir, "extracted")
+	if err := os.MkdirAll(extractDir, 0755); err != nil {
+		return fmt.Errorf("failed to create extraction directory: %w", err)
+	}
+
+	fmt.Printf("   Extracting crate...\n")
+	tarCmd := exec.CommandContext(ctx.Context, "tar", "xzf", crateTarball, "-C", extractDir)
+	tarOutput, err := tarCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to extract crate tarball: %w\nOutput: %s", err, string(tarOutput))
+	}
+
+	// The extracted crate is in a subdirectory named {crate}-{version}
+	crateDir := filepath.Join(extractDir, fmt.Sprintf("%s-%s", crateName, version))
+	cargoTomlPath := filepath.Join(crateDir, "Cargo.toml")
+
+	// Verify Cargo.toml exists
+	if _, err := os.Stat(cargoTomlPath); err != nil {
+		return fmt.Errorf("Cargo.toml not found in extracted crate at %s", cargoTomlPath)
+	}
+
+	// Write the captured Cargo.lock to the crate directory
+	lockPath := filepath.Join(crateDir, "Cargo.lock")
+	if err := os.WriteFile(lockPath, []byte(lockData), 0644); err != nil {
+		return fmt.Errorf("failed to write Cargo.lock: %w", err)
+	}
+
 	// Build deterministic environment
 	env := buildDeterministicCargoEnv(cargoPath, tempDir)
 
@@ -413,19 +419,24 @@ edition = "2021"
 	fmt.Printf("   Pre-fetching dependencies...\n")
 	fetchArgs := []string{"fetch", "--locked", "--manifest-path", cargoTomlPath}
 	fetchCmd := exec.CommandContext(ctx.Context, cargoPath, fetchArgs...)
-	fetchCmd.Dir = tempDir
+	fetchCmd.Dir = crateDir
 	fetchCmd.Env = env
 	fetchOutput, err := fetchCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("cargo fetch failed: %w\nOutput: %s", err, string(fetchOutput))
 	}
 
-	// Build with --locked --offline
-	buildArgs := []string{"build", "--release", "--locked", "--offline", "--manifest-path", cargoTomlPath}
-	fmt.Printf("   Running: cargo %s\n", strings.Join(buildArgs, " "))
-
+	// Build the crate with the lockfile
+	fmt.Printf("   Running: cargo build --release --locked --offline --manifest-path %s\n", cargoTomlPath)
+	buildArgs := []string{
+		"build",
+		"--release",
+		"--locked",
+		"--offline",
+		"--manifest-path", cargoTomlPath,
+	}
 	buildCmd := exec.CommandContext(ctx.Context, cargoPath, buildArgs...)
-	buildCmd.Dir = tempDir
+	buildCmd.Dir = crateDir
 	buildCmd.Env = env
 
 	buildOutput, err := buildCmd.CombinedOutput()
@@ -439,16 +450,14 @@ edition = "2021"
 		fmt.Printf("   cargo output:\n%s\n", outputStr)
 	}
 
-	// Find built executables in target/release
-	releaseDir := filepath.Join(tempDir, "target", "release")
-
-	// Create bin directory in install dir
+	// Copy executables from target/release/ to install bin/
+	fmt.Printf("   Installing executables...\n")
 	binDir := filepath.Join(ctx.InstallDir, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		return fmt.Errorf("failed to create bin directory: %w", err)
 	}
 
-	// Copy executables to install directory
+	releaseDir := filepath.Join(crateDir, "target", "release")
 	for _, exe := range executables {
 		srcPath := filepath.Join(releaseDir, exe)
 		dstPath := filepath.Join(binDir, exe)

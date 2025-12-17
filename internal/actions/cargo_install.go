@@ -271,50 +271,66 @@ func findCargoForEval() string {
 	return ""
 }
 
-// generateCargoLock generates a Cargo.lock using cargo generate-lockfile.
+// generateCargoLock downloads the crate source and reads/generates its Cargo.lock.
 func generateCargoLock(ctx *EvalContext, cargoPath, crateName, version, tempDir string) (string, error) {
-	// Create src directory and minimal main.rs (required for valid Cargo package)
-	srcDir := filepath.Join(tempDir, "src")
-	if err := os.MkdirAll(srcDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create src directory: %w", err)
-	}
+	// Download the crate source from crates.io
+	// Format: https://crates.io/api/v1/crates/{crate}/{version}/download
+	crateURL := fmt.Sprintf("https://crates.io/api/v1/crates/%s/%s/download", crateName, version)
+	crateTarball := filepath.Join(tempDir, fmt.Sprintf("%s-%s.crate", crateName, version))
 
-	mainRsPath := filepath.Join(srcDir, "main.rs")
-	mainRsContent := "fn main() {}\n"
-	if err := os.WriteFile(mainRsPath, []byte(mainRsContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write main.rs: %w", err)
-	}
-
-	// Write minimal Cargo.toml
-	cargoTomlPath := filepath.Join(tempDir, "Cargo.toml")
-	cargoTomlContent := fmt.Sprintf(`[package]
-name = "tsuku-temp"
-version = "0.0.0"
-edition = "2021"
-
-[dependencies]
-%s = "=%s"
-`, crateName, version)
-
-	if err := os.WriteFile(cargoTomlPath, []byte(cargoTomlContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write Cargo.toml: %w", err)
-	}
-
-	// Generate Cargo.lock
-	cmd := exec.CommandContext(ctx.Context, cargoPath, "generate-lockfile", "--manifest-path", cargoTomlPath)
-	cmd.Dir = tempDir
-	cmd.Env = os.Environ()
-
-	output, err := cmd.CombinedOutput()
+	// Download the .crate file
+	downloadCmd := exec.CommandContext(ctx.Context, "curl", "-L", "-o", crateTarball, crateURL)
+	downloadOutput, err := downloadCmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("cargo generate-lockfile failed: %w\nOutput: %s", err, string(output))
+		return "", fmt.Errorf("failed to download crate from %s: %w\nOutput: %s", crateURL, err, string(downloadOutput))
 	}
 
-	// Read generated Cargo.lock
-	lockPath := filepath.Join(tempDir, "Cargo.lock")
+	// Extract the .crate file (it's a gzipped tar archive)
+	extractDir := filepath.Join(tempDir, "extracted")
+	if err := os.MkdirAll(extractDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create extraction directory: %w", err)
+	}
+
+	tarCmd := exec.CommandContext(ctx.Context, "tar", "xzf", crateTarball, "-C", extractDir)
+	tarOutput, err := tarCmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to extract crate tarball: %w\nOutput: %s", err, string(tarOutput))
+	}
+
+	// The extracted crate is in a subdirectory named {crate}-{version}
+	crateDir := filepath.Join(extractDir, fmt.Sprintf("%s-%s", crateName, version))
+	cargoTomlPath := filepath.Join(crateDir, "Cargo.toml")
+
+	// Check if Cargo.toml exists
+	if _, err := os.Stat(cargoTomlPath); err != nil {
+		return "", fmt.Errorf("Cargo.toml not found in extracted crate at %s", cargoTomlPath)
+	}
+
+	// Check if Cargo.lock already exists in the crate
+	lockPath := filepath.Join(crateDir, "Cargo.lock")
+	if _, err := os.Stat(lockPath); err == nil {
+		// Cargo.lock exists, read it
+		lockData, err := os.ReadFile(lockPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read existing Cargo.lock: %w", err)
+		}
+		return string(lockData), nil
+	}
+
+	// Cargo.lock doesn't exist, generate it
+	genLockCmd := exec.CommandContext(ctx.Context, cargoPath, "generate-lockfile", "--manifest-path", cargoTomlPath)
+	genLockCmd.Dir = crateDir
+	genLockCmd.Env = os.Environ()
+
+	genLockOutput, err := genLockCmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("cargo generate-lockfile failed: %w\nOutput: %s", err, string(genLockOutput))
+	}
+
+	// Read the generated Cargo.lock
 	lockData, err := os.ReadFile(lockPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read Cargo.lock: %w", err)
+		return "", fmt.Errorf("failed to read generated Cargo.lock: %w", err)
 	}
 
 	return string(lockData), nil
