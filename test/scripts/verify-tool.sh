@@ -156,6 +156,34 @@ verify_pkg_config() {
     fi
 }
 
+verify_scdoc-source() {
+    echo "Testing: scdoc -v"
+    scdoc -v
+
+    echo ""
+    echo "Testing: Process a simple scdoc document"
+    cd "$TEMP_DIR"
+    cat > test.scd << 'EOF'
+test(1)
+
+# NAME
+
+test - a test man page
+
+# DESCRIPTION
+
+This is a test.
+EOF
+    scdoc < test.scd > test.1
+    if [ -f test.1 ]; then
+        echo "Successfully generated man page"
+        head -5 test.1
+    else
+        echo "Error: Failed to generate man page"
+        return 1
+    fi
+}
+
 verify_generic() {
     echo "Testing: $TOOL_NAME --version (generic check)"
     if "$TOOL_NAME" --version 2>&1; then
@@ -194,6 +222,9 @@ case "$TOOL_NAME" in
         ;;
     libpng)
         verify_libpng
+        ;;
+    scdoc-source)
+        verify_scdoc-source
         ;;
     *)
         echo "No specific test for '$TOOL_NAME', running generic check"
