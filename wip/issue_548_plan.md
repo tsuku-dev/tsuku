@@ -22,11 +22,11 @@ Following the established pattern used by make.toml and other homebrew-based bui
 - `internal/recipe/recipes/p/pkg-config.toml` - Recipe definition
 
 ## Implementation Steps
-- [ ] Create pkg-config.toml recipe with homebrew action
-- [ ] Add basic installation test to test-matrix.json
-- [ ] Add build-from-source test that uses pkg-config (e.g., a simple configure-based build)
-- [ ] Test locally that recipe works on current platform
-- [ ] Verify test matrix entries are correctly formatted
+- [x] Create pkg-config.toml recipe with homebrew action
+- [x] Add basic installation test to build-essentials.yml
+- [x] Add build-from-source test that uses pkg-config (gdbm-source already uses configure_make which depends on pkg-config)
+- [x] Test locally that recipe works on current platform
+- [x] Verify test matrix entries are correctly formatted
 
 ## Testing Strategy
 - Unit tests: Existing recipe validation tests will cover the new recipe
