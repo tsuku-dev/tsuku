@@ -19,10 +19,10 @@ Following the established pattern in the codebase where each action implements t
 None - meson_build doesn't exist yet, so we'll only implement configure_make and cmake_build per the actual codebase state.
 
 ## Implementation Steps
-- [ ] Add Dependencies() method to ConfigureMakeAction
-- [ ] Add Dependencies() method to CMakeBuildAction
-- [ ] Add test cases for configure_make and cmake_build dependencies
-- [ ] Run tests to verify dependencies are resolved correctly
+- [x] Add Dependencies() method to ConfigureMakeAction
+- [x] Add Dependencies() method to CMakeBuildAction
+- [x] Add test cases for configure_make and cmake_build dependencies
+- [x] Run tests to verify dependencies are resolved correctly
 
 ## Testing Strategy
 - Unit tests: Add test cases to dependencies_test.go for the new build action dependencies
