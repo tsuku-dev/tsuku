@@ -134,6 +134,8 @@ graph LR
 | [#561](https://github.com/tsukumogami/tsuku/issues/561) | feat(recipes): add docker recipe using require_system | [#560](https://github.com/tsukumogami/tsuku/issues/560) |
 | [#562](https://github.com/tsukumogami/tsuku/issues/562) | feat(recipes): add cuda recipe using require_system | [#560](https://github.com/tsukumogami/tsuku/issues/560) |
 | [#563](https://github.com/tsukumogami/tsuku/issues/563) | feat(cli): add tsuku check-deps command | [#560](https://github.com/tsukumogami/tsuku/issues/560) |
+| [#643](https://github.com/tsukumogami/tsuku/issues/643) | feat(actions): add platform-conditional dependencies | None |
+| [#644](https://github.com/tsukumogami/tsuku/issues/644) | feat(actions): aggregate primitive action dependencies in composites | None |
 
 ```mermaid
 graph LR
@@ -141,6 +143,8 @@ graph LR
     I561["#561: docker recipe"]
     I562["#562: cuda recipe"]
     I563["#563: check-deps command"]
+    I643["#643: platform-conditional deps"]
+    I644["#644: aggregate primitive deps"]
 
     I560 --> I561
     I560 --> I562
@@ -150,7 +154,7 @@ graph LR
     classDef ready fill:#bbdefb
     classDef blocked fill:#fff9c4
 
-    class I560 ready
+    class I560,I643,I644 ready
     class I561,I562,I563 blocked
 ```
 
