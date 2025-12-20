@@ -18,7 +18,8 @@ type HomebrewRelocateAction struct{ BaseAction }
 func (HomebrewRelocateAction) IsDeterministic() bool { return true }
 
 // Dependencies returns patchelf as an install-time dependency (needed for Linux ELF RPATH fixup).
-// Patchelf is installed on all platforms for consistency, but only used on Linux.
+// TODO(#643): Use platform-conditional dependencies to only install patchelf on Linux.
+// Currently installed on all platforms for consistency, but only used on Linux.
 func (HomebrewRelocateAction) Dependencies() ActionDeps {
 	return ActionDeps{
 		InstallTime: []string{"patchelf"},
@@ -184,10 +185,8 @@ func (a *HomebrewRelocateAction) fixBinaryRpath(binaryPath, installPath string) 
 func (a *HomebrewRelocateAction) fixElfRpath(binaryPath, installPath string) error {
 	patchelf, err := exec.LookPath("patchelf")
 	if err != nil {
-		// patchelf not available - try to proceed without it
-		// The binary may still work if its dependencies are system libraries
-		fmt.Printf("   Warning: patchelf not found, skipping RPATH fix for %s\n", filepath.Base(binaryPath))
-		return nil
+		// Patchelf is declared as a dependency, so this indicates a bug in dependency resolution
+		return fmt.Errorf("patchelf not found (required for ELF RPATH fixup): %w", err)
 	}
 
 	// Homebrew bottles often have read-only files; make writable before patching
