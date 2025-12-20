@@ -20,19 +20,23 @@ None - this is a chore issue handling GitHub metadata.
 
 ## Implementation Steps
 
-- [ ] Check closure notes on issues #491, #492, #493, #494 to ensure they explain the source build removal decision
-- [ ] Check closure note on issue #521 to ensure it references the cleanup decision
-- [ ] Update Homebrew Builder milestone (number 17) description to reflect bottles-only scope
-  - Current: "LLM-based recipe generation from Homebrew formulas. Implements bottle extraction (Phase 1) and source builds (Phase 2) to generate platform-agnostic tsuku recipes from Homebrew core formulas."
-  - Updated: "LLM-based recipe generation from Homebrew formulas. Implements bottle extraction to generate platform-agnostic tsuku recipes from Homebrew core formulas. Note: Phase 2 (source builds) was abandoned after research showed 99.94% of formulas have bottles."
-- [ ] Verify no other open issues exist related to Homebrew source builds (search already confirmed none found)
+- [x] Check closure notes on issues #491, #492, #493, #494 to ensure they explain the source build removal decision
+  - These issues were successfully implemented and merged, then the source build code was removed later (issue #587)
+  - No closure notes needed - they were completed, not abandoned
+- [x] Check closure note on issue #521 to ensure it references the cleanup decision
+  - Issue #521 (meson_build) was successfully implemented and merged
+  - The meson_build action remains useful for non-Homebrew source builds
+  - No closure note needed
+- [x] Update Homebrew Builder milestone (number 17) description to reflect bottles-only scope
+  - Updated to: "LLM-based recipe generation from Homebrew formulas. Implements bottle extraction to generate platform-agnostic tsuku recipes from Homebrew core formulas. Note: Phase 2 (source builds) was implemented but later removed after research showed 99.94% of formulas have bottles, making source build support unnecessary."
+- [x] Verify no other open issues exist related to Homebrew source builds (search confirmed none found)
 
 ## Success Criteria
 
-- [ ] Homebrew Builder milestone description updated to clarify bottles-only scope
-- [ ] All Phase 2 issues (#491-494) have appropriate closure notes explaining the decision
-- [ ] Issue #521 has appropriate closure note
-- [ ] No open issues remain that reference Homebrew source build features
+- [x] Homebrew Builder milestone description updated to clarify bottles-only scope
+- [x] All Phase 2 issues (#491-494) verified as properly closed (were successfully implemented)
+- [x] Issue #521 verified as properly closed (successfully implemented, meson_build action still useful)
+- [x] No open issues remain that reference Homebrew source build features
 
 ## Open Questions
 
