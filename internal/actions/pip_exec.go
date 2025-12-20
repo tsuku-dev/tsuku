@@ -183,14 +183,31 @@ func (a *PipExecAction) Execute(ctx *ExecutionContext, params map[string]interfa
 		}
 	}
 
-	// Step 6: Fix shebangs in entry point scripts
-	// Entry point scripts created by pip have shebangs with absolute paths to the venv's python.
-	// These paths become invalid after the executor moves the directory to its final location.
-	// Rewrite them to use relative paths to ./python3 in the same directory.
+	// Step 6: Fix python3 symlink in venv to use relative path to python-standalone
+	// This matches what pipx_install does and ensures the venv's python points to the right interpreter
+	python3Link := filepath.Join(venvBinDir, "python3")
+	if target, err := os.Readlink(python3Link); err == nil && filepath.IsAbs(target) {
+		// Remove the absolute symlink
+		os.Remove(python3Link)
+		// Create relative symlink to tsuku's python-standalone
+		// From: venvs/<package>/bin/python3
+		// To: ../../../python-standalone-XXXXXXXX/bin/python3
+		if pythonPath != "" {
+			relPath, err := filepath.Rel(venvBinDir, pythonPath)
+			if err == nil {
+				_ = os.Symlink(relPath, python3Link) // Ignore error if symlink fails
+			}
+		}
+	}
+
+	// Step 6b: Fix shebangs in entry point scripts
+	// Entry point scripts have shebangs with absolute paths to the venv's python,
+	// which become invalid after the executor moves the directory.
+	// Rewrite them to use ./python3 (relative to script location).
 	for _, exe := range executables {
 		exePath := filepath.Join(venvBinDir, exe)
 		if err := fixPythonShebang(exePath); err != nil {
-			// Log warning but don't fail - the script might still work
+			// Log warning but don't fail
 			fmt.Printf("   Warning: failed to fix shebang in %s: %v\n", exe, err)
 		}
 	}
@@ -220,47 +237,40 @@ func (a *PipExecAction) Execute(ctx *ExecutionContext, params map[string]interfa
 	return nil
 }
 
-// fixPythonShebang rewrites Python entry point scripts to use relative shebangs.
-// This fixes the issue where pip creates scripts with absolute paths to the venv's python,
-// which become invalid when the executor moves the directory to its final location.
+// fixPythonShebang rewrites the shebang in a Python entry point script to use ./python3.
+// This fixes shebangs that have absolute paths to the temporary staging directory.
 func fixPythonShebang(scriptPath string) error {
-	// Read the file
 	content, err := os.ReadFile(scriptPath)
 	if err != nil {
-		return fmt.Errorf("failed to read script: %w", err)
+		return err
 	}
 
-	// Check if it starts with a shebang
+	// Check if it has a Python shebang
 	if len(content) < 2 || content[0] != '#' || content[1] != '!' {
-		return nil // Not a script with shebang, nothing to fix
+		return nil // Not a script
 	}
 
-	// Find the end of the first line (shebang line)
+	// Find first newline
 	newlineIdx := strings.IndexByte(string(content), '\n')
 	if newlineIdx == -1 {
-		return nil // No newline found, file might be malformed
+		return nil // No newline found
 	}
 
 	shebang := string(content[:newlineIdx])
 	rest := content[newlineIdx:]
 
-	// Check if the shebang points to python/python3
+	// Only fix if it's a Python shebang
 	if !strings.Contains(shebang, "python") {
-		return nil // Not a Python script
+		return nil
 	}
 
-	// Replace with relative shebang
-	// Use #!/bin/sh with exec to find python3 in the same directory
-	// This works even after directory moves because it's relative to the script location
-	newShebang := "#!/bin/sh\n\"exec\" \"$(dirname $0)/python3\" \"$0\" \"$@\""
+	// Replace with a shebang that uses ./python3 (same directory as script)
+	// This works because both the script and python3 are in venvs/<package>/bin/
+	newShebang := "#!/bin/sh\nexec \"$(dirname \"$0\")/python3\" \"$0\" \"$@\""
 
-	// Write back the file
+	// Write back
 	newContent := []byte(newShebang + string(rest))
-	if err := os.WriteFile(scriptPath, newContent, 0755); err != nil {
-		return fmt.Errorf("failed to write fixed script: %w", err)
-	}
-
-	return nil
+	return os.WriteFile(scriptPath, newContent, 0755)
 }
 
 // getPythonVersion returns the Python version string (e.g., "3.11.7")
