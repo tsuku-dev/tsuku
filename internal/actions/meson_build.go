@@ -183,35 +183,44 @@ func (a *MesonBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 	// Meson builds often link executables to shared libraries in lib/
 	// The RPATH gets set to the absolute staging directory, which breaks after relocation
 	libDir := filepath.Join(ctx.InstallDir, "lib")
+	fmt.Printf("   Checking for lib directory: %s\n", libDir)
 	if stat, err := os.Stat(libDir); err == nil && stat.IsDir() {
-		fmt.Printf("   Fixing RPATH for shared library dependencies\n")
+		fmt.Printf("   Found lib/ directory, fixing RPATH for shared library dependencies\n")
 
 		binDir := filepath.Join(ctx.InstallDir, "bin")
 		for _, exe := range executables {
 			exePath := filepath.Join(binDir, exe)
+			fmt.Printf("   Processing %s\n", exe)
 
 			// Detect binary format
 			format, err := detectBinaryFormat(exePath)
 			if err != nil {
 				return fmt.Errorf("failed to detect binary format for %s: %w", exe, err)
 			}
+			fmt.Printf("   Binary format: %s\n", format)
 
 			// Set RPATH to $ORIGIN/../lib for relative library lookup
 			var rpathErr error
 			switch format {
 			case "elf":
+				fmt.Printf("   Setting RPATH with patchelf\n")
 				rpathErr = setRpathLinux(exePath, "$ORIGIN/../lib")
 			case "macho":
+				fmt.Printf("   Setting RPATH with install_name_tool\n")
 				rpathErr = setRpathMacOS(exePath, "$ORIGIN/../lib")
 			default:
 				// Unknown format, skip RPATH fix
+				fmt.Printf("   Skipping RPATH fix (unknown format)\n")
 				continue
 			}
 
 			if rpathErr != nil {
 				return fmt.Errorf("failed to set RPATH for %s: %w", exe, rpathErr)
 			}
+			fmt.Printf("   Successfully set RPATH for %s\n", exe)
 		}
+	} else {
+		fmt.Printf("   No lib/ directory found or stat failed: %v\n", err)
 	}
 
 	// Step 5: Verify executables exist
