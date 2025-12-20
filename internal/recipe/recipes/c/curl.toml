@@ -5,17 +5,14 @@ homepage = "https://curl.se/"
 dependencies = ["openssl", "zlib"]
 binaries = ["bin/curl"]
 
-[version]
-github_repo = "curl/curl"
-
 [[steps]]
-action = "download"
-url = "https://curl.se/download/curl-{version}.tar.gz"
+action = "download_file"
+url = "https://curl.se/download/curl-8.11.1.tar.gz"
 checksum = "a889ac9dbba3644271bd9d1302b5c22a088893719b72be3487bc3d401e5c4e80"
 
 [[steps]]
 action = "extract"
-archive = "curl-{version}.tar.gz"
+archive = "curl-8.11.1.tar.gz"
 format = "tar.gz"
 
 [[steps]]
@@ -23,7 +20,7 @@ action = "setup_build_env"
 
 [[steps]]
 action = "configure_make"
-source_dir = "curl-{version}"
+source_dir = "curl-8.11.1"
 configure_args = ["--with-openssl", "--with-zlib", "--disable-silent-rules", "--without-libpsl"]
 executables = ["curl"]
 
@@ -42,4 +39,4 @@ binaries = ["bin/curl"]
 
 [verify]
 command = "curl --version"
-pattern = "curl {version}"
+pattern = "curl 8.11.1"
