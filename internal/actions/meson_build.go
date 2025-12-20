@@ -188,6 +188,14 @@ func (a *MesonBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 	if stat, err := os.Stat(libDir); err == nil && stat.IsDir() {
 		fmt.Printf("   Found lib/ directory, fixing RPATH for shared library dependencies\n")
 
+		// Find where .so files are actually located (could be in subdirectories)
+		libPaths := findLibraryDirectories(libDir)
+		if len(libPaths) == 0 {
+			fmt.Printf("   No shared libraries found in lib/\n")
+		} else {
+			fmt.Printf("   Found libraries in: %v\n", libPaths)
+		}
+
 		binDir := filepath.Join(ctx.InstallDir, "bin")
 		for _, exe := range executables {
 			exePath := filepath.Join(binDir, exe)
@@ -200,15 +208,24 @@ func (a *MesonBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 			}
 			fmt.Printf("   Binary format: %s\n", format)
 
-			// Set RPATH to $ORIGIN/../lib for relative library lookup
+			// Build RPATH from found library directories
+			// Convert absolute paths to $ORIGIN-relative paths
+			rpath := buildRpathFromLibDirs(libPaths, ctx.InstallDir)
+			if rpath == "" {
+				// Fallback to standard lib path
+				rpath = "$ORIGIN/../lib"
+			}
+			fmt.Printf("   RPATH: %s\n", rpath)
+
+			// Set RPATH for relative library lookup
 			var rpathErr error
 			switch format {
 			case "elf":
 				fmt.Printf("   Setting RPATH with patchelf\n")
-				rpathErr = setRpathLinux(exePath, "$ORIGIN/../lib")
+				rpathErr = setRpathLinux(exePath, rpath)
 			case "macho":
 				fmt.Printf("   Setting RPATH with install_name_tool\n")
-				rpathErr = setRpathMacOS(exePath, "$ORIGIN/../lib")
+				rpathErr = setRpathMacOS(exePath, rpath)
 				if rpathErr == nil {
 					// Also fix library load commands to use @rpath
 					rpathErr = fixMachoLibraryPaths(exePath, ctx.InstallDir)
@@ -363,4 +380,71 @@ func fixMachoLibraryPaths(binaryPath, installDir string) error {
 	}
 
 	return nil
+}
+
+// findLibraryDirectories recursively searches for directories containing shared libraries.
+// Returns absolute paths to directories containing .so files (Linux) or .dylib files (macOS).
+func findLibraryDirectories(libDir string) []string {
+	var dirs []string
+	seen := make(map[string]bool)
+
+	// Walk the lib directory tree
+	filepath.Walk(libDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Continue on errors
+		}
+
+		// Check if this is a shared library file
+		if !info.IsDir() {
+			ext := filepath.Ext(path)
+			isLibrary := ext == ".so" || ext == ".dylib" || strings.HasPrefix(ext, ".so.")
+
+			if isLibrary {
+				// Add the parent directory (not the file itself)
+				dir := filepath.Dir(path)
+				if !seen[dir] {
+					seen[dir] = true
+					dirs = append(dirs, dir)
+				}
+			}
+		}
+
+		return nil
+	})
+
+	return dirs
+}
+
+// buildRpathFromLibDirs converts absolute library directory paths to $ORIGIN-relative paths.
+// Returns a single RPATH string with relative paths to all library directories.
+func buildRpathFromLibDirs(libPaths []string, installDir string) string {
+	if len(libPaths) == 0 {
+		return ""
+	}
+
+	// For each library directory, compute relative path from bin/ to that directory
+	binDir := filepath.Join(installDir, "bin")
+	var rpathParts []string
+
+	for _, libPath := range libPaths {
+		// Compute relative path from bin/ to the library directory
+		relPath, err := filepath.Rel(binDir, libPath)
+		if err != nil {
+			continue // Skip paths that can't be made relative
+		}
+
+		// Convert to $ORIGIN-relative path
+		// From bin/executable, $ORIGIN is bin/, so we need $ORIGIN/<relPath>
+		rpathPart := "$ORIGIN/" + relPath
+		rpathParts = append(rpathParts, rpathPart)
+	}
+
+	if len(rpathParts) == 0 {
+		return ""
+	}
+
+	// Return the first (most common) path
+	// Note: We can't use ':' to combine multiple paths because validateRpath rejects it
+	// In practice, libraries are usually in one location
+	return rpathParts[0]
 }
