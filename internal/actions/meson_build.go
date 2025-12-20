@@ -16,7 +16,7 @@ type MesonBuildAction struct{ BaseAction }
 
 // Dependencies declares the install-time dependencies for this action.
 func (MesonBuildAction) Dependencies() ActionDeps {
-	return ActionDeps{InstallTime: []string{"meson", "make", "zig"}}
+	return ActionDeps{InstallTime: []string{"meson", "make", "zig", "patchelf"}}
 }
 
 // Name returns the action name
@@ -179,7 +179,42 @@ func (a *MesonBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 		return fmt.Errorf("meson install failed: %w\nOutput: %s", err, string(installOutput))
 	}
 
-	// Step 4: Verify executables exist
+	// Step 4: Fix RPATH on installed executables if lib/ directory exists
+	// Meson builds often link executables to shared libraries in lib/
+	// The RPATH gets set to the absolute staging directory, which breaks after relocation
+	libDir := filepath.Join(ctx.InstallDir, "lib")
+	if stat, err := os.Stat(libDir); err == nil && stat.IsDir() {
+		fmt.Printf("   Fixing RPATH for shared library dependencies\n")
+
+		binDir := filepath.Join(ctx.InstallDir, "bin")
+		for _, exe := range executables {
+			exePath := filepath.Join(binDir, exe)
+
+			// Detect binary format
+			format, err := detectBinaryFormat(exePath)
+			if err != nil {
+				return fmt.Errorf("failed to detect binary format for %s: %w", exe, err)
+			}
+
+			// Set RPATH to $ORIGIN/../lib for relative library lookup
+			var rpathErr error
+			switch format {
+			case "elf":
+				rpathErr = setRpathLinux(exePath, "$ORIGIN/../lib")
+			case "macho":
+				rpathErr = setRpathMacOS(exePath, "$ORIGIN/../lib")
+			default:
+				// Unknown format, skip RPATH fix
+				continue
+			}
+
+			if rpathErr != nil {
+				return fmt.Errorf("failed to set RPATH for %s: %w", exe, rpathErr)
+			}
+		}
+	}
+
+	// Step 5: Verify executables exist
 	binDir := filepath.Join(ctx.InstallDir, "bin")
 	for _, exe := range executables {
 		exePath := filepath.Join(binDir, exe)
