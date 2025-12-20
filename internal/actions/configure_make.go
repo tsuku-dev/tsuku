@@ -213,14 +213,13 @@ func buildAutotoolsEnv(ctx *ExecutionContext) []string {
 		toolsDepDir := filepath.Join(ctx.ToolsDir, depName+"-"+depVersion)
 		libsDepDir := filepath.Join(ctx.LibsDir, depName+"-"+depVersion)
 
-		// Check which directory exists
+		// Prefer libs directory if it exists, otherwise use tools directory
+		// We don't check if either exists here - let the subdirectory checks below
+		// handle whether to add flags. This preserves the original behavior.
 		if _, err := os.Stat(libsDepDir); err == nil {
 			depDir = libsDepDir
-		} else if _, err := os.Stat(toolsDepDir); err == nil {
-			depDir = toolsDepDir
 		} else {
-			// Dependency not found, skip
-			continue
+			depDir = toolsDepDir
 		}
 
 		// PKG_CONFIG_PATH: check for lib/pkgconfig directory
