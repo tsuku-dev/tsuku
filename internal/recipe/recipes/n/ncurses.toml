@@ -2,11 +2,11 @@
 name = "ncurses"
 description = "Text-based UI library"
 homepage = "https://invisible-island.net/ncurses/"
-binaries = ["bin/ncurses6-config"]
+binaries = ["bin/ncursesw6-config"]
 
 [version]
-source = "static"
-value = "6.5"
+source = "homebrew"
+formula = "ncurses"
 
 [[steps]]
 action = "download_file"
@@ -16,6 +16,7 @@ checksum = "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
 [[steps]]
 action = "extract"
 archive = "ncurses-{version}.tar.gz"
+format = "tar.gz"
 
 [[steps]]
 action = "setup_build_env"
@@ -23,13 +24,14 @@ action = "setup_build_env"
 [[steps]]
 action = "configure_make"
 source_dir = "ncurses-{version}"
-executables = ["ncurses6-config"]
+configure_args = ["--with-shared", "--enable-pc-files"]
+executables = ["ncursesw6-config"]
 
 [[steps]]
 action = "install_binaries"
 install_mode = "directory"
 binaries = [
-    "bin/ncurses6-config",
+    "bin/ncursesw6-config",
     "bin/clear",
     "bin/infocmp",
     "bin/tabs",
@@ -60,5 +62,5 @@ binaries = [
 ]
 
 [verify]
-command = "ncurses6-config --version"
+command = "ncursesw6-config --version"
 pattern = "{version}"
