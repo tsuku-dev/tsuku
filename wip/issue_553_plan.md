@@ -25,12 +25,7 @@ This validates the complete build environment provisioning chain:
 - `internal/recipe/recipes/n/ncurses.toml` - ncurses recipe using configure_make
 
 ## Implementation Steps
-- [x] Download ncurses source tarball (use download_file or github_archive)
-- [ ] Extract tarball
-- [ ] Run setup_build_env
-- [ ] Run configure_make with appropriate parameters
-- [ ] Install binaries (ncurses executables)
-- [ ] Add verify section using pkg-config
+- [x] Create ncurses recipe with all steps (download, extract, setup_build_env, configure_make, install_binaries, verify)
 
 ## Testing Strategy
 - Unit tests: Recipe validation (schema, required fields)
