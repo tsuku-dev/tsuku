@@ -16,7 +16,7 @@ type MesonBuildAction struct{ BaseAction }
 
 // Dependencies declares the install-time dependencies for this action.
 func (MesonBuildAction) Dependencies() ActionDeps {
-	return ActionDeps{InstallTime: []string{"meson", "make", "zig", "pkg-config"}}
+	return ActionDeps{InstallTime: []string{"meson", "make", "zig"}}
 }
 
 // Name returns the action name
