@@ -200,34 +200,53 @@ func (a *PipExecAction) Execute(ctx *ExecutionContext, params map[string]interfa
 		}
 	}
 
-	// Step 6b: Fix shebangs in entry point scripts
-	// Entry point scripts have shebangs with absolute paths to the venv's python,
+	// Step 6b: Fix shebangs in ALL scripts in venv bin directory
+	// Entry point scripts have absolute shebangs to the staging venv's python,
 	// which become invalid after the executor moves the directory.
-	// Rewrite them to use ./python3 (relative to script location).
-	for _, exe := range executables {
-		exePath := filepath.Join(venvBinDir, exe)
-		if err := fixPythonShebang(exePath); err != nil {
-			// Log warning but don't fail
-			fmt.Printf("   Warning: failed to fix shebang in %s: %v\n", exe, err)
+	// Replace with relative path shebangs.
+	venvBinFiles, err := os.ReadDir(venvBinDir)
+	if err != nil {
+		return fmt.Errorf("failed to read venv bin directory: %w", err)
+	}
+
+	for _, file := range venvBinFiles {
+		if file.IsDir() {
+			continue
+		}
+		scriptPath := filepath.Join(venvBinDir, file.Name())
+		if err := fixPythonShebang(scriptPath); err != nil {
+			// Log warning but don't fail - some files might not be Python scripts
+			fmt.Printf("   Debug: skipped shebang fix for %s: %v\n", file.Name(), err)
 		}
 	}
 
-	// Step 7: Create symlinks in bin/ directory (where executor expects them)
+	// Step 7: Create wrapper scripts in bin/ directory (where executor expects them)
+	// We create wrapper scripts instead of symlinks because entry point scripts have
+	// absolute shebangs that break when the directory is moved.
 	binDir := filepath.Join(ctx.InstallDir, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		return fmt.Errorf("failed to create bin directory: %w", err)
 	}
 
 	for _, exe := range executables {
-		// Create relative symlink: bin/<exe> -> ../venvs/<package>/bin/<exe>
-		srcPath := filepath.Join("..", "venvs", packageName, "bin", exe)
-		dstPath := filepath.Join(binDir, exe)
+		wrapperPath := filepath.Join(binDir, exe)
 
-		// Remove existing symlink if present
-		os.Remove(dstPath)
+		// Create a wrapper script that executes the venv's python with the real script
+		// Relative paths work after directory relocation
+		// Add venv bin to PATH so dependencies like ninja can be found
+		wrapperScript := fmt.Sprintf(`#!/bin/sh
+# Wrapper for %s from pip venv
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV_DIR="$SCRIPT_DIR/../venvs/%s"
+export PATH="$VENV_DIR/bin:$PATH"
+exec "$VENV_DIR/bin/python3" "$VENV_DIR/bin/%s" "$@"
+`, exe, packageName, exe)
 
-		if err := os.Symlink(srcPath, dstPath); err != nil {
-			return fmt.Errorf("failed to create symlink for %s: %w", exe, err)
+		// Remove existing file if present
+		os.Remove(wrapperPath)
+
+		if err := os.WriteFile(wrapperPath, []byte(wrapperScript), 0755); err != nil {
+			return fmt.Errorf("failed to create wrapper for %s: %w", exe, err)
 		}
 	}
 
@@ -237,39 +256,49 @@ func (a *PipExecAction) Execute(ctx *ExecutionContext, params map[string]interfa
 	return nil
 }
 
-// fixPythonShebang rewrites the shebang in a Python entry point script to use ./python3.
-// This fixes shebangs that have absolute paths to the temporary staging directory.
+// fixPythonShebang fixes absolute Python shebangs in scripts to use relative paths.
+// This is necessary because pip creates entry points with absolute shebangs pointing
+// to the staging venv's python, which becomes invalid when the directory is moved.
 func fixPythonShebang(scriptPath string) error {
 	content, err := os.ReadFile(scriptPath)
 	if err != nil {
 		return err
 	}
 
-	// Check if it has a Python shebang
+	// Check if it has a shebang
 	if len(content) < 2 || content[0] != '#' || content[1] != '!' {
-		return nil // Not a script
+		return fmt.Errorf("not a script (no shebang)")
 	}
 
 	// Find first newline
 	newlineIdx := strings.IndexByte(string(content), '\n')
 	if newlineIdx == -1 {
-		return nil // No newline found
+		return fmt.Errorf("no newline found")
 	}
 
 	shebang := string(content[:newlineIdx])
-	rest := content[newlineIdx:]
 
-	// Only fix if it's a Python shebang
-	if !strings.Contains(shebang, "python") {
+	// Only fix if it's a Python shebang with an absolute path
+	if !strings.Contains(shebang, "python") || !strings.HasPrefix(shebang, "#!") {
+		return fmt.Errorf("not a Python script")
+	}
+
+	// If it already uses a relative path, skip it
+	if strings.Contains(shebang, "./python") {
 		return nil
 	}
 
-	// Replace with a shebang that uses ./python3 (same directory as script)
-	// This works because both the script and python3 are in venvs/<package>/bin/
-	newShebang := "#!/bin/sh\nexec \"$(dirname \"$0\")/python3\" \"$0\" \"$@\""
+	// Use a polyglot shebang that works as both shell and Python
+	// Shell executes the first line and execs python3 from the same directory
+	// Python sees this as a harmless triple-quoted string
+	rest := content[newlineIdx+1:]
+	polyglot := `#!/bin/sh
+''':'
+exec "$(dirname "$0")/python3" "$0" "$@"
+'''`
 
-	// Write back
-	newContent := []byte(newShebang + string(rest))
+	// Write back with polyglot shebang + original Python code
+	newContent := []byte(polyglot + "\n" + string(rest))
 	return os.WriteFile(scriptPath, newContent, 0755)
 }
 
