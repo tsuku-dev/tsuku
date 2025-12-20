@@ -116,8 +116,18 @@ func (a *MesonBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 	// Build environment
 	env := buildMesonEnv()
 
-	// Find meson
-	mesonPath := "meson"
+	// Find meson - check ExecPaths first (for installed dependencies), then fall back to PATH
+	mesonPath := ""
+	for _, p := range ctx.ExecPaths {
+		candidatePath := filepath.Join(p, "meson")
+		if _, err := os.Stat(candidatePath); err == nil {
+			mesonPath = candidatePath
+			break
+		}
+	}
+	if mesonPath == "" {
+		mesonPath = "meson" // Fall back to PATH
+	}
 
 	// Step 1: Setup with meson
 	setupArgs := []string{
