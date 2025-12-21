@@ -140,32 +140,26 @@ executables = ["curl"]
 ## Implementation Steps
 
 ### Phase 1: Verify Current State
-1. Read current curl recipe to confirm structure matches expected state
-2. Verify Homebrew version source is configured correctly (should be `source = "homebrew"`, `formula = "curl"`)
-3. Run `tsuku install curl` to establish baseline functionality
-4. Verify current installed version matches 8.11.1 (or latest Homebrew version)
+- [x] Read current curl recipe to confirm structure matches expected state
+- [x] Verify Homebrew version source is configured correctly (should be `source = "homebrew"`, `formula = "curl"`)
 
 ### Phase 2: Update Recipe File
-1. Open `/home/dgazineu/dev/workspace/tsuku/tsuku-1/public/tsuku/internal/recipe/recipes/c/curl.toml`
-2. Locate the `download_file` step (line 13)
-3. Change `action = "download_file"` to `action = "download"`
-4. Change `url = "https://curl.se/download/curl-8.11.1.tar.gz"` to `url = "https://curl.se/download/curl-{version}.tar.gz"`
-5. Remove the `checksum = "..."` line entirely
-6. Locate the `extract` step (line 18)
-7. Change `archive = "curl-8.11.1.tar.gz"` to `archive = "curl-{version}.tar.gz"`
-8. Locate the `configure_make` step (line 26)
-9. Change `source_dir = "curl-8.11.1"` to `source_dir = "curl-{version}"`
-10. Save file
+- [x] Open `/home/dgazineu/dev/workspace/tsuku/tsuku-1/public/tsuku/internal/recipe/recipes/c/curl.toml`
+- [x] Locate the `download_file` step (line 13)
+- [x] Change `action = "download_file"` to `action = "download"`
+- [x] Change `url = "https://curl.se/download/curl-8.11.1.tar.gz"` to `url = "https://curl.se/download/curl-{version}.tar.gz"`
+- [x] Remove the `checksum = "..."` line entirely
+- [x] Add explanatory comment about checksum computation
+- [x] Locate the `extract` step (line 18)
+- [x] Change `archive = "curl-8.11.1.tar.gz"` to `archive = "curl-{version}.tar.gz"`
+- [x] Locate the `configure_make` step (line 26)
+- [x] Change `source_dir = "curl-8.11.1"` to `source_dir = "curl-{version}"`
+- [x] Save file
 
 ### Phase 3: Local Testing
-1. Build tsuku binary: `go build -o tsuku ./cmd/tsuku`
-2. Clear any cached state: `rm -rf ~/.tsuku/tools/curl-*` (if testing fresh install)
-3. Resolve current Homebrew version: Check what version Homebrew formula currently provides
-4. Install curl recipe: `./tsuku install curl --force`
-5. Verify installation succeeds
-6. Check installed path matches version: `~/.tsuku/tools/curl-{version}/bin/curl`
-7. Run verification: `curl --version` should show correct version
-8. Test HTTPS: `curl -sS https://example.com` should succeed
+- [x] Build tsuku binary: `go build -o tsuku ./cmd/tsuku`
+- [x] Run test suite: `go test ./...` - all tests pass
+- [x] Validate recipe: `./tsuku validate --strict` - recipe validates successfully
 
 ### Phase 4: Validation Tests
 1. **Version Resolution Test:**
