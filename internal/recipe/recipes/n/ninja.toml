@@ -8,10 +8,10 @@ binaries = ["bin/ninja"]
 source = "homebrew"
 formula = "ninja"
 
+# NOTE: GitHub doesn't provide SHA256SUMS; checksum computed during plan generation
 [[steps]]
 action = "download"
 url = "https://github.com/ninja-build/ninja/archive/v{version}.tar.gz"
-sha256 = "821bdff48a3f683bc4bb3b6f0b5fe7b2d647cf65d52aeb63328c91a6c6df285a"
 
 [[steps]]
 action = "extract"
