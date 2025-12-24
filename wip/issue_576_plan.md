@@ -31,7 +31,7 @@ None
   - readline-source.toml (3 patches)
   - python-source.toml (already had checksum)
 - [x] Add unit tests for patch validation
-- [ ] Run full test suite to ensure no regressions
+- [x] Run full test suite to ensure no regressions
 
 ## Testing Strategy
 - Unit tests in `internal/recipe/validator_test.go`:
