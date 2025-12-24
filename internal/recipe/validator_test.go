@@ -1084,3 +1084,275 @@ patterns = ["lib/*.so*"]
 		t.Errorf("expected valid recipe with install_libraries action, got errors: %v", result.Errors)
 	}
 }
+
+func TestValidateBytes_PatchWithURLMissingChecksum(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+url = "https://example.com/fix.patch"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if result.Valid {
+		t.Error("expected validation error for URL patch without checksum")
+	}
+
+	if len(result.Errors) == 0 {
+		t.Fatal("expected at least one error")
+	}
+
+	foundError := false
+	for _, err := range result.Errors {
+		if err.Field == "patches[0].checksum" && err.Message == "checksum is required for url-based patches" {
+			foundError = true
+			break
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected error for missing checksum, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_PatchWithURLAndChecksum(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+url = "https://example.com/fix.patch"
+checksum = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if !result.Valid {
+		t.Errorf("expected valid recipe, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_PatchWithInlineData(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+data = "--- a/file.c\n+++ b/file.c\n@@ -1 +1 @@\n-old\n+new"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if !result.Valid {
+		t.Errorf("expected valid recipe for inline patch without checksum, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_PatchWithInvalidChecksum(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+url = "https://example.com/fix.patch"
+checksum = "invalid"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if result.Valid {
+		t.Error("expected validation error for invalid checksum")
+	}
+
+	foundError := false
+	for _, err := range result.Errors {
+		if err.Field == "patches[0].checksum" && err.Message == "checksum must be 64 characters (SHA256 hex)" {
+			foundError = true
+			break
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected error for invalid checksum length, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_PatchWithNonHexChecksum(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+url = "https://example.com/fix.patch"
+checksum = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if result.Valid {
+		t.Error("expected validation error for non-hex checksum")
+	}
+
+	foundError := false
+	for _, err := range result.Errors {
+		if err.Field == "patches[0].checksum" && err.Message == "checksum must be hexadecimal (0-9, a-f)" {
+			foundError = true
+			break
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected error for non-hex checksum, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_PatchWithBothURLAndData(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+url = "https://example.com/fix.patch"
+data = "some patch data"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if result.Valid {
+		t.Error("expected validation error for patch with both url and data")
+	}
+
+	foundError := false
+	for _, err := range result.Errors {
+		if err.Field == "patches[0]" && err.Message == "cannot specify both 'url' and 'data' (must be mutually exclusive)" {
+			foundError = true
+			break
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected error for mutual exclusivity, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_PatchWithNeitherURLNorData(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+strip = 1
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if result.Valid {
+		t.Error("expected validation error for patch without url or data")
+	}
+
+	foundError := false
+	for _, err := range result.Errors {
+		if err.Field == "patches[0]" && err.Message == "must specify either 'url' or 'data'" {
+			foundError = true
+			break
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected error for missing url/data, got errors: %v", result.Errors)
+	}
+}
+
+func TestValidateBytes_MultiplePatches(t *testing.T) {
+	recipe := `
+[metadata]
+name = "test-tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/test.tar.gz"
+
+[[patches]]
+url = "https://example.com/fix1.patch"
+checksum = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+
+[[patches]]
+url = "https://example.com/fix2.patch"
+
+[[patches]]
+data = "inline patch"
+
+[verify]
+command = "test-tool --version"
+`
+	result := ValidateBytes([]byte(recipe))
+
+	if result.Valid {
+		t.Error("expected validation error for second patch missing checksum")
+	}
+
+	// Should have exactly one error for patches[1]
+	foundError := false
+	for _, err := range result.Errors {
+		if err.Field == "patches[1].checksum" && err.Message == "checksum is required for url-based patches" {
+			foundError = true
+			break
+		}
+	}
+
+	if !foundError {
+		t.Errorf("expected error for patches[1] missing checksum, got errors: %v", result.Errors)
+	}
+
+	// patches[0] should be valid (has checksum)
+	// patches[2] should be valid (inline data, no checksum required)
+	for _, err := range result.Errors {
+		if err.Field == "patches[0].checksum" || err.Field == "patches[2].checksum" {
+			t.Errorf("unexpected error for valid patches: %v", err)
+		}
+	}
+}
