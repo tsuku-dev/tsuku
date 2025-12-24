@@ -26,10 +26,10 @@ None
   - Returns clear error messages indicating which patch index is missing checksum
 - [x] Call `validatePatches()` from `ValidateBytes()` function
 - [x] Update ToTOML() method in types.go to serialize checksum field
-- [ ] Update test recipes in testdata/ that use URL patches to include checksums:
+- [x] Update test recipes in testdata/ that use URL patches to include checksums:
   - bash-source.toml (9 patches)
-  - readline-source.toml (if applicable)
-  - python-source.toml (if applicable)
+  - readline-source.toml (3 patches)
+  - python-source.toml (already had checksum)
 - [ ] Add unit tests for patch validation
 - [ ] Run full test suite to ensure no regressions
 
