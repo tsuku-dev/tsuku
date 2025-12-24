@@ -20,20 +20,20 @@ This implementation creates a new primitive action that uses direct command exec
 - `/home/dgazineu/dev/workspace/tsuku/tsuku-1/public/tsuku/internal/actions/require_system_test.go` - Unit tests
 
 ## Implementation Steps
-- [ ] Create require_system.go with RequireSystemAction struct, Name(), and IsDeterministic() methods
-- [ ] Implement Execute() method: parameter extraction (command, version_flag, version_regex, min_version, install_guide)
-- [ ] Implement detectCommand() helper: use exec.LookPath() to find command, exec.Command() to run version check
-- [ ] Implement parseVersion() helper: apply regex to version output, extract version string
-- [ ] Export compareVersions() in version/version_utils.go by capitalizing function name
-- [ ] Implement version comparison logic using exported CompareVersions()
-- [ ] Implement getPlatformGuide() helper: detect platform (runtime.GOOS), return matching guide from install_guide map
-- [ ] Define custom error types: SystemDepMissingError, SystemDepVersionError
-- [ ] Implement error messages with platform-specific guidance
-- [ ] Register RequireSystemAction in action.go init() function
-- [ ] Create comprehensive unit tests: command found, command missing, version too old, version sufficient, regex parsing, platform guide selection
-- [ ] Add edge case tests: invalid regex, missing required params, empty install_guide, version comparison edge cases
-- [ ] Run `go test ./internal/actions/` to verify all tests pass
-- [ ] Run `go build -o tsuku ./cmd/tsuku` to verify build succeeds
+- [x] Create require_system.go with RequireSystemAction struct, Name(), and IsDeterministic() methods
+- [x] Implement Execute() method: parameter extraction (command, version_flag, version_regex, min_version, install_guide)
+- [x] Implement detectCommand() helper: use exec.LookPath() to find command, exec.Command() to run version check
+- [x] Implement parseVersion() helper: apply regex to version output, extract version string
+- [x] Export compareVersions() in version/version_utils.go by capitalizing function name
+- [x] Implement version comparison logic using exported CompareVersions()
+- [x] Implement getPlatformGuide() helper: detect platform (runtime.GOOS), return matching guide from install_guide map
+- [x] Define custom error types: SystemDepMissingError, SystemDepVersionError
+- [x] Implement error messages with platform-specific guidance
+- [x] Register RequireSystemAction in action.go init() function
+- [x] Create comprehensive unit tests: command found, command missing, version too old, version sufficient, regex parsing, platform guide selection
+- [x] Add edge case tests: invalid regex, missing required params, empty install_guide, version comparison edge cases
+- [x] Run `go test ./internal/actions/` to verify all tests pass
+- [x] Run `go build -o tsuku ./cmd/tsuku` to verify build succeeds
 
 ## Testing Strategy
 - Unit tests:
