@@ -196,11 +196,23 @@ func parseDependency(dep string) (name, version string) {
 // aggregatePrimitiveDeps recursively decomposes an action and collects dependencies
 // from all primitive actions in the decomposition tree.
 // Returns ActionDeps containing aggregated install-time and runtime dependencies.
-// Returns empty ActionDeps if the action is not decomposable or doesn't exist.
+// For primitive actions, returns their own dependencies directly.
+// Returns empty ActionDeps if the action doesn't exist.
 func aggregatePrimitiveDeps(action string, params map[string]interface{}) ActionDeps {
-	// If action is not decomposable, return empty deps
-	if !IsDecomposable(action) {
+	// Get the action from registry
+	act := Get(action)
+	if act == nil {
 		return ActionDeps{}
+	}
+
+	// If action is primitive, return its dependencies directly
+	if IsPrimitive(action) {
+		return act.Dependencies()
+	}
+
+	// If action is not decomposable (and not primitive), return its own deps
+	if !IsDecomposable(action) {
+		return act.Dependencies()
 	}
 
 	// Create minimal eval context for decomposition
