@@ -50,7 +50,7 @@ This approach was chosen because:
   - Ensure self-dependency filtering still works (skip if dep == recipe name)
   - Preserve existing step-level override semantics (dependencies param replaces all)
 
-- [ ] Implement shadowed dependency detection in `dependencies.go`
+- [x] Implement shadowed dependency detection in `dependencies.go`
   - Add `DetectShadowedDeps(recipe, aggregatedDeps)` that compares declared deps with inherited deps
   - Return list of shadowed dependency names with source information (which primitive provides it)
   - Handle both install-time and runtime dependencies
