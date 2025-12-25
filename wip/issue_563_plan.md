@@ -25,52 +25,52 @@ Use existing patterns from `info.go` for dependency resolution and `require_syst
 
 ## Implementation Steps
 
-- [ ] Create `cmd/tsuku/check_deps.go` with command structure
+- [x] Create `cmd/tsuku/check_deps.go` with command structure
   - Define `checkDepsCmd` cobra command with `check-deps <recipe>` usage
   - Add `--json` flag for JSON output mode
   - Add command to root in `init()`
 
-- [ ] Implement `DepStatus` struct and classification logic
+- [x] Implement `DepStatus` struct and classification logic
   - Create `DepStatus` struct with Name, Type, Status, Version, Required, InstallGuide fields
-  - Create `classifyDependency()` function that loads a dependency's recipe and returns "system-required" if all steps are `require_system`, otherwise "provisionable"
+  - Create `checkDependency()` function that loads a dependency's recipe and returns "system-required" if all steps are `require_system`, otherwise "provisionable"
   - Handle recipe-not-found case as "unknown" type
 
-- [ ] Implement status detection for each dependency type
-  - For system-required deps: Create `checkSystemDep()` that runs `require_system` detection logic (exec.LookPath + version check)
-  - For provisionable deps: Create `checkProvisionableDep()` that checks `mgr.GetState()` for installation status
+- [x] Implement status detection for each dependency type
+  - For system-required deps: Create `checkSystemDependency()` that runs `require_system` detection logic (exec.LookPath + version check)
+  - For provisionable deps: Create `checkProvisionableDependency()` that checks `mgr.List()` for installation status
   - Return appropriate status: "installed", "missing", "version_mismatch"
 
-- [ ] Implement the main `runCheckDeps()` function
+- [x] Implement the main `runCheckDeps()` function
   - Load recipe via `loader.Get()`
   - Resolve direct deps via `actions.ResolveDependencies()`
   - Resolve transitive deps via `actions.ResolveTransitive()`
   - Iterate over all deps, classify, and check status
   - Track if any system dependency is missing for exit code
 
-- [ ] Implement colorized output
+- [x] Implement colorized output
   - Define ANSI color constants (green, red, yellow, reset)
-  - Create output formatting functions: `printDepStatus()`, `printSummary()`
+  - Create output formatting functions: `printDepLine()`, `printSummary()`
   - Use colors: green for installed, red for missing, yellow for version mismatch
   - Mark system-required vs provisionable clearly in output
 
-- [ ] Implement JSON output mode
+- [x] Implement JSON output mode
   - Define JSON output struct with tool name and dependencies array
   - Add `--json` flag handling
   - Output JSON when flag is set
 
-- [ ] Handle exit codes
+- [x] Handle exit codes
   - Exit 0 if all dependencies satisfied
-  - Exit 1 (`ExitGeneral`) if any system dependency is missing
+  - Exit `ExitDependencyFailed` if any system dependency is missing
   - Provisionable missing deps don't cause non-zero exit (they can be auto-installed)
 
-- [ ] Register command in main.go
+- [x] Register command in main.go (via init() in check_deps.go)
   - Add `rootCmd.AddCommand(checkDepsCmd)` in `init()`
 
-- [ ] Write unit tests
+- [x] Write unit tests
   - Test dependency classification (system-required vs provisionable)
-  - Test status detection with mock state
-  - Test exit code behavior
-  - Test JSON output format
+  - Test mergeDeps function
+  - Test getInstallGuide function
+  - Test struct creation
 
 ## Testing Strategy
 
