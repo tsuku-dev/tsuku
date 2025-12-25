@@ -76,8 +76,12 @@ func ResolveDependenciesForPlatform(r *recipe.Recipe, targetOS string) ResolvedD
 		// Merge aggregated deps with explicit action deps
 		// Explicit deps take precedence for version constraints
 		combinedDeps := ActionDeps{
-			InstallTime: append(append([]string{}, actionDeps.InstallTime...), aggregatedDeps.InstallTime...),
-			Runtime:     append(append([]string{}, actionDeps.Runtime...), aggregatedDeps.Runtime...),
+			InstallTime:       append(append([]string{}, actionDeps.InstallTime...), aggregatedDeps.InstallTime...),
+			Runtime:           append(append([]string{}, actionDeps.Runtime...), aggregatedDeps.Runtime...),
+			LinuxInstallTime:  append(append([]string{}, actionDeps.LinuxInstallTime...), aggregatedDeps.LinuxInstallTime...),
+			DarwinInstallTime: append(append([]string{}, actionDeps.DarwinInstallTime...), aggregatedDeps.DarwinInstallTime...),
+			LinuxRuntime:      append(append([]string{}, actionDeps.LinuxRuntime...), aggregatedDeps.LinuxRuntime...),
+			DarwinRuntime:     append(append([]string{}, actionDeps.DarwinRuntime...), aggregatedDeps.DarwinRuntime...),
 		}
 		actionDeps = combinedDeps
 
