@@ -517,3 +517,39 @@ func TestContainsPlaceholder(t *testing.T) {
 		}
 	}
 }
+
+func TestGitHubFileAction_ArchiveExtensionWarning(t *testing.T) {
+	tests := []struct {
+		name        string
+		pattern     string
+		wantWarning bool
+	}{
+		{"tar.gz", "tool-{os}-{arch}.tar.gz", true},
+		{"zip", "tool-{os}.zip", true},
+		{"tgz", "tool.tgz", true},
+		{"binary no ext", "tool-{os}-{arch}", false},
+		{"exe", "tool.exe", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateAction("github_file", map[string]interface{}{
+				"repo":          "owner/repo",
+				"asset_pattern": tt.pattern,
+				"binary_name":   "tool",
+			})
+			hasArchiveWarning := false
+			for _, w := range result.Warnings {
+				if strings.Contains(w, "archive extension") {
+					hasArchiveWarning = true
+					break
+				}
+			}
+			if tt.wantWarning && !hasArchiveWarning {
+				t.Errorf("expected archive extension warning for pattern %q", tt.pattern)
+			}
+			if !tt.wantWarning && hasArchiveWarning {
+				t.Errorf("unexpected archive extension warning for pattern %q", tt.pattern)
+			}
+		})
+	}
+}

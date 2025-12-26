@@ -676,6 +676,18 @@ func (a *GitHubFileAction) Preflight(params map[string]interface{}) *PreflightRe
 		}
 	}
 
+	// WARNING: Archive extension in asset_pattern
+	if assetPattern, hasPattern := GetString(params, "asset_pattern"); hasPattern {
+		archiveExts := []string{".tar.gz", ".tgz", ".tar.xz", ".tar.bz2", ".zip", ".tar"}
+		lowerPattern := strings.ToLower(assetPattern)
+		for _, ext := range archiveExts {
+			if strings.HasSuffix(lowerPattern, ext) {
+				result.AddWarning("asset_pattern ends with archive extension; consider using 'github_archive' action instead")
+				break
+			}
+		}
+	}
+
 	return result
 }
 
