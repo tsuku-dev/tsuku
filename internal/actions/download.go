@@ -45,7 +45,7 @@ func (a *DownloadAction) Preflight(params map[string]interface{}) *PreflightResu
 
 	// WARNING: Missing checksum_url
 	if _, hasChecksumURL := GetString(params, "checksum_url"); !hasChecksumURL {
-		result.AddWarning("no 'checksum_url' configured; downloaded files will not be verified for integrity")
+		result.AddWarning("no upstream checksum verification (checksum_url); integrity relies on plan-time computation")
 	}
 
 	// ERROR: URL without variables - should use download_file instead

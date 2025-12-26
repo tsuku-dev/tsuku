@@ -91,7 +91,7 @@ func TestDownloadAction_MissingChecksumURLWarning(t *testing.T) {
 	}
 	found := false
 	for _, warn := range result.Warnings {
-		if warn == "no 'checksum_url' configured; downloaded files will not be verified for integrity" {
+		if warn == "no upstream checksum verification (checksum_url); integrity relies on plan-time computation" {
 			found = true
 			break
 		}
