@@ -10,7 +10,7 @@ module = "honnef.co/go/tools"
 
 [[steps]]
 action = "go_install"
-module = "honnef.co/go/tools/cmd/staticcheck"
+module = "honnef.co/go/tools"
 executables = ["staticcheck"]
 
 [verify]

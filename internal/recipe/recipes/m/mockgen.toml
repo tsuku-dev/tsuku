@@ -14,5 +14,5 @@ module = "go.uber.org/mock/mockgen"
 executables = ["mockgen"]
 
 [verify]
-command = "mockgen --version"
+command = "mockgen -version"
 pattern = "{version}"

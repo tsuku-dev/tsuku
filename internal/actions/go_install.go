@@ -358,7 +358,12 @@ func (a *GoInstallAction) Decompose(ctx *EvalContext, params map[string]interfac
 	)
 
 	// Run go get to populate go.sum
-	target := module + "@" + version
+	// Use version module if recipe specifies one (for subpackages like golang.org/x/tools/cmd/goimports)
+	moduleForVersioning := module
+	if ctx.Recipe != nil && ctx.Recipe.Version.Module != "" {
+		moduleForVersioning = ctx.Recipe.Version.Module
+	}
+	target := moduleForVersioning + "@" + version
 	getCmd := exec.CommandContext(ctx.Context, goPath, "get", target)
 	getCmd.Dir = tempDir
 	getCmd.Env = filteredEnv
