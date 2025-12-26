@@ -38,6 +38,27 @@ func GetVersionValidator() VersionValidator {
 	return versionValidator
 }
 
+// ActionValidationResult contains the results of action validation.
+// Actions can return both errors (fatal) and warnings (non-fatal suggestions).
+type ActionValidationResult struct {
+	// Errors are fatal validation failures that would cause execution to fail.
+	Errors []string
+
+	// Warnings are non-fatal suggestions for improvement.
+	// Examples: missing platform support, deprecated parameters, redundant config.
+	Warnings []string
+}
+
+// HasErrors returns true if there are any errors.
+func (r *ActionValidationResult) HasErrors() bool {
+	return r != nil && len(r.Errors) > 0
+}
+
+// HasWarnings returns true if there are any warnings.
+func (r *ActionValidationResult) HasWarnings() bool {
+	return r != nil && len(r.Warnings) > 0
+}
+
 // ActionValidator validates action names and parameters for recipes.
 // This interface is implemented by the actions package and registered at init time,
 // enabling the recipe package to validate actions without importing the actions
@@ -47,8 +68,8 @@ type ActionValidator interface {
 	RegisteredNames() []string
 
 	// ValidateAction checks if an action exists and validates its parameters.
-	// Returns nil if valid, error describing the problem if invalid.
-	ValidateAction(name string, params map[string]interface{}) error
+	// Returns an ActionValidationResult containing errors (fatal) and warnings (non-fatal).
+	ValidateAction(name string, params map[string]interface{}) *ActionValidationResult
 }
 
 var (

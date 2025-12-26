@@ -23,11 +23,12 @@ func (DownloadArchiveAction) IsDeterministic() bool { return true }
 func (a *DownloadArchiveAction) Name() string { return "download_archive" }
 
 // Preflight validates parameters without side effects.
-func (a *DownloadArchiveAction) Preflight(params map[string]interface{}) error {
+func (a *DownloadArchiveAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "url"); !ok {
-		return fmt.Errorf("download_archive action requires 'url' parameter")
+		result.AddError("download_archive action requires 'url' parameter")
 	}
-	return nil
+	return result
 }
 
 func (a *DownloadArchiveAction) Execute(ctx *ExecutionContext, params map[string]interface{}) error {
@@ -298,14 +299,15 @@ func (GitHubArchiveAction) IsDeterministic() bool { return true }
 func (a *GitHubArchiveAction) Name() string { return "github_archive" }
 
 // Preflight validates parameters without side effects.
-func (a *GitHubArchiveAction) Preflight(params map[string]interface{}) error {
+func (a *GitHubArchiveAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "repo"); !ok {
-		return fmt.Errorf("github_archive action requires 'repo' parameter")
+		result.AddError("github_archive action requires 'repo' parameter")
 	}
 	if _, ok := GetString(params, "asset_pattern"); !ok {
-		return fmt.Errorf("github_archive action requires 'asset_pattern' parameter")
+		result.AddError("github_archive action requires 'asset_pattern' parameter")
 	}
-	return nil
+	return result
 }
 
 func (a *GitHubArchiveAction) Execute(ctx *ExecutionContext, params map[string]interface{}) error {
@@ -606,14 +608,15 @@ func (GitHubFileAction) IsDeterministic() bool { return true }
 func (a *GitHubFileAction) Name() string { return "github_file" }
 
 // Preflight validates parameters without side effects.
-func (a *GitHubFileAction) Preflight(params map[string]interface{}) error {
+func (a *GitHubFileAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "repo"); !ok {
-		return fmt.Errorf("github_file action requires 'repo' parameter")
+		result.AddError("github_file action requires 'repo' parameter")
 	}
 	if _, ok := GetString(params, "asset_pattern"); !ok {
-		return fmt.Errorf("github_file action requires 'asset_pattern' parameter")
+		result.AddError("github_file action requires 'asset_pattern' parameter")
 	}
-	return nil
+	return result
 }
 
 func (a *GitHubFileAction) Execute(ctx *ExecutionContext, params map[string]interface{}) error {

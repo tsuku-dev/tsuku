@@ -81,16 +81,31 @@ func ValidateBytes(data []byte) *ValidationResult {
 
 	result.Recipe = &recipe
 
-	// Run all validations
-	validateMetadata(result, &recipe)
-	validateVersion(result, &recipe)
-	validatePatches(result, &recipe)
-	validateSteps(result, &recipe)
-	validateVerify(result, &recipe)
-	// Note: Shadowed dependency validation is done at the CLI layer
-	// to avoid circular dependencies between recipe and actions packages
+	// Run validations on the parsed recipe
+	runRecipeValidations(result, &recipe)
 
 	return result
+}
+
+// ValidateRecipe validates an already-parsed Recipe object.
+// Use this when you have a Recipe loaded from the registry or loader,
+// rather than raw TOML bytes or a file path.
+func ValidateRecipe(r *Recipe) *ValidationResult {
+	result := &ValidationResult{Valid: true, Recipe: r}
+	runRecipeValidations(result, r)
+	return result
+}
+
+// runRecipeValidations runs all validation checks on a Recipe.
+// This is the common validation logic shared by ValidateBytes and ValidateRecipe.
+func runRecipeValidations(result *ValidationResult, r *Recipe) {
+	validateMetadata(result, r)
+	validateVersion(result, r)
+	validatePatches(result, r)
+	validateSteps(result, r)
+	validateVerify(result, r)
+	// Note: Shadowed dependency validation is done at the CLI layer
+	// to avoid circular dependencies between recipe and actions packages
 }
 
 // validateMetadata checks the metadata section
@@ -266,8 +281,10 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 
 		// Validate action via registered ActionValidator (avoids circular import)
 		if av != nil {
-			if err := av.ValidateAction(step.Action, step.Params); err != nil {
-				errMsg := err.Error()
+			actionResult := av.ValidateAction(step.Action, step.Params)
+
+			// Process errors from action validation
+			for _, errMsg := range actionResult.Errors {
 				// Check if this is an "unknown action" error (action not registered)
 				if strings.Contains(errMsg, "unknown action") {
 					// Build suggestion map for typo detection
@@ -285,6 +302,14 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 					// Action exists but parameter validation failed (Preflight error)
 					result.addError(stepField, errMsg)
 				}
+			}
+
+			// Process warnings from action validation
+			for _, warnMsg := range actionResult.Warnings {
+				result.addWarning(stepField, warnMsg)
+			}
+
+			if actionResult.HasErrors() {
 				continue
 			}
 		}

@@ -27,14 +27,15 @@ func (a *CpanInstallAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *CpanInstallAction) Preflight(params map[string]interface{}) error {
+func (a *CpanInstallAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "distribution"); !ok {
-		return fmt.Errorf("cpan_install action requires 'distribution' parameter")
+		result.AddError("cpan_install action requires 'distribution' parameter")
 	}
 	if _, ok := GetStringSlice(params, "executables"); !ok {
-		return fmt.Errorf("cpan_install action requires 'executables' parameter")
+		result.AddError("cpan_install action requires 'executables' parameter")
 	}
-	return nil
+	return result
 }
 
 // Execute installs a CPAN distribution to the install directory

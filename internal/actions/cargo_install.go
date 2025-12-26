@@ -33,11 +33,12 @@ func (a *CargoInstallAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *CargoInstallAction) Preflight(params map[string]interface{}) error {
+func (a *CargoInstallAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "crate"); !ok {
-		return fmt.Errorf("cargo_install action requires 'crate' parameter")
+		result.AddError("cargo_install action requires 'crate' parameter")
 	}
-	return nil
+	return result
 }
 
 // Execute installs a Rust crate to the install directory

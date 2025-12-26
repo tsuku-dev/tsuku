@@ -21,16 +21,19 @@ func (m *mockActionValidator) RegisteredNames() []string {
 	return names
 }
 
-func (m *mockActionValidator) ValidateAction(name string, params map[string]interface{}) error {
+func (m *mockActionValidator) ValidateAction(name string, params map[string]interface{}) *ActionValidationResult {
+	result := &ActionValidationResult{}
 	if !m.actions[name] {
-		return fmt.Errorf("unknown action '%s'", name)
+		result.Errors = append(result.Errors, fmt.Sprintf("unknown action '%s'", name))
+		return result
 	}
 	// Mimic Preflight validation for each action
-	return m.validateParams(name, params)
+	m.validateParams(result, name, params)
+	return result
 }
 
 // validateParams mimics the Preflight methods of real actions
-func (m *mockActionValidator) validateParams(action string, params map[string]interface{}) error {
+func (m *mockActionValidator) validateParams(result *ActionValidationResult, action string, params map[string]interface{}) {
 	getString := func(key string) (string, bool) {
 		if v, ok := params[key]; ok {
 			if s, ok := v.(string); ok {
@@ -43,87 +46,86 @@ func (m *mockActionValidator) validateParams(action string, params map[string]in
 	switch action {
 	case "download", "download_archive":
 		if _, ok := getString("url"); !ok {
-			return fmt.Errorf("%s action requires 'url' parameter", action)
+			result.Errors = append(result.Errors, fmt.Sprintf("%s action requires 'url' parameter", action))
 		}
 	case "extract":
 		if _, ok := getString("archive"); !ok {
-			return fmt.Errorf("extract action requires 'archive' parameter")
+			result.Errors = append(result.Errors, "extract action requires 'archive' parameter")
 		}
 	case "install_binaries":
 		_, hasBinaries := params["binaries"]
 		_, hasBinary := params["binary"]
 		if !hasBinaries && !hasBinary {
-			return fmt.Errorf("install_binaries action requires 'binaries' or 'binary' parameter")
+			result.Errors = append(result.Errors, "install_binaries action requires 'binaries' or 'binary' parameter")
 		}
 	case "github_archive", "github_file":
 		if _, ok := getString("repo"); !ok {
-			return fmt.Errorf("%s action requires 'repo' parameter", action)
+			result.Errors = append(result.Errors, fmt.Sprintf("%s action requires 'repo' parameter", action))
 		}
 		if _, ok := getString("asset_pattern"); !ok {
-			return fmt.Errorf("%s action requires 'asset_pattern' parameter", action)
+			result.Errors = append(result.Errors, fmt.Sprintf("%s action requires 'asset_pattern' parameter", action))
 		}
 	case "npm_install":
 		if _, ok := getString("package"); !ok {
-			return fmt.Errorf("npm_install action requires 'package' parameter")
+			result.Errors = append(result.Errors, "npm_install action requires 'package' parameter")
 		}
 	case "pipx_install":
 		if _, ok := getString("package"); !ok {
-			return fmt.Errorf("pipx_install action requires 'package' parameter")
+			result.Errors = append(result.Errors, "pipx_install action requires 'package' parameter")
 		}
 	case "cargo_install":
 		if _, ok := getString("crate"); !ok {
-			return fmt.Errorf("cargo_install action requires 'crate' parameter")
+			result.Errors = append(result.Errors, "cargo_install action requires 'crate' parameter")
 		}
 	case "go_install":
 		if _, ok := getString("module"); !ok {
-			return fmt.Errorf("go_install action requires 'module' parameter")
+			result.Errors = append(result.Errors, "go_install action requires 'module' parameter")
 		}
 	case "gem_install":
 		if _, ok := getString("gem"); !ok {
-			return fmt.Errorf("gem_install action requires 'gem' parameter")
+			result.Errors = append(result.Errors, "gem_install action requires 'gem' parameter")
 		}
 	case "cpan_install":
 		if _, ok := getString("distribution"); !ok {
-			return fmt.Errorf("cpan_install action requires 'distribution' parameter")
+			result.Errors = append(result.Errors, "cpan_install action requires 'distribution' parameter")
 		}
 		if _, ok := params["executables"]; !ok {
-			return fmt.Errorf("cpan_install action requires 'executables' parameter")
+			result.Errors = append(result.Errors, "cpan_install action requires 'executables' parameter")
 		}
 	case "run_command":
 		if _, ok := getString("command"); !ok {
-			return fmt.Errorf("run_command action requires 'command' parameter")
+			result.Errors = append(result.Errors, "run_command action requires 'command' parameter")
 		}
 	case "require_system":
 		if _, ok := getString("command"); !ok {
-			return fmt.Errorf("require_system action requires 'command' parameter")
+			result.Errors = append(result.Errors, "require_system action requires 'command' parameter")
 		}
 	case "homebrew":
 		if _, ok := getString("formula"); !ok {
-			return fmt.Errorf("homebrew action requires 'formula' parameter")
+			result.Errors = append(result.Errors, "homebrew action requires 'formula' parameter")
 		}
 	case "configure_make":
 		if _, ok := getString("source_dir"); !ok {
-			return fmt.Errorf("configure_make action requires 'source_dir' parameter")
+			result.Errors = append(result.Errors, "configure_make action requires 'source_dir' parameter")
 		}
 		if _, ok := params["executables"]; !ok {
-			return fmt.Errorf("configure_make action requires 'executables' parameter")
+			result.Errors = append(result.Errors, "configure_make action requires 'executables' parameter")
 		}
 	case "apply_patch":
 		url, hasURL := getString("url")
 		_, hasData := getString("data")
 		if !hasURL && !hasData {
-			return fmt.Errorf("apply_patch action requires either 'url' or 'data' parameter")
+			result.Errors = append(result.Errors, "apply_patch action requires either 'url' or 'data' parameter")
 		}
 		if hasURL && hasData {
-			return fmt.Errorf("apply_patch action cannot have both 'url' and 'data' parameters")
+			result.Errors = append(result.Errors, "apply_patch action cannot have both 'url' and 'data' parameters")
 		}
 		if hasURL && url != "" {
 			if _, hasSHA256 := getString("sha256"); !hasSHA256 {
-				return fmt.Errorf("apply_patch action requires 'sha256' parameter when using 'url'")
+				result.Errors = append(result.Errors, "apply_patch action requires 'sha256' parameter when using 'url'")
 			}
 		}
 	}
-	return nil
 }
 
 func TestMain(m *testing.M) {
@@ -1665,5 +1667,106 @@ command = "test-tool --version"
 				t.Errorf("unexpected error for valid apply_patch actions: %v", err)
 			}
 		}
+	}
+}
+
+func TestValidateRecipe_ValidRecipe(t *testing.T) {
+	// Create a valid recipe struct directly (simulates loading from registry)
+	r := &Recipe{
+		Metadata: MetadataSection{
+			Name:        "test-tool",
+			Description: "A test tool",
+		},
+		Steps: []Step{
+			{
+				Action: "download",
+				Params: map[string]interface{}{"url": "https://example.com/file.tar.gz"},
+			},
+		},
+		Verify: VerifySection{
+			Command: "test-tool --version",
+		},
+	}
+
+	result := ValidateRecipe(r)
+
+	if !result.Valid {
+		t.Errorf("expected valid recipe, got errors: %v", result.Errors)
+	}
+
+	// Recipe should be set in result
+	if result.Recipe != r {
+		t.Error("expected result.Recipe to be the same as input recipe")
+	}
+}
+
+func TestValidateRecipe_InvalidRecipe(t *testing.T) {
+	// Create an invalid recipe (missing name)
+	r := &Recipe{
+		Metadata: MetadataSection{
+			Description: "A test tool",
+		},
+		Steps: []Step{
+			{
+				Action: "download",
+				Params: map[string]interface{}{"url": "https://example.com/file.tar.gz"},
+			},
+		},
+		Verify: VerifySection{
+			Command: "test-tool --version",
+		},
+	}
+
+	result := ValidateRecipe(r)
+
+	if result.Valid {
+		t.Error("expected validation to fail for recipe missing name")
+	}
+
+	// Should have error about missing name
+	found := false
+	for _, err := range result.Errors {
+		if err.Field == "metadata.name" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected error for missing metadata.name")
+	}
+}
+
+func TestValidateRecipe_EquivalentToValidateBytes(t *testing.T) {
+	// Test that ValidateRecipe produces same results as ValidateBytes
+	// for the same recipe content
+	tomlContent := `
+[metadata]
+name = "test-tool"
+description = "A test tool"
+
+[[steps]]
+action = "download"
+url = "https://example.com/file.tar.gz"
+
+[verify]
+command = "test-tool --version"
+`
+	bytesResult := ValidateBytes([]byte(tomlContent))
+	if !bytesResult.Valid {
+		t.Fatalf("ValidateBytes should produce valid result, got: %v", bytesResult.Errors)
+	}
+
+	// Now validate the parsed recipe directly
+	recipeResult := ValidateRecipe(bytesResult.Recipe)
+
+	// Both should be valid
+	if !recipeResult.Valid {
+		t.Errorf("ValidateRecipe should produce same valid result, got errors: %v", recipeResult.Errors)
+	}
+
+	// Both should have same number of warnings
+	if len(bytesResult.Warnings) != len(recipeResult.Warnings) {
+		t.Errorf("warning count mismatch: ValidateBytes=%d, ValidateRecipe=%d",
+			len(bytesResult.Warnings), len(recipeResult.Warnings))
 	}
 }

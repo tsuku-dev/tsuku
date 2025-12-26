@@ -29,11 +29,12 @@ func (a *DownloadAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *DownloadAction) Preflight(params map[string]interface{}) error {
+func (a *DownloadAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "url"); !ok {
-		return fmt.Errorf("download action requires 'url' parameter")
+		result.AddError("download action requires 'url' parameter")
 	}
-	return nil
+	return result
 }
 
 // Decompose converts the download composite action to a download_file primitive.

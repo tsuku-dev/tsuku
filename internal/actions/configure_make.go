@@ -21,14 +21,15 @@ func (a *ConfigureMakeAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *ConfigureMakeAction) Preflight(params map[string]interface{}) error {
+func (a *ConfigureMakeAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "source_dir"); !ok {
-		return fmt.Errorf("configure_make action requires 'source_dir' parameter")
+		result.AddError("configure_make action requires 'source_dir' parameter")
 	}
 	if _, ok := GetStringSlice(params, "executables"); !ok {
-		return fmt.Errorf("configure_make action requires 'executables' parameter")
+		result.AddError("configure_make action requires 'executables' parameter")
 	}
-	return nil
+	return result
 }
 
 // Dependencies returns the dependencies needed for configure_make builds.

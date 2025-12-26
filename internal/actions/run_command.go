@@ -20,11 +20,12 @@ func (a *RunCommandAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *RunCommandAction) Preflight(params map[string]interface{}) error {
+func (a *RunCommandAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "command"); !ok {
-		return fmt.Errorf("run_command action requires 'command' parameter")
+		result.AddError("run_command action requires 'command' parameter")
 	}
-	return nil
+	return result
 }
 
 // Execute runs a shell command

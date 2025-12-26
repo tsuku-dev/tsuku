@@ -33,11 +33,12 @@ func (a *GemInstallAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *GemInstallAction) Preflight(params map[string]interface{}) error {
+func (a *GemInstallAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "gem"); !ok {
-		return fmt.Errorf("gem_install action requires 'gem' parameter")
+		result.AddError("gem_install action requires 'gem' parameter")
 	}
-	return nil
+	return result
 }
 
 // Execute installs a Ruby gem to the install directory

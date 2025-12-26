@@ -41,11 +41,12 @@ func (HomebrewAction) Dependencies() ActionDeps {
 func (a *HomebrewAction) Name() string { return "homebrew" }
 
 // Preflight validates parameters without side effects.
-func (a *HomebrewAction) Preflight(params map[string]interface{}) error {
+func (a *HomebrewAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	if _, ok := GetString(params, "formula"); !ok {
-		return fmt.Errorf("homebrew action requires 'formula' parameter")
+		result.AddError("homebrew action requires 'formula' parameter")
 	}
-	return nil
+	return result
 }
 
 // Execute downloads a Homebrew bottle and extracts it to the install directory

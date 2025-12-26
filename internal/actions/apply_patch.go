@@ -25,22 +25,23 @@ func (a *ApplyPatchAction) Name() string {
 }
 
 // Preflight validates parameters without side effects.
-func (a *ApplyPatchAction) Preflight(params map[string]interface{}) error {
+func (a *ApplyPatchAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
 	url, hasURL := GetString(params, "url")
 	_, hasData := GetString(params, "data")
 
 	if !hasURL && !hasData {
-		return fmt.Errorf("apply_patch action requires either 'url' or 'data' parameter")
+		result.AddError("apply_patch action requires either 'url' or 'data' parameter")
 	}
 	if hasURL && hasData {
-		return fmt.Errorf("apply_patch action cannot have both 'url' and 'data' parameters")
+		result.AddError("apply_patch action cannot have both 'url' and 'data' parameters")
 	}
 	if hasURL && url != "" {
 		if _, hasSHA256 := GetString(params, "sha256"); !hasSHA256 {
-			return fmt.Errorf("apply_patch action requires 'sha256' parameter when using 'url'")
+			result.AddError("apply_patch action requires 'sha256' parameter when using 'url'")
 		}
 	}
-	return nil
+	return result
 }
 
 // Execute applies a patch to the source code.

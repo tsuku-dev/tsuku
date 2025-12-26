@@ -358,8 +358,8 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 		if action == nil {
 			return fmt.Errorf("step %d: unknown action '%s'", i+1, step.Action)
 		}
-		if err := actions.ValidateAction(step.Action, step.Params); err != nil {
-			return fmt.Errorf("step %d (%s): %w", i+1, step.Action, err)
+		if result := actions.ValidateAction(step.Action, step.Params); result.HasErrors() {
+			return fmt.Errorf("step %d (%s): %s", i+1, step.Action, result.ToError())
 		}
 	}
 
@@ -588,8 +588,8 @@ func (e *Executor) installSingleDependency(ctx context.Context, dep *DependencyP
 		if action == nil {
 			return fmt.Errorf("dependency %s step %d: unknown action '%s'", dep.Tool, i+1, step.Action)
 		}
-		if err := actions.ValidateAction(step.Action, step.Params); err != nil {
-			return fmt.Errorf("dependency %s step %d (%s): %w", dep.Tool, i+1, step.Action, err)
+		if result := actions.ValidateAction(step.Action, step.Params); result.HasErrors() {
+			return fmt.Errorf("dependency %s step %d (%s): %s", dep.Tool, i+1, step.Action, result.ToError())
 		}
 	}
 
