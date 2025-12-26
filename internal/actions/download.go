@@ -43,9 +43,11 @@ func (a *DownloadAction) Preflight(params map[string]interface{}) *PreflightResu
 		result.AddError("download action does not support static 'checksum'; use 'checksum_url' for dynamic verification or 'download_file' for static URLs")
 	}
 
-	// WARNING: Missing checksum_url
+	// WARNING: Missing checksum_url (unless explicitly acknowledged)
 	if _, hasChecksumURL := GetString(params, "checksum_url"); !hasChecksumURL {
-		result.AddWarning("no upstream checksum verification (checksum_url); integrity relies on plan-time computation")
+		if _, hasSkipReason := GetString(params, "skip_verification_reason"); !hasSkipReason {
+			result.AddWarning("no upstream checksum verification (checksum_url); integrity relies on plan-time computation")
+		}
 	}
 
 	// ERROR: URL without variables - should use download_file instead
