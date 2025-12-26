@@ -3,6 +3,8 @@ package actions
 import (
 	"fmt"
 	"sort"
+
+	"github.com/tsukumogami/tsuku/internal/recipe"
 )
 
 // Preflight is implemented by actions that can validate their parameters
@@ -55,4 +57,19 @@ func RegisteredNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// registryValidator implements recipe.ActionValidator using the action registry.
+type registryValidator struct{}
+
+func (v *registryValidator) RegisteredNames() []string {
+	return RegisteredNames()
+}
+
+func (v *registryValidator) ValidateAction(name string, params map[string]interface{}) error {
+	return ValidateAction(name, params)
+}
+
+func init() {
+	recipe.SetActionValidator(&registryValidator{})
 }

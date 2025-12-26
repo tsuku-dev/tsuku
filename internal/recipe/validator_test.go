@@ -1,9 +1,74 @@
 package recipe
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
+
+// mockActionValidator implements ActionValidator for testing
+type mockActionValidator struct {
+	actions map[string]bool
+}
+
+func (m *mockActionValidator) RegisteredNames() []string {
+	names := make([]string, 0, len(m.actions))
+	for name := range m.actions {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (m *mockActionValidator) ValidateAction(name string, params map[string]interface{}) error {
+	if !m.actions[name] {
+		return fmt.Errorf("unknown action '%s'", name)
+	}
+	return nil
+}
+
+func TestMain(m *testing.M) {
+	// Register mock action validator with known actions for tests
+	SetActionValidator(&mockActionValidator{
+		actions: map[string]bool{
+			"download":          true,
+			"download_archive":  true,
+			"download_file":     true,
+			"extract":           true,
+			"apply_patch":       true,
+			"chmod":             true,
+			"install_binaries":  true,
+			"install_libraries": true,
+			"link_dependencies": true,
+			"set_env":           true,
+			"set_rpath":         true,
+			"run_command":       true,
+			"npm_install":       true,
+			"npm_exec":          true,
+			"pipx_install":      true,
+			"pip_install":       true,
+			"pip_exec":          true,
+			"cargo_install":     true,
+			"cargo_build":       true,
+			"go_install":        true,
+			"go_build":          true,
+			"gem_install":       true,
+			"cpan_install":      true,
+			"nix_install":       true,
+			"nix_realize":       true,
+			"github_archive":    true,
+			"github_file":       true,
+			"homebrew":          true,
+			"homebrew_relocate": true,
+			"require_system":    true,
+			"setup_build_env":   true,
+			"configure_make":    true,
+			"cmake_build":       true,
+			"meson_build":       true,
+		},
+	})
+	os.Exit(m.Run())
+}
 
 func TestValidateBytes_ValidRecipe(t *testing.T) {
 	validRecipe := `

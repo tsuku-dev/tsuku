@@ -254,41 +254,7 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 		return
 	}
 
-	// Known action types
-	knownActions := map[string]bool{
-		"download":          true,
-		"download_archive":  true,
-		"download_file":     true,
-		"extract":           true,
-		"apply_patch":       true,
-		"chmod":             true,
-		"install_binaries":  true,
-		"install_libraries": true,
-		"link_dependencies": true,
-		"set_env":           true,
-		"set_rpath":         true,
-		"run_command":       true,
-		"apt_install":       true,
-		"yum_install":       true,
-		"brew_install":      true,
-		"npm_install":       true,
-		"pipx_install":      true,
-		"pip_exec":          true,
-		"cargo_install":     true,
-		"go_install":        true,
-		"gem_install":       true,
-		"cpan_install":      true,
-		"nix_install":       true,
-		"github_archive":    true,
-		"github_file":       true,
-		"homebrew":          true,
-		"require_system":    true,
-		"setup_build_env":   true,
-		"configure_make":    true,
-		"cmake_build":       true,
-		"meson_build":       true,
-		"cargo_build":       true,
-	}
+	av := GetActionValidator()
 
 	for i, step := range r.Steps {
 		stepField := fmt.Sprintf("steps[%d]", i)
@@ -298,18 +264,26 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 			continue
 		}
 
-		if !knownActions[step.Action] {
-			// Try to suggest similar actions
-			suggestion := suggestSimilar(step.Action, knownActions)
-			if suggestion != "" {
-				result.addError(stepField+".action", fmt.Sprintf("unknown action '%s' (did you mean '%s'?)", step.Action, suggestion))
-			} else {
-				result.addError(stepField+".action", fmt.Sprintf("unknown action '%s'", step.Action))
+		// Validate action via registered ActionValidator (avoids circular import)
+		if av != nil {
+			if err := av.ValidateAction(step.Action, step.Params); err != nil {
+				// Build suggestion map for typo detection
+				knownActions := make(map[string]bool)
+				for _, name := range av.RegisteredNames() {
+					knownActions[name] = true
+				}
+				suggestion := suggestSimilar(step.Action, knownActions)
+				if suggestion != "" {
+					result.addError(stepField+".action", fmt.Sprintf("unknown action '%s' (did you mean '%s'?)", step.Action, suggestion))
+				} else {
+					result.addError(stepField+".action", err.Error())
+				}
+				continue
 			}
-			continue
 		}
 
-		// Validate action-specific parameters
+		// Validate action-specific parameters (legacy validation, to be removed
+		// once all actions implement Preflight interface)
 		validateActionParams(result, stepField, &step)
 	}
 }
