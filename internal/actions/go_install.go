@@ -31,6 +31,14 @@ func (a *GoInstallAction) Name() string {
 	return "go_install"
 }
 
+// Preflight validates parameters without side effects.
+func (a *GoInstallAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "module"); !ok {
+		return fmt.Errorf("go_install action requires 'module' parameter")
+	}
+	return nil
+}
+
 // Execute installs a Go module to the install directory
 //
 // Parameters:

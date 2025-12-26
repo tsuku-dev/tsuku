@@ -23,6 +23,14 @@ func (a *RequireSystemAction) Name() string {
 	return "require_system"
 }
 
+// Preflight validates parameters without side effects.
+func (a *RequireSystemAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "command"); !ok {
+		return fmt.Errorf("require_system action requires 'command' parameter")
+	}
+	return nil
+}
+
 // Execute validates a system dependency is installed and meets version requirements.
 //
 // Parameters:

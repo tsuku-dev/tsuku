@@ -35,6 +35,14 @@ func (a *PipxInstallAction) Name() string {
 	return "pipx_install"
 }
 
+// Preflight validates parameters without side effects.
+func (a *PipxInstallAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "package"); !ok {
+		return fmt.Errorf("pipx_install action requires 'package' parameter")
+	}
+	return nil
+}
+
 // Execute installs a Python package via pipx
 //
 // Parameters:

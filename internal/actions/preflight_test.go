@@ -14,12 +14,27 @@ func TestValidateAction_UnknownAction(t *testing.T) {
 	}
 }
 
-func TestValidateAction_KnownActionWithoutPreflight(t *testing.T) {
-	// Actions that don't implement Preflight should pass validation
-	// (most actions don't implement it yet during migration)
+func TestValidateAction_ActionWithPreflight(t *testing.T) {
+	// Actions implementing Preflight validate their parameters
+	// download requires 'url' parameter
 	err := ValidateAction("download", nil)
+	if err == nil {
+		t.Error("expected error for download without url parameter")
+	}
+
+	// With valid params, should pass
+	err = ValidateAction("download", map[string]interface{}{"url": "https://example.com"})
 	if err != nil {
-		t.Errorf("expected nil for action without Preflight, got: %v", err)
+		t.Errorf("expected nil for download with url, got: %v", err)
+	}
+}
+
+func TestValidateAction_ActionWithoutPreflight(t *testing.T) {
+	// Actions that don't implement Preflight pass validation
+	// chmod is an example that doesn't require specific params in Preflight
+	err := ValidateAction("chmod", nil)
+	if err != nil {
+		t.Errorf("expected nil for action that passes Preflight validation, got: %v", err)
 	}
 }
 

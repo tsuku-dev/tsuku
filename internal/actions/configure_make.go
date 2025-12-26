@@ -20,6 +20,17 @@ func (a *ConfigureMakeAction) Name() string {
 	return "configure_make"
 }
 
+// Preflight validates parameters without side effects.
+func (a *ConfigureMakeAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "source_dir"); !ok {
+		return fmt.Errorf("configure_make action requires 'source_dir' parameter")
+	}
+	if _, ok := GetStringSlice(params, "executables"); !ok {
+		return fmt.Errorf("configure_make action requires 'executables' parameter")
+	}
+	return nil
+}
+
 // Dependencies returns the dependencies needed for configure_make builds.
 // Install-time dependencies are make (for building), zig (as C compiler), and pkg-config (for library discovery).
 func (ConfigureMakeAction) Dependencies() ActionDeps {

@@ -21,6 +21,16 @@ func (a *InstallBinariesAction) Name() string {
 	return "install_binaries"
 }
 
+// Preflight validates parameters without side effects.
+func (a *InstallBinariesAction) Preflight(params map[string]interface{}) error {
+	_, hasBinaries := params["binaries"]
+	_, hasBinary := params["binary"]
+	if !hasBinaries && !hasBinary {
+		return fmt.Errorf("install_binaries action requires 'binaries' or 'binary' parameter")
+	}
+	return nil
+}
+
 // Execute installs binaries to the installation directory
 //
 // Parameters:

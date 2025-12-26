@@ -22,6 +22,14 @@ func (DownloadArchiveAction) IsDeterministic() bool { return true }
 
 func (a *DownloadArchiveAction) Name() string { return "download_archive" }
 
+// Preflight validates parameters without side effects.
+func (a *DownloadArchiveAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "url"); !ok {
+		return fmt.Errorf("download_archive action requires 'url' parameter")
+	}
+	return nil
+}
+
 func (a *DownloadArchiveAction) Execute(ctx *ExecutionContext, params map[string]interface{}) error {
 	// Extract parameters
 	url, ok := GetString(params, "url")
@@ -288,6 +296,17 @@ type GitHubArchiveAction struct{ BaseAction }
 func (GitHubArchiveAction) IsDeterministic() bool { return true }
 
 func (a *GitHubArchiveAction) Name() string { return "github_archive" }
+
+// Preflight validates parameters without side effects.
+func (a *GitHubArchiveAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "repo"); !ok {
+		return fmt.Errorf("github_archive action requires 'repo' parameter")
+	}
+	if _, ok := GetString(params, "asset_pattern"); !ok {
+		return fmt.Errorf("github_archive action requires 'asset_pattern' parameter")
+	}
+	return nil
+}
 
 func (a *GitHubArchiveAction) Execute(ctx *ExecutionContext, params map[string]interface{}) error {
 	// Extract parameters
@@ -585,6 +604,17 @@ type GitHubFileAction struct{ BaseAction }
 func (GitHubFileAction) IsDeterministic() bool { return true }
 
 func (a *GitHubFileAction) Name() string { return "github_file" }
+
+// Preflight validates parameters without side effects.
+func (a *GitHubFileAction) Preflight(params map[string]interface{}) error {
+	if _, ok := GetString(params, "repo"); !ok {
+		return fmt.Errorf("github_file action requires 'repo' parameter")
+	}
+	if _, ok := GetString(params, "asset_pattern"); !ok {
+		return fmt.Errorf("github_file action requires 'asset_pattern' parameter")
+	}
+	return nil
+}
 
 func (a *GitHubFileAction) Execute(ctx *ExecutionContext, params map[string]interface{}) error {
 	// Extract parameters

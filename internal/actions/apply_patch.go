@@ -24,6 +24,25 @@ func (a *ApplyPatchAction) Name() string {
 	return "apply_patch"
 }
 
+// Preflight validates parameters without side effects.
+func (a *ApplyPatchAction) Preflight(params map[string]interface{}) error {
+	url, hasURL := GetString(params, "url")
+	_, hasData := GetString(params, "data")
+
+	if !hasURL && !hasData {
+		return fmt.Errorf("apply_patch action requires either 'url' or 'data' parameter")
+	}
+	if hasURL && hasData {
+		return fmt.Errorf("apply_patch action cannot have both 'url' and 'data' parameters")
+	}
+	if hasURL && url != "" {
+		if _, hasSHA256 := GetString(params, "sha256"); !hasSHA256 {
+			return fmt.Errorf("apply_patch action requires 'sha256' parameter when using 'url'")
+		}
+	}
+	return nil
+}
+
 // Execute applies a patch to the source code.
 // This method provides backwards compatibility for direct execution.
 // For plan generation with checksum validation, use Decompose instead.

@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-// mockActionValidator implements ActionValidator for testing
+// mockActionValidator implements ActionValidator for testing.
+// It mimics the Preflight behavior of real actions for parameter validation.
 type mockActionValidator struct {
 	actions map[string]bool
 }
@@ -23,6 +24,104 @@ func (m *mockActionValidator) RegisteredNames() []string {
 func (m *mockActionValidator) ValidateAction(name string, params map[string]interface{}) error {
 	if !m.actions[name] {
 		return fmt.Errorf("unknown action '%s'", name)
+	}
+	// Mimic Preflight validation for each action
+	return m.validateParams(name, params)
+}
+
+// validateParams mimics the Preflight methods of real actions
+func (m *mockActionValidator) validateParams(action string, params map[string]interface{}) error {
+	getString := func(key string) (string, bool) {
+		if v, ok := params[key]; ok {
+			if s, ok := v.(string); ok {
+				return s, true
+			}
+		}
+		return "", false
+	}
+
+	switch action {
+	case "download", "download_archive":
+		if _, ok := getString("url"); !ok {
+			return fmt.Errorf("%s action requires 'url' parameter", action)
+		}
+	case "extract":
+		if _, ok := getString("archive"); !ok {
+			return fmt.Errorf("extract action requires 'archive' parameter")
+		}
+	case "install_binaries":
+		_, hasBinaries := params["binaries"]
+		_, hasBinary := params["binary"]
+		if !hasBinaries && !hasBinary {
+			return fmt.Errorf("install_binaries action requires 'binaries' or 'binary' parameter")
+		}
+	case "github_archive", "github_file":
+		if _, ok := getString("repo"); !ok {
+			return fmt.Errorf("%s action requires 'repo' parameter", action)
+		}
+		if _, ok := getString("asset_pattern"); !ok {
+			return fmt.Errorf("%s action requires 'asset_pattern' parameter", action)
+		}
+	case "npm_install":
+		if _, ok := getString("package"); !ok {
+			return fmt.Errorf("npm_install action requires 'package' parameter")
+		}
+	case "pipx_install":
+		if _, ok := getString("package"); !ok {
+			return fmt.Errorf("pipx_install action requires 'package' parameter")
+		}
+	case "cargo_install":
+		if _, ok := getString("crate"); !ok {
+			return fmt.Errorf("cargo_install action requires 'crate' parameter")
+		}
+	case "go_install":
+		if _, ok := getString("module"); !ok {
+			return fmt.Errorf("go_install action requires 'module' parameter")
+		}
+	case "gem_install":
+		if _, ok := getString("gem"); !ok {
+			return fmt.Errorf("gem_install action requires 'gem' parameter")
+		}
+	case "cpan_install":
+		if _, ok := getString("distribution"); !ok {
+			return fmt.Errorf("cpan_install action requires 'distribution' parameter")
+		}
+		if _, ok := params["executables"]; !ok {
+			return fmt.Errorf("cpan_install action requires 'executables' parameter")
+		}
+	case "run_command":
+		if _, ok := getString("command"); !ok {
+			return fmt.Errorf("run_command action requires 'command' parameter")
+		}
+	case "require_system":
+		if _, ok := getString("command"); !ok {
+			return fmt.Errorf("require_system action requires 'command' parameter")
+		}
+	case "homebrew":
+		if _, ok := getString("formula"); !ok {
+			return fmt.Errorf("homebrew action requires 'formula' parameter")
+		}
+	case "configure_make":
+		if _, ok := getString("source_dir"); !ok {
+			return fmt.Errorf("configure_make action requires 'source_dir' parameter")
+		}
+		if _, ok := params["executables"]; !ok {
+			return fmt.Errorf("configure_make action requires 'executables' parameter")
+		}
+	case "apply_patch":
+		url, hasURL := getString("url")
+		_, hasData := getString("data")
+		if !hasURL && !hasData {
+			return fmt.Errorf("apply_patch action requires either 'url' or 'data' parameter")
+		}
+		if hasURL && hasData {
+			return fmt.Errorf("apply_patch action cannot have both 'url' and 'data' parameters")
+		}
+		if hasURL && url != "" {
+			if _, hasSHA256 := getString("sha256"); !hasSHA256 {
+				return fmt.Errorf("apply_patch action requires 'sha256' parameter when using 'url'")
+			}
+		}
 	}
 	return nil
 }
@@ -1311,7 +1410,8 @@ command = "test-tool --version"
 
 	foundError := false
 	for _, err := range result.Errors {
-		if err.Field == "steps[1].sha256" && err.Message == "sha256 checksum is required for url-based patches" {
+		// Error comes from Preflight at the step level
+		if err.Field == "steps[1]" && strings.Contains(err.Message, "sha256") {
 			foundError = true
 			break
 		}
@@ -1546,7 +1646,8 @@ command = "test-tool --version"
 	// Should have exactly one error for steps[2]
 	foundError := false
 	for _, err := range result.Errors {
-		if err.Field == "steps[2].sha256" && err.Message == "sha256 checksum is required for url-based patches" {
+		// Error comes from Preflight at the step level
+		if err.Field == "steps[2]" && strings.Contains(err.Message, "sha256") {
 			foundError = true
 			break
 		}
@@ -1559,8 +1660,10 @@ command = "test-tool --version"
 	// steps[1] should be valid (has sha256)
 	// steps[3] should be valid (inline data, no sha256 required)
 	for _, err := range result.Errors {
-		if err.Field == "steps[1].sha256" || err.Field == "steps[3].sha256" {
-			t.Errorf("unexpected error for valid apply_patch actions: %v", err)
+		if err.Field == "steps[1]" || err.Field == "steps[3]" {
+			if strings.Contains(err.Message, "sha256") {
+				t.Errorf("unexpected error for valid apply_patch actions: %v", err)
+			}
 		}
 	}
 }
