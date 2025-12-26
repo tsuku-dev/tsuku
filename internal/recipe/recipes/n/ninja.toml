@@ -12,7 +12,6 @@ formula = "ninja"
 [[steps]]
 action = "download_archive"
 url = "https://github.com/ninja-build/ninja/archive/v{version}.tar.gz"
-archive_format = "tar.gz"
 
 [[steps]]
 action = "cmake_build"

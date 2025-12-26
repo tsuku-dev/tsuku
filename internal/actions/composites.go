@@ -44,6 +44,14 @@ func (a *DownloadArchiveAction) Preflight(params map[string]interface{}) *Prefli
 		}
 	}
 
+	// WARNING: Redundant archive_format when it can be inferred from URL
+	if archiveFormat, hasFormat := GetString(params, "archive_format"); hasFormat {
+		detectedFormat := DetectArchiveFormat(url)
+		if detectedFormat != "" && detectedFormat == archiveFormat {
+			result.AddWarning("archive_format can be inferred from URL; consider removing redundant parameter")
+		}
+	}
+
 	return result
 }
 
@@ -54,9 +62,13 @@ func (a *DownloadArchiveAction) Execute(ctx *ExecutionContext, params map[string
 		return fmt.Errorf("url is required")
 	}
 
-	archiveFormat, ok := GetString(params, "archive_format")
-	if !ok {
-		return fmt.Errorf("archive_format is required")
+	archiveFormat, _ := GetString(params, "archive_format")
+	if archiveFormat == "" {
+		// Auto-detect from URL
+		archiveFormat = DetectArchiveFormat(url)
+		if archiveFormat == "" {
+			return fmt.Errorf("could not detect archive format from URL; please specify 'archive_format'")
+		}
 	}
 
 	binariesRaw, ok := params["binaries"]
@@ -185,9 +197,13 @@ func (a *DownloadArchiveAction) Decompose(ctx *EvalContext, params map[string]in
 		return nil, fmt.Errorf("url is required")
 	}
 
-	archiveFormat, ok := GetString(params, "archive_format")
-	if !ok {
-		return nil, fmt.Errorf("archive_format is required")
+	archiveFormat, _ := GetString(params, "archive_format")
+	if archiveFormat == "" {
+		// Auto-detect from URL
+		archiveFormat = DetectArchiveFormat(url)
+		if archiveFormat == "" {
+			return nil, fmt.Errorf("could not detect archive format from URL; please specify 'archive_format'")
+		}
 	}
 
 	binariesRaw, ok := params["binaries"]
@@ -345,6 +361,14 @@ func (a *GitHubArchiveAction) Preflight(params map[string]interface{}) *Prefligh
 		}
 	}
 
+	// WARNING: Redundant archive_format when it can be inferred from asset_pattern
+	if archiveFormat, hasFormat := GetString(params, "archive_format"); hasFormat {
+		detectedFormat := DetectArchiveFormat(assetPattern)
+		if detectedFormat != "" && detectedFormat == archiveFormat {
+			result.AddWarning("archive_format can be inferred from asset_pattern; consider removing redundant parameter")
+		}
+	}
+
 	return result
 }
 
@@ -360,9 +384,13 @@ func (a *GitHubArchiveAction) Execute(ctx *ExecutionContext, params map[string]i
 		return fmt.Errorf("asset_pattern is required")
 	}
 
-	archiveFormat, ok := GetString(params, "archive_format")
-	if !ok {
-		return fmt.Errorf("archive_format is required")
+	archiveFormat, _ := GetString(params, "archive_format")
+	if archiveFormat == "" {
+		// Auto-detect from asset_pattern
+		archiveFormat = DetectArchiveFormat(assetPattern)
+		if archiveFormat == "" {
+			return fmt.Errorf("could not detect archive format from asset_pattern; please specify 'archive_format'")
+		}
 	}
 
 	stripDirs, _ := GetInt(params, "strip_dirs") // Defaults to 0 if not present
@@ -506,9 +534,13 @@ func (a *GitHubArchiveAction) Decompose(ctx *EvalContext, params map[string]inte
 		return nil, fmt.Errorf("asset_pattern is required")
 	}
 
-	archiveFormat, ok := GetString(params, "archive_format")
-	if !ok {
-		return nil, fmt.Errorf("archive_format is required")
+	archiveFormat, _ := GetString(params, "archive_format")
+	if archiveFormat == "" {
+		// Auto-detect from asset_pattern
+		archiveFormat = DetectArchiveFormat(assetPattern)
+		if archiveFormat == "" {
+			return nil, fmt.Errorf("could not detect archive format from asset_pattern; please specify 'archive_format'")
+		}
 	}
 
 	binariesRaw, ok := params["binaries"]

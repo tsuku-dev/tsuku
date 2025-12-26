@@ -13,7 +13,6 @@ formula = "curl"
 [[steps]]
 action = "download_archive"
 url = "https://curl.se/download/curl-{version}.tar.gz"
-archive_format = "tar.gz"
 
 [[steps]]
 action = "setup_build_env"
