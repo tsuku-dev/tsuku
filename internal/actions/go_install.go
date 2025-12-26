@@ -382,12 +382,15 @@ func (a *GoInstallAction) Decompose(ctx *EvalContext, params map[string]interfac
 	goSum := string(goSumBytes)
 
 	// Build go_build params
+	// Use moduleForVersioning for go.mod require (parent module)
+	// Pass original module as install_module for go install (subpackage path)
 	goBuildParams := map[string]interface{}{
-		"module":      module,
-		"version":     version,
-		"executables": executables,
-		"go_sum":      goSum,
-		"go_version":  goVersion, // Captured for reproducibility
+		"module":         moduleForVersioning,
+		"install_module": module, // Subpackage path for go install
+		"version":        version,
+		"executables":    executables,
+		"go_sum":         goSum,
+		"go_version":     goVersion, // Captured for reproducibility
 	}
 
 	// Pass through optional params if set
