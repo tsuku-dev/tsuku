@@ -38,6 +38,9 @@ func (a *CargoInstallAction) Preflight(params map[string]interface{}) *Preflight
 	if _, ok := GetString(params, "crate"); !ok {
 		result.AddError("cargo_install action requires 'crate' parameter")
 	}
+	if _, hasExecutables := params["executables"]; !hasExecutables {
+		result.AddError("cargo_install action requires 'executables' parameter")
+	}
 	return result
 }
 

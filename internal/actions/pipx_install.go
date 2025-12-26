@@ -41,6 +41,9 @@ func (a *PipxInstallAction) Preflight(params map[string]interface{}) *PreflightR
 	if _, ok := GetString(params, "package"); !ok {
 		result.AddError("pipx_install action requires 'package' parameter")
 	}
+	if _, hasExecutables := params["executables"]; !hasExecutables {
+		result.AddError("pipx_install action requires 'executables' parameter")
+	}
 	return result
 }
 

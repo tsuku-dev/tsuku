@@ -37,6 +37,9 @@ func (a *GoInstallAction) Preflight(params map[string]interface{}) *PreflightRes
 	if _, ok := GetString(params, "module"); !ok {
 		result.AddError("go_install action requires 'module' parameter")
 	}
+	if _, hasExecutables := params["executables"]; !hasExecutables {
+		result.AddError("go_install action requires 'executables' parameter")
+	}
 	return result
 }
 

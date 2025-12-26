@@ -39,6 +39,9 @@ func (a *NpmInstallAction) Preflight(params map[string]interface{}) *PreflightRe
 	if _, ok := GetString(params, "package"); !ok {
 		result.AddError("npm_install action requires 'package' parameter")
 	}
+	if _, hasExecutables := params["executables"]; !hasExecutables {
+		result.AddError("npm_install action requires 'executables' parameter")
+	}
 	return result
 }
 

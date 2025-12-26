@@ -553,3 +553,100 @@ func TestGitHubFileAction_ArchiveExtensionWarning(t *testing.T) {
 		})
 	}
 }
+
+// Tests for package manager actions requiring executables parameter
+
+func TestNpmInstallAction_RequiresExecutables(t *testing.T) {
+	result := ValidateAction("npm_install", map[string]interface{}{
+		"package": "some-package",
+	})
+	if !result.HasErrors() {
+		t.Error("expected error for missing executables")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err == "npm_install action requires 'executables' parameter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected executables error, got: %v", result.Errors)
+	}
+}
+
+func TestPipxInstallAction_RequiresExecutables(t *testing.T) {
+	result := ValidateAction("pipx_install", map[string]interface{}{
+		"package": "some-package",
+	})
+	if !result.HasErrors() {
+		t.Error("expected error for missing executables")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err == "pipx_install action requires 'executables' parameter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected executables error, got: %v", result.Errors)
+	}
+}
+
+func TestCargoInstallAction_RequiresExecutables(t *testing.T) {
+	result := ValidateAction("cargo_install", map[string]interface{}{
+		"crate": "some-crate",
+	})
+	if !result.HasErrors() {
+		t.Error("expected error for missing executables")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err == "cargo_install action requires 'executables' parameter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected executables error, got: %v", result.Errors)
+	}
+}
+
+func TestGoInstallAction_RequiresExecutables(t *testing.T) {
+	result := ValidateAction("go_install", map[string]interface{}{
+		"module": "github.com/some/module",
+	})
+	if !result.HasErrors() {
+		t.Error("expected error for missing executables")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err == "go_install action requires 'executables' parameter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected executables error, got: %v", result.Errors)
+	}
+}
+
+func TestGemInstallAction_RequiresExecutables(t *testing.T) {
+	result := ValidateAction("gem_install", map[string]interface{}{
+		"gem": "some-gem",
+	})
+	if !result.HasErrors() {
+		t.Error("expected error for missing executables")
+	}
+	found := false
+	for _, err := range result.Errors {
+		if err == "gem_install action requires 'executables' parameter" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected executables error, got: %v", result.Errors)
+	}
+}
