@@ -650,3 +650,28 @@ func TestGemInstallAction_RequiresExecutables(t *testing.T) {
 		t.Errorf("expected executables error, got: %v", result.Errors)
 	}
 }
+
+func TestRequireSystemAction_MissingInstallGuide(t *testing.T) {
+	result := ValidateAction("require_system", map[string]interface{}{
+		"command": "gcc",
+	})
+	if !result.HasWarnings() {
+		t.Error("expected warning for missing install_guide")
+	}
+}
+
+func TestRequireSystemAction_WithInstallGuide(t *testing.T) {
+	result := ValidateAction("require_system", map[string]interface{}{
+		"command": "gcc",
+		"install_guide": map[string]interface{}{
+			"darwin": "brew install gcc",
+			"linux":  "apt install gcc",
+		},
+	})
+	// Should not have install_guide warning
+	for _, w := range result.Warnings {
+		if strings.Contains(w, "install_guide") {
+			t.Errorf("unexpected install_guide warning: %s", w)
+		}
+	}
+}

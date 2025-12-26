@@ -29,6 +29,11 @@ func (a *RequireSystemAction) Preflight(params map[string]interface{}) *Prefligh
 	if _, ok := GetString(params, "command"); !ok {
 		result.AddError("require_system action requires 'command' parameter")
 	}
+
+	// WARNING: Missing install_guide
+	if _, hasGuide := params["install_guide"]; !hasGuide {
+		result.AddWarning("consider adding 'install_guide' with platform-specific installation instructions")
+	}
 	return result
 }
 
