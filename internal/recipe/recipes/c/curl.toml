@@ -11,13 +11,8 @@ formula = "curl"
 
 # NOTE: curl.se provides PGP signatures but not SHA256SUMS; checksum computed during plan generation
 [[steps]]
-action = "download"
+action = "download_archive"
 url = "https://curl.se/download/curl-{version}.tar.gz"
-
-[[steps]]
-action = "extract"
-archive = "curl-{version}.tar.gz"
-format = "tar.gz"
 
 [[steps]]
 action = "setup_build_env"

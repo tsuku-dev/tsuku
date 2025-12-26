@@ -15,26 +15,20 @@ github_repo = "ruby/ruby-builder"
 tag_prefix = "ruby-"
 
 # Step 1: Download Ruby
+# NOTE: ruby-builder releases don't include checksum files; checksum computed at plan time
 [[steps]]
-action = "download"
+action = "download_archive"
 url = "https://github.com/ruby/ruby-builder/releases/download/ruby-{version}/ruby-{version}-{os}-{arch}.tar.gz"
-dest = "ruby.tar.gz"
+strip_dirs = 1
 os_mapping = { linux = "ubuntu-22.04", darwin = "darwin" }
 arch_mapping = { amd64 = "x64", arm64 = "arm64" }
 
-# Step 2: Extract Ruby
-[[steps]]
-action = "extract"
-archive = "ruby.tar.gz"
-format = "tar.gz"
-strip_dirs = 1
-
-# Step 3: Link libyaml library from shared libs
+# Step 2: Link libyaml library from shared libs
 [[steps]]
 action = "link_dependencies"
 library = "libyaml"
 
-# Step 4: Create wrapper for ruby binary
+# Step 3: Create wrapper for ruby binary
 [[steps]]
 action = "run_command"
 command = '''
@@ -120,7 +114,7 @@ done
 '''
 description = "Creating wrapper for ruby and converting Ruby scripts"
 
-# Step 5: Register binaries for symlinking
+# Step 4: Register binaries for symlinking
 [[steps]]
 action = "install_binaries"
 binaries = ["bin/ruby", "bin/gem", "bin/bundle", "bin/bundler", "bin/irb", "bin/erb"]
