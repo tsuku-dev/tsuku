@@ -145,161 +145,73 @@ This design addresses multiple independent questions about platform support. Opt
 
 ### Decision 1: Schema Design - How should recipes declare platform constraints?
 
-#### Option 1A: Allowlist via `supported` Fields
+After exploring pure allowlist, pure denylist, and mutually-exclusive hybrid approaches, we identified a superior solution: **complementary hybrid** that combines coarse allowlists with fine-grained denylists.
 
-Add `supported_os` and `supported_arch` arrays to `[metadata]`:
-
-```toml
-[metadata]
-name = "hello-nix"
-supported_os = ["linux"]  # Only Linux
-```
-
-If fields are missing, recipe supports all platforms (backwards compatible).
-
-**Pros:**
-- Simple mental model: "this recipe works on these platforms"
-- Easy to query: check if user's platform is in the list
-- Backwards compatible: missing fields = universal support
-- Clear semantics for CI: skip tests when platform not in list
-
-**Cons:**
-- Requires explicit listing even when only one platform is excluded (e.g., if tool works on linux/darwin but not windows, must list both)
-- Doesn't distinguish between "never tested" and "known to fail"
-- No way to express "all except X" compactly
-- Allowlists can become stale when new platforms are added (e.g., a new OS or arch might work but isn't in the list)
-
-#### Option 1B: Denylist via `unsupported` Fields
-
-Add `unsupported_os` and `unsupported_arch` arrays to `[metadata]`:
+#### Option 1: Pure Allowlist
 
 ```toml
-[metadata]
-name = "some-tool"
-unsupported_os = ["windows"]  # Works everywhere except Windows
-```
-
-Missing fields = no restrictions (backwards compatible).
-
-**Pros:**
-- Compact for "all except" cases
-- Backwards compatible: missing fields = universal support
-- Natural for tools that work widely with known exceptions
-- Most recipes won't need the field (universal support is the common case)
-
-**Cons:**
-- Inverted logic can be confusing ("not in unsupported list" = supported)
-- Doesn't help with "only works on X" cases (e.g., hello-nix Linux-only)
-- Harder to generate "supported platforms" list for display
-
-#### Option 1C: Combined Allowlist/Denylist
-
-Support both `supported_*` and `unsupported_*` with validation rules:
-
-```toml
-# Allowlist form
-[metadata]
-supported_os = ["linux", "darwin"]
-
-# Denylist form (mutually exclusive)
-[metadata]
-unsupported_os = ["windows"]
-
-# Error: cannot specify both
-```
-
-Recipe validator ensures only one form is used.
-
-**Pros:**
-- Flexibility: recipe author chooses natural expression
-- Supports both "only on X" and "all except Y" use cases
-- Backwards compatible: missing fields = universal support
-
-**Cons:**
-- Two ways to express same concept increases complexity
-- Validation logic needed to prevent conflicts
-- Consumers (CLI, website) must handle both forms
-- Documentation burden: explain when to use which form
-
-### Decision 2: Granularity - What level of platform constraints?
-
-#### Option 2A: OS and Architecture Separate
-
-Separate `os` and `arch` constraints (following existing `Step.When` pattern):
-
-```toml
-[metadata]
 supported_os = ["linux", "darwin"]
 supported_arch = ["amd64", "arm64"]
 ```
 
-Platform is supported if `(os in supported_os) AND (arch in supported_arch)`.
+**Pros:** Simple, clear semantics
+**Cons:** Verbose for "all except X" cases, doesn't scale when new platforms added
 
-**Pros:**
-- Follows existing `Step.When` pattern for consistency
-- Natural for constraints that apply to OS or arch independently
-- Matches how actions currently handle platform mappings
-- Easy to extend (could add `supported_libc`, etc.)
-
-**Cons:**
-- Can't express "darwin/amd64 supported but not darwin/arm64" (OS-arch specific combinations)
-- Cartesian product may over-specify (linux+darwin × amd64+arm64 = 4 platforms when only 2 are tested)
-- Verbose for single-platform recipes (must specify both OS and arch)
-- No wildcard support (can't express "linux/*, darwin/amd64" compactly)
-
-#### Option 2B: Combined Platform Tuples
-
-Use Go-style platform tuples:
+#### Option 2: Pure Denylist
 
 ```toml
-[metadata]
-supported_platforms = ["linux/amd64", "linux/arm64", "darwin/amd64"]
+unsupported_platforms = ["darwin/arm64"]
 ```
 
-Platform tuple format: `{os}/{arch}`.
+**Pros:** Compact for "all except X", scales with new platforms
+**Cons:** Verbose for OS-only tools, inverted logic
 
-**Pros:**
-- Precise: explicitly lists supported combinations
-- Matches Go's `GOOS/GOARCH` convention (familiar to Go developers)
-- No ambiguity about unsupported combinations
-- Easy to generate from `go tool dist list` for Go-based tools
+#### Option 3: Mutually-Exclusive Hybrid
 
-**Cons:**
-- Verbose: must list all combinations even if arch doesn't matter
-- Harder to query "is this OS supported?" without parsing tuples
-- Doesn't align with existing `Step.When` pattern (os/arch separate)
-- Less human-friendly for non-Go users
+Allow either allowlist OR denylist (not both).
 
-#### Option 2C: Hybrid - OS/Arch Separate + Optional Platform Tuples
+**Pros:** Author chooses natural expression
+**Cons:** Can't combine for precision (e.g., "Linux and macOS, but not macOS/arm64")
 
-Separate OS/arch fields with optional override via platform tuples:
+#### Option 4: Complementary Hybrid (CHOSEN)
+
+Combine coarse allowlists with fine-grained denylists:
 
 ```toml
-# Case 1: OS constraint only
-[metadata]
-supported_os = ["linux"]  # All Linux archs
+# Coarse allowlist (default: all OS, all arch)
+supported_os = ["linux", "darwin"]
+supported_arch = ["amd64", "arm64"]
 
-# Case 2: Specific combinations
-[metadata]
-supported_platforms = ["linux/amd64", "darwin/amd64"]
+# Fine-grained denylist (default: empty)
+unsupported_platforms = ["darwin/arm64"]
 ```
 
-Validator ensures only one form is used.
+**Computation:** `Result = (supported_os × supported_arch) - unsupported_platforms`
+
+**Defaults:**
+- `supported_os`: All known OS values (linux, darwin, windows, etc.)
+- `supported_arch`: All known arch values (amd64, arm64, 386, etc.)
+- `unsupported_platforms`: Empty list
+
+**Override semantics:** Each field independently overrides its own default.
 
 **Pros:**
-- Flexibility: simple cases use os/arch, complex cases use tuples
-- Handles both "OS doesn't matter, arch doesn't matter" and "specific combinations only"
-- Can evolve over time (start with os/arch, add tuples when needed)
+- **Handles all patterns naturally:**
+  - Linux-only: `supported_os = ["linux"]`
+  - Works-everywhere-except: `unsupported_platforms = ["darwin/arm64"]`
+  - Precise combination: `supported_os = ["linux", "darwin"]` + `unsupported_platforms = ["darwin/arm64"]`
+- **Scales with new platforms:** New OS/arch automatically supported unless explicitly denied
+- **Simple for common cases:** Most recipes set one field
+- **Precise when needed:** Combine both for exact control
+- **Backwards compatible:** Missing fields = universal support
 
 **Cons:**
-- Two schema patterns increases complexity
-- Validation logic needed to prevent conflicts
-- Documentation burden: explain when to use which form
-- Risk of inconsistent usage across recipes
+- Slightly more complex validation logic (must compute Cartesian product and subtract exceptions)
+- Requires edge case validation (contradictory constraints, empty result sets)
 
-### Decision 3: Enforcement - When should platform constraints be checked?
+### Decision 2: Enforcement - When should platform constraints be checked?
 
-#### Option 3A: Preflight Check Before Execution
+#### Option 2A: Preflight Check Before Execution
 
 Check platform constraints in `install` command before creating executor:
 
@@ -323,7 +235,7 @@ Fail immediately without downloading dependencies or creating work directory.
 - Doesn't help with cross-compilation or platform-specific build plans
 - Validation logic duplicated if other commands need it (validate, plan)
 
-#### Option 3B: Executor Validation During Initialization
+#### Option 2B: Executor Validation During Initialization
 
 Check constraints when executor is created:
 
@@ -347,7 +259,7 @@ Executor initialization fails with specific error type.
 - Later in the flow than preflight (some work already done)
 - Couples executor to platform detection (harder to mock in tests)
 
-#### Option 3C: Dual Validation - Preflight + Executor
+#### Option 2C: Dual Validation - Preflight + Executor
 
 Validate in both install command (preflight) and executor (enforcement):
 
@@ -366,9 +278,9 @@ Validate in both install command (preflight) and executor (enforcement):
 - Slightly more code to maintain
 - Overhead of two checks (negligible but exists)
 
-### Decision 4: Error Messaging - What should users see when platform is unsupported?
+### Decision 3: Error Messaging - What should users see when platform is unsupported?
 
-#### Option 4A: Simple Error Message
+#### Option 3A: Simple Error Message
 
 Show supported platforms and current platform:
 
@@ -392,7 +304,7 @@ Supported platforms:
 - Users must manually search for similar tools
 - Doesn't explain why it's unsupported
 
-#### Option 4B: Error Message with Alternatives
+#### Option 3B: Error Message with Alternatives
 
 Suggest similar recipes that support user's platform:
 
@@ -420,7 +332,7 @@ Use 'tsuku search hello' to find more options.
 - May suggest poor matches if metadata is incomplete
 - More complex implementation
 
-#### Option 4C: Error with Upstream Issue Link
+#### Option 3C: Error with Upstream Issue Link
 
 Include link to upstream project's platform support:
 
@@ -447,78 +359,82 @@ See: https://github.com/DavHau/nix-portable/issues/123
 
 ## Decision Outcome
 
-**Chosen: 1A (Allowlist Schema) + 2A (Separate OS/Arch) + 3A (Preflight Check) + 4A (Simple Error Messages)**
+**Chosen: Option 4 (Complementary Hybrid) + Option 2A (Preflight Check) + Option 3A (Simple Error Messages)**
 
 ### Summary
 
-We'll add `supported_os` and `supported_arch` arrays to recipe metadata, validate platform compatibility in the install command before execution begins, and show users a clear error message listing supported platforms when installation is attempted on an unsupported platform.
+We'll use a **complementary hybrid approach** that combines coarse allowlists (`supported_os`, `supported_arch`) with fine-grained denylists (`unsupported_platforms`). Platform support is computed as `(supported_os × supported_arch) - unsupported_platforms` with sensible defaults (all OS, all arch, no exceptions). Validation happens in the install command before execution begins, and users see clear error messages showing current vs supported platforms.
 
 ### Rationale
 
-This combination best serves our Priority 0 goals (user experience and backwards compatibility) with minimal implementation complexity:
+This combination best serves our Priority 0 goals (user experience and backwards compatibility) while scaling to tsuku's mission of supporting all tools:
 
-**Decision 1 - Allowlist (1A):**
-- Explicit "this works on X, Y, Z" is clearer than inverted "doesn't work on A" logic
-- Aligns with user mental model: "show me what platforms are supported"
-- Easy for consumers (CLI, website, CI) to check: `if current_platform in supported_platforms`
-- Backwards compatible: missing fields means universal support
-- Rejected 1B (denylist): Inverted logic is confusing for querying and display
-- Rejected 1C (combined): Adds schema complexity with minimal benefit given current use cases
+**Decision 1 - Complementary Hybrid (Option 4):**
 
-**Decision 2 - Separate OS/Arch (2A):**
-- Follows existing `Step.When` pattern (`when.os`, `when.arch`)
-- Matches how actions currently handle platform mappings (`os_mapping`, `arch_mapping`)
-- Natural for current use cases: btop (OS-specific), hello-nix (OS-specific), most tools don't care about arch
-- Simple to implement and document
-- Rejected 2B (tuples): Over-specifies for common cases (most recipes care about OS, not OS/arch combination)
-- Rejected 2C (hybrid): Unnecessary complexity when 2A handles known use cases
+The key insight is that tsuku must support *all tools in the world*, and most tools work on most platforms. This makes a complementary approach superior to pure allowlist or pure denylist:
 
-**Decision 3 - Preflight Check (3A):**
+- **Scales with new platforms**: When Go adds `linux/riscv64`, tools automatically support it (not in denylist, in default allowlist) without recipe updates
+- **Handles all patterns naturally**:
+  - Linux-only tools: `supported_os = ["linux"]` (concise)
+  - Works-everywhere-except: `unsupported_platforms = ["darwin/arm64"]` (concise)
+  - Precise combinations: `supported_os = ["linux", "darwin"]` + `unsupported_platforms = ["darwin/arm64"]` (exact control)
+- **Simple for common cases**: Most recipes set just one field
+- **Backwards compatible**: Missing fields = universal support
+
+The hybrid approach solves the precision problem: a tool that works on linux/darwin but not darwin/arm64 can be expressed exactly without verbose enumeration.
+
+Rejected alternatives:
+- Pure allowlist: Doesn't scale (new platforms require updates), verbose for "all except X"
+- Pure denylist: Verbose for OS-only tools (must list all non-Linux platforms)
+- Mutually-exclusive hybrid: Can't combine allowlist + denylist for precision
+
+**Decision 2 - Preflight Check (Option 2A):**
 - Fail fast: no wasted downloads, directory creation, or dependency resolution
 - Clean error path: no executor state to clean up
 - Easy to test: no mocking required
 - Consistent with existing preflight validation pattern
-- Rejected 3B (executor validation): Fails after work directory created, requires cleanup
-- Rejected 3C (dual validation): Unnecessary duplication when 3A provides both UX and safety
+- Rejected 2B (executor validation): Fails after work directory created, requires cleanup
+- Rejected 2C (dual validation): Unnecessary duplication when 2A provides both UX and safety
 
-**Decision 4 - Simple Error Messages (4A):**
+**Decision 3 - Simple Error Messages (Option 3A):**
 - Fastest to implement, unblocks ecosystem integration work
 - Sufficient information: users know current platform and supported platforms
 - Consistent with Nix's approach (proven UX pattern)
 - Can be enhanced later without breaking changes (alternative suggestions, upstream links are additive)
-- Rejected 4B (alternatives): Requires similarity/tagging system not yet built
-- Rejected 4C (upstream links): Adds maintenance burden, links go stale
+- Rejected 3B (alternatives): Requires similarity/tagging system not yet built
+- Rejected 3C (upstream links): Adds maintenance burden, links go stale
 
 ### Trade-offs Accepted
 
 By choosing this approach, we accept:
 
-**1. Allowlists can become stale when new platforms are added**
+**1. More complex validation logic**
+- **Trade-off**: Must compute Cartesian product `(supported_os × supported_arch)` and subtract `unsupported_platforms`
 - **Mitigation**: This is acceptable because:
-  - Recipe authors already update recipes when upstream adds new platform binaries
-  - CI tests will catch omissions (new platform added to test matrix, recipe doesn't declare support)
-  - Most tools don't frequently add new platform support
-  - Allowlist makes staleness visible (recipe says "only linux" when darwin now works) vs hidden (recipe says "all except windows" but freebsd doesn't work)
+  - Computation is simple and fast (happens once at install time)
+  - Complexity is implementation detail, not user-facing
+  - Validation logic is well-defined with clear edge cases
 
-**2. Can't express OS/arch-specific combinations**
+**2. Edge case validation required**
+- **Trade-off**: Must validate contradictory constraints (e.g., excluding a platform not in the allowlist) and empty result sets
 - **Mitigation**: This is acceptable because:
-  - Current failing recipes (btop, hello-nix) are OS-specific, not combination-specific
-  - Can add tuple support later (additive, backwards compatible) if use cases emerge
-  - Most binaries are either OS-specific (nix-portable Linux-only) or arch-agnostic (Go binaries work on all archs)
-  - Worst case: recipe declares `supported_os = ["darwin"]` and `supported_arch = ["amd64"]`, allowing darwin/arm64 to attempt install and fail - graceful degradation to current behavior
+  - Follows existing preflight warning pattern (similar to unused `os_mapping`)
+  - Warnings in strict mode catch recipe errors during CI
+  - Errors for empty result sets prevent broken recipes from being published
 
-**3. No alternative suggestions in error messages**
+**3. Allowlists can become stale when new platforms are added**
+- **Mitigation**: This is acceptable because:
+  - Only affects recipes that explicitly set `supported_os` or `supported_arch`
+  - Recipes without constraints automatically support new platforms (default = all)
+  - CI tests on new platforms will reveal missing support
+  - New platforms are added infrequently (years between new GOOS/GOARCH values)
+
+**4. No alternative suggestions in error messages**
 - **Mitigation**: This is acceptable because:
   - Users can run `tsuku search <query>` manually (documented in error message)
   - Keeps initial implementation simple and shippable
   - Can be added later without breaking changes (just enhance the error formatter)
   - Alternative suggestion quality depends on recipe metadata completeness (not yet mature enough)
-
-**4. Platform check happens at install time, not earlier (e.g., search/info)**
-- **Mitigation**: This is acceptable because:
-  - `tsuku info <tool>` will display platform support (separate work item)
-  - Search results don't currently filter by platform (future enhancement)
-  - Install-time check is sufficient to prevent the actual problem (installing incompatible tools)
 
 ## Solution Architecture
 
@@ -530,7 +446,7 @@ Platform awareness is implemented as declarative metadata in recipe TOML files, 
 
 **1. Recipe Schema Extension** (`internal/recipe/types.go`)
 
-Add two optional fields to the `Metadata` struct:
+Add three optional fields to the `Metadata` struct:
 
 ```go
 type Metadata struct {
@@ -540,16 +456,21 @@ type Metadata struct {
     VersionFormat string  `toml:"version_format"`
     Tier         int      `toml:"tier,omitempty"`
 
-    // Platform constraints (optional)
-    SupportedOS   []string `toml:"supported_os,omitempty"`
-    SupportedArch []string `toml:"supported_arch,omitempty"`
+    // Platform constraints (optional, defaults provide universal support)
+    SupportedOS          []string `toml:"supported_os,omitempty"`          // Default: all OS
+    SupportedArch        []string `toml:"supported_arch,omitempty"`        // Default: all arch
+    UnsupportedPlatforms []string `toml:"unsupported_platforms,omitempty"` // Default: empty (no exceptions)
 }
 ```
 
 **Semantics:**
-- Missing fields = universal support (all platforms)
-- Empty array `[]` = no platforms supported (effectively disables recipe)
-- Non-empty array = only listed platforms supported
+- **Defaults:**
+  - `supported_os`: All known OS values (linux, darwin, windows, etc.)
+  - `supported_arch`: All known arch values (amd64, arm64, 386, etc.)
+  - `unsupported_platforms`: Empty list (no exceptions)
+- **Override behavior:** Each field independently overrides its own default
+- **Computation:** `Result = (supported_os × supported_arch) - unsupported_platforms`
+- **Empty arrays:** Empty array `[]` overrides default to "none" (explicit restriction)
 
 **2. Platform Validation** (`internal/recipe/validation.go` or new `platform.go`)
 
@@ -557,23 +478,89 @@ Add a method to check if recipe supports current platform:
 
 ```go
 // SupportsPlatform returns true if the recipe supports the given OS and architecture.
-// Missing or empty constraint fields indicate universal support.
+// Uses complementary hybrid: (allowlist_os × allowlist_arch) - denylist_platforms
 func (r *Recipe) SupportsPlatform(targetOS, targetArch string) bool {
-    // Check OS constraint
-    if len(r.Metadata.SupportedOS) > 0 {
-        if !contains(r.Metadata.SupportedOS, targetOS) {
-            return false
+    // Build allowlist with defaults
+    supportedOS := r.Metadata.SupportedOS
+    if len(supportedOS) == 0 {
+        supportedOS = allKnownOS() // Default: all OS
+    }
+
+    supportedArch := r.Metadata.SupportedArch
+    if len(supportedArch) == 0 {
+        supportedArch = allKnownArch() // Default: all arch
+    }
+
+    // Check if in Cartesian product (allowlist)
+    inAllowlist := contains(supportedOS, targetOS) && contains(supportedArch, targetArch)
+    if !inAllowlist {
+        return false
+    }
+
+    // Check if in denylist (exceptions)
+    platformTuple := fmt.Sprintf("%s/%s", targetOS, targetArch)
+    inDenylist := contains(r.Metadata.UnsupportedPlatforms, platformTuple)
+
+    return !inDenylist
+}
+
+// Helper functions for default platform lists
+func allKnownOS() []string {
+    return []string{"linux", "darwin", "windows", "freebsd", "openbsd", "netbsd", "dragonfly", "plan9", "solaris", "aix", "js", "wasip1"}
+}
+
+func allKnownArch() []string {
+    return []string{"amd64", "386", "arm", "arm64", "ppc64", "ppc64le", "mips", "mipsle", "mips64", "mips64le", "s390x", "riscv64", "wasm"}
+}
+```
+
+**2a. Edge Case Validation** (`internal/recipe/validation.go`)
+
+Add preflight validation for contradictory constraints and empty result sets:
+
+```go
+// ValidatePlatformConstraints performs edge case validation on platform fields.
+// Returns warnings for no-op constraints, errors for empty result sets.
+func (r *Recipe) ValidatePlatformConstraints() (warnings []string, err error) {
+    // Compute effective supported platforms
+    supportedOS := r.Metadata.SupportedOS
+    if len(supportedOS) == 0 {
+        supportedOS = allKnownOS()
+    }
+
+    supportedArch := r.Metadata.SupportedArch
+    if len(supportedArch) == 0 {
+        supportedArch = allKnownArch()
+    }
+
+    // Build Cartesian product
+    allowedPlatforms := map[string]bool{}
+    for _, os := range supportedOS {
+        for _, arch := range supportedArch {
+            allowedPlatforms[fmt.Sprintf("%s/%s", os, arch)] = true
         }
     }
 
-    // Check arch constraint
-    if len(r.Metadata.SupportedArch) > 0 {
-        if !contains(r.Metadata.SupportedArch, targetArch) {
-            return false
+    // Check for no-op exclusions (warning in strict mode)
+    for _, unsupported := range r.Metadata.UnsupportedPlatforms {
+        if !allowedPlatforms[unsupported] {
+            warnings = append(warnings, fmt.Sprintf(
+                "unsupported_platforms contains '%s' which is not in (supported_os × supported_arch); this constraint has no effect",
+                unsupported,
+            ))
+        } else {
+            delete(allowedPlatforms, unsupported)
         }
     }
 
-    return true
+    // Check for empty result set (error)
+    if len(allowedPlatforms) == 0 {
+        return warnings, fmt.Errorf(
+            "platform constraints result in no supported platforms (all platforms excluded)",
+        )
+    }
+
+    return warnings, nil
 }
 ```
 
@@ -600,11 +587,12 @@ Define structured error for unsupported platforms:
 
 ```go
 type UnsupportedPlatformError struct {
-    RecipeName   string
-    CurrentOS    string
-    CurrentArch  string
-    SupportedOS  []string
-    SupportedArch []string
+    RecipeName           string
+    CurrentOS            string
+    CurrentArch          string
+    SupportedOS          []string
+    SupportedArch        []string
+    UnsupportedPlatforms []string
 }
 
 func (e *UnsupportedPlatformError) Error() string {
@@ -612,22 +600,30 @@ func (e *UnsupportedPlatformError) Error() string {
     fmt.Fprintf(&msg, "Error: %s is not available for %s/%s\n\n",
         e.RecipeName, e.CurrentOS, e.CurrentArch)
 
-    // Show supported platforms
-    if len(e.SupportedOS) > 0 || len(e.SupportedArch) > 0 {
-        msg.WriteString("Supported platforms:\n")
+    // Show constraint details
+    hasAllowlist := len(e.SupportedOS) > 0 || len(e.SupportedArch) > 0
+    hasDenylist := len(e.UnsupportedPlatforms) > 0
 
-        osStr := "any"
+    if hasAllowlist || hasDenylist {
+        msg.WriteString("Platform constraints:\n")
+
+        // Show allowlist
+        osStr := "all"
         if len(e.SupportedOS) > 0 {
             osStr = strings.Join(e.SupportedOS, ", ")
         }
 
-        archStr := "any"
+        archStr := "all"
         if len(e.SupportedArch) > 0 {
             archStr = strings.Join(e.SupportedArch, ", ")
         }
 
-        fmt.Fprintf(&msg, "  OS: %s\n", osStr)
-        fmt.Fprintf(&msg, "  Architecture: %s\n", archStr)
+        fmt.Fprintf(&msg, "  Allowed: %s OS, %s arch\n", osStr, archStr)
+
+        // Show denylist if present
+        if hasDenylist {
+            fmt.Fprintf(&msg, "  Except: %s\n", strings.Join(e.UnsupportedPlatforms, ", "))
+        }
     }
 
     return msg.String()
@@ -640,9 +636,14 @@ Display platform support in `tsuku info <tool>` output:
 
 ```go
 // Add to printRecipeInfo() function
-if len(recipe.Metadata.SupportedOS) > 0 || len(recipe.Metadata.SupportedArch) > 0 {
+hasConstraints := len(recipe.Metadata.SupportedOS) > 0 ||
+                  len(recipe.Metadata.SupportedArch) > 0 ||
+                  len(recipe.Metadata.UnsupportedPlatforms) > 0
+
+if hasConstraints {
     fmt.Println("\nPlatform Support:")
 
+    // Show allowlist
     if len(recipe.Metadata.SupportedOS) > 0 {
         fmt.Printf("  OS: %s\n", strings.Join(recipe.Metadata.SupportedOS, ", "))
     } else {
@@ -653,6 +654,11 @@ if len(recipe.Metadata.SupportedOS) > 0 || len(recipe.Metadata.SupportedArch) > 
         fmt.Printf("  Architecture: %s\n", strings.Join(recipe.Metadata.SupportedArch, ", "))
     } else {
         fmt.Println("  Architecture: all")
+    }
+
+    // Show denylist if present
+    if len(recipe.Metadata.UnsupportedPlatforms) > 0 {
+        fmt.Printf("  Except: %s\n", strings.Join(recipe.Metadata.UnsupportedPlatforms, ", "))
     }
 }
 ```
@@ -670,21 +676,24 @@ Update existing platform-specific recipes:
 ```go
 type Metadata struct {
     // ... existing fields ...
-    SupportedOS   []string `toml:"supported_os,omitempty"`
-    SupportedArch []string `toml:"supported_arch,omitempty"`
+    SupportedOS          []string `toml:"supported_os,omitempty"`
+    SupportedArch        []string `toml:"supported_arch,omitempty"`
+    UnsupportedPlatforms []string `toml:"unsupported_platforms,omitempty"`
 }
 
 func (r *Recipe) SupportsPlatform(targetOS, targetArch string) bool
+func (r *Recipe) ValidatePlatformConstraints() (warnings []string, err error)
 ```
 
 **Error Handling:**
 ```go
 type UnsupportedPlatformError struct {
-    RecipeName   string
-    CurrentOS    string
-    CurrentArch  string
-    SupportedOS  []string
-    SupportedArch []string
+    RecipeName           string
+    CurrentOS            string
+    CurrentArch          string
+    SupportedOS          []string
+    SupportedArch        []string
+    UnsupportedPlatforms []string
 }
 ```
 
@@ -720,25 +729,34 @@ type UnsupportedPlatformError struct {
 ### Phase 1: Schema and Validation (Core Functionality)
 
 **Deliverables:**
-- Extend `Metadata` struct with `SupportedOS` and `SupportedArch` fields
-- Implement `Recipe.SupportsPlatform()` method
-- Define `UnsupportedPlatformError` type with formatted output
-- Add unit tests for validation logic (various constraint combinations)
+- Extend `Metadata` struct with `SupportedOS`, `SupportedArch`, and `UnsupportedPlatforms` fields
+- Implement `Recipe.SupportsPlatform()` method with Cartesian product and denylist logic
+- Implement `Recipe.ValidatePlatformConstraints()` for edge case detection
+- Define `UnsupportedPlatformError` type with formatted output (includes denylist)
+- Add helper functions: `allKnownOS()`, `allKnownArch()`
+- Add unit tests for validation logic (various constraint combinations and edge cases)
 
 **Testing:**
-- Test missing fields (should return true for all platforms)
-- Test empty arrays (should return false for all platforms)
-- Test OS-only constraints
-- Test arch-only constraints
-- Test combined OS+arch constraints
-- Test error message formatting
+- Test missing fields (should default to all platforms)
+- Test empty arrays (should override to empty set)
+- Test OS-only constraints (e.g., `supported_os = ["linux"]`)
+- Test arch-only constraints (e.g., `supported_arch = ["amd64"]`)
+- Test denylist-only (e.g., `unsupported_platforms = ["darwin/arm64"]`)
+- Test combined allowlist + denylist (e.g., `supported_os = ["linux", "darwin"]` + `unsupported_platforms = ["darwin/arm64"]`)
+- **Edge case tests:**
+  - Contradictory constraints: `supported_os = ["linux"]` + `unsupported_platforms = ["darwin/arm64"]` (warning)
+  - Empty result set: `supported_os = ["linux"]` + `supported_arch = ["arm64"]` + `unsupported_platforms = ["linux/arm64"]` (error)
+  - Validate warning messages in strict mode
+- Test error message formatting (shows allowlist and denylist)
 
 **Dependencies:** None (standalone addition to recipe package)
 
 **Success Criteria:**
-- Recipe TOML parsing handles new fields
-- `SupportsPlatform()` correctly evaluates all combinations
-- Error messages are clear and actionable
+- Recipe TOML parsing handles all three fields
+- `SupportsPlatform()` correctly computes `(os × arch) - unsupported_platforms`
+- `ValidatePlatformConstraints()` detects no-op exclusions and empty result sets
+- Error messages clearly show platform constraints
+- Edge cases produce appropriate warnings (strict mode) or errors
 
 ### Phase 2: CLI Integration (Preflight and Error Handling)
 
