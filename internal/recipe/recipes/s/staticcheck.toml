@@ -5,7 +5,6 @@ homepage = "https://staticcheck.dev/"
 version_format = "semver"
 
 [version]
-source = "goproxy"
 module = "honnef.co/go/tools"
 
 [[steps]]

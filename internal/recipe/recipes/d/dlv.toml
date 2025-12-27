@@ -5,7 +5,6 @@ homepage = "https://github.com/go-delve/delve"
 version_format = "semver"
 
 [version]
-source = "goproxy"
 module = "github.com/go-delve/delve"
 
 [[steps]]

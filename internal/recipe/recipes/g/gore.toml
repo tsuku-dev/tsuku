@@ -7,7 +7,6 @@ version_format = "semver"
 runtime_dependencies = ["golang"]
 
 [version]
-source = "goproxy"
 module = "github.com/x-motemen/gore"
 
 [[steps]]
