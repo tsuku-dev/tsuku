@@ -288,23 +288,35 @@ Many actions automatically infer the version source from their parameters, so an
 | `cpan_install` | `metacpan` | `distribution` |
 | `github_archive` | `github_releases` | `repo` |
 | `github_file` | `github_releases` | `repo` |
+| `go_install` | `goproxy` | `module` |
 
 **When to add `[version]`:**
 
 - **Different source**: When version comes from a different source than the action implies (e.g., using GitHub releases for version but installing from crates.io)
-- **go_install**: Always requires explicit `source = "goproxy"` with `module` parameter
+- **go_install with differing module**: When the install path differs from the versioning module path (see below)
 - **download_archive**: Always requires explicit version configuration
 
-**Example - go_install (always explicit):**
+**Example - go_install (simple case, no `[version]` needed):**
 
 ```toml
-[version]
-source = "goproxy"
-module = "mvdan.cc/gofumpt"
-
 [[steps]]
 action = "go_install"
 module = "mvdan.cc/gofumpt"
+executables = ["gofumpt"]
+```
+
+**Example - go_install (differing paths, `module` required):**
+
+When the install path differs from the versioning module path (common with `/cmd/` subpackages), specify only `module` in `[version]`:
+
+```toml
+[version]
+module = "github.com/go-delve/delve"  # Versioning module
+
+[[steps]]
+action = "go_install"
+module = "github.com/go-delve/delve/cmd/dlv"  # Install path
+executables = ["dlv"]
 ```
 
 **Example - override version source:**
