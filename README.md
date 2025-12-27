@@ -77,6 +77,82 @@ tsuku create zlib --from homebrew:zlib
 tsuku create jq --from homebrew:jq
 ```
 
+#### LLM-Powered Recipe Generation
+
+Some recipe builders use LLM analysis to generate recipes from complex sources. These require an API key:
+
+**Builders requiring LLM**:
+- `--from github:owner/repo` - Analyzes GitHub releases
+- `--from homebrew:formula` - Analyzes Homebrew formulas
+
+**Builders NOT requiring LLM** (deterministic):
+- `--from crates.io` - Uses crates.io API
+- `--from npm` - Uses npm registry
+- `--from pypi` - Uses PyPI API
+- `--from rubygems` - Uses RubyGems API
+
+To use LLM-powered builders, export an API key for Claude or Gemini:
+
+```bash
+# Claude (Anthropic)
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Or Gemini (Google)
+export GOOGLE_API_KEY="AIza..."
+```
+
+Cost per recipe generation: ~$0.02-0.15 depending on complexity.
+
+#### Dependency Discovery
+
+When you request a Homebrew formula, tsuku automatically discovers all dependencies and estimates generation cost:
+
+```bash
+$ tsuku create neovim --from homebrew:neovim
+
+Discovering dependencies...
+
+Dependency tree for neovim:
+  neovim (needs recipe)
+  ├── gettext (needs recipe)
+  ├── libuv (has recipe ✓)
+  ├── lpeg (needs recipe)
+  │   └── lua (needs recipe)
+  ...
+
+Recipes to generate: 8
+Estimated cost: ~$0.40
+
+Proceed? [y/N]
+```
+
+Recipes are generated in dependency order (leaves first) to ensure validation succeeds.
+
+#### Platform Support
+
+Homebrew recipes are platform-agnostic - a single recipe works on:
+- macOS ARM64 (Apple Silicon)
+- macOS x86_64 (Intel)
+- Linux ARM64
+- Linux x86_64
+
+The `homebrew` action automatically selects the correct bottle for your platform at install time.
+
+#### Recipe Validation
+
+Generated recipes are automatically validated in isolated containers with a repair loop:
+
+```bash
+# Validation happens automatically during tsuku create
+tsuku create jq --from homebrew:jq
+# Downloads bottle, validates in container, repairs if needed (max 2 attempts)
+
+# Skip validation if you trust the source
+tsuku create jq --from homebrew:jq --skip-sandbox
+```
+
+Validation catches issues like wrong executable names, missing dependencies, incorrect verification commands, and platform-specific problems. If validation fails, the LLM attempts repairs before returning an error.
+
 Generated recipes are stored in `$TSUKU_HOME/recipes/` and take precedence over registry recipes. You can inspect and edit them before installation:
 
 ```bash
@@ -149,21 +225,72 @@ tsuku remove tool-a   # tool-b remains (it was explicit)
 
 ### Build Dependency Provisioning
 
-tsuku automatically provides build tools and libraries needed for source builds, eliminating the need for system dependencies:
+tsuku automatically provides build tools needed for source builds, eliminating the need for system dependencies.
 
-- **Compilers**: zig (C/C++ via zig cc fallback when system compiler unavailable)
-- **Build tools**: make, pkg-config, cmake, autoconf, automake
-- **Common libraries**: zlib, openssl, ncurses, readline
+#### Build System Actions
 
-When you install a tool that requires compilation, tsuku automatically installs the necessary build dependencies. No manual setup required.
+- **cmake_build** - CMake-based builds (auto-provisions cmake, make, zig, pkg-config)
+- **configure_make** - Autotools builds (auto-provisions make, zig, pkg-config)
+- **setup_build_env** - Configures build environment (PKG_CONFIG_PATH, CPPFLAGS, LDFLAGS)
 
-Example:
+#### Core Build Tools
+
+- **zig** - C/C++ compiler fallback via `zig cc` when no system compiler exists
+- **cmake** - Modern build system with dedicated cmake_build action
+- **pkg-config** - Library discovery tool with automatic path configuration
+- **make** - Build automation
+
+#### Automatic Dependency Provisioning
+
+When you install a tool that requires libraries, tsuku automatically provisions all dependencies:
+
 ```bash
-# Build gdbm from source - tsuku provides make and zig automatically
-tsuku install gdbm-source
+tsuku install sqlite
+# Automatically installs: sqlite → readline → ncurses
+# No apt-get or brew needed
 ```
 
-Build essentials are installed to `$TSUKU_HOME/tools/` just like any other tool and are subject to the same dependency management rules.
+All dependencies are isolated to `$TSUKU_HOME` - no system modifications required.
+
+### System Dependencies
+
+Some tools require dependencies that tsuku cannot provision - things like Docker, CUDA, or kernel modules that require system-level installation. For these, tsuku provides clear guidance.
+
+#### Check Dependencies
+
+Before installing a tool, check what dependencies it requires:
+
+```bash
+# Check dependencies for a tool
+tsuku check-deps docker-compose
+
+# Output shows:
+# - Provisionable: Dependencies tsuku will install automatically
+# - System-required: Dependencies you must install manually
+```
+
+The `check-deps` command:
+- Shows which dependencies tsuku can provision vs. which require manual installation
+- Provides platform-specific installation instructions for system dependencies
+- Exits with code 1 if any system dependency is missing (useful for CI)
+
+#### System-Required Dependencies
+
+When a tool depends on something tsuku cannot provide, the recipe uses the `require_system` action. This:
+- Validates the command exists on your system
+- Checks version requirements if specified
+- Provides installation guidance if missing
+
+Example output when Docker is missing:
+```
+Error: System dependency 'docker' not found
+
+To install on macOS:
+  brew install --cask docker
+
+To install on Linux:
+  See https://docs.docker.com/engine/install/ for platform-specific installation
+```
 
 ### Multi-Version Support
 

@@ -29,8 +29,40 @@ File operation primitives are the atomic building blocks of installation. They p
 | `apply_patch_file` | Apply patch file using system patch command | Fully deterministic |
 | `text_replace` | Text replacement in files (Homebrew inreplace equivalent) | Fully deterministic |
 | `homebrew_relocate` | Relocate Homebrew placeholder paths in binaries | Fully deterministic |
+| `require_system` | Validate system dependency exists with version check | Fully deterministic |
 
 **Key property**: All file operation primitives are fully reproducible. Running the same primitive twice produces identical results.
+
+#### require_system Action
+
+The `require_system` action validates that a system dependency exists and optionally checks its version. This is used for dependencies tsuku cannot provision (Docker, CUDA, kernel modules).
+
+```toml
+[[steps]]
+action = "require_system"
+command = "docker"
+version_flag = "--version"
+version_regex = "Docker version ([0-9.]+)"
+min_version = "20.0"  # Optional minimum version
+
+[steps.install_guide]
+darwin = "brew install --cask docker"
+linux = "See https://docs.docker.com/engine/install/"
+fallback = "Visit https://docs.docker.com/get-docker/"
+```
+
+Parameters:
+- `command` (required): The command to check for
+- `version_flag`: Flag to get version output (e.g., `--version`)
+- `version_regex`: Regex to extract version from output
+- `min_version`: Minimum required version
+- `install_guide`: Platform-specific installation instructions
+
+The action:
+1. Checks if the command exists in PATH
+2. If `version_flag` is specified, extracts and validates version
+3. If missing or version too old, displays platform-specific installation guidance
+4. Fails the installation with actionable error message
 
 ### Ecosystem Primitives
 
@@ -42,6 +74,7 @@ Ecosystem primitives delegate to external package managers and build systems (Go
 | `cmake_build` | CMake | CMakeLists.txt | Compiler version, platform differences |
 | `configure_make` | Autotools | configure script | Compiler version, platform detection |
 | `cpan_install` | Perl | cpanfile.snapshot | XS modules, Perl version |
+| `meson_build` | Meson | meson.build | Compiler version, build scripts |
 | `gem_exec` | Ruby | Gemfile.lock | Native extensions, Ruby version |
 | `go_build` | Go | go.sum, module versions | Compiler version, CGO |
 | `install_gem_direct` | Ruby | Exact version | Native extensions, Ruby version |
@@ -51,6 +84,40 @@ Ecosystem primitives delegate to external package managers and build systems (Go
 | `pip_install` | Python | Version only (legacy) | Platform wheels, Python version, transitive deps |
 
 **Key property**: Ecosystem primitives capture dependency versions during evaluation but cannot guarantee bit-for-bit reproducibility due to compiler and platform variations.
+
+#### Build System Primitives
+
+Build system primitives handle source compilation using standard build tools. These are used when tools need to be built from source:
+
+- `configure_make` - Autotools builds (`./configure && make && make install`)
+- `cmake_build` - CMake projects
+- `meson_build` - Meson build system (common in GNOME/GTK projects)
+
+Build system primitives are ecosystem primitives that depend on system compilers. They capture build configuration but have residual non-determinism from compiler versions and platform detection.
+
+#### setup_build_env
+
+Configures build environment from dependency graph. Sets environment variables for all declared dependencies:
+- PKG_CONFIG_PATH - lib/pkgconfig paths from dependencies
+- CPPFLAGS - -I flags for include directories
+- LDFLAGS - -L flags for library directories
+- CMAKE_PREFIX_PATH - for CMake builds
+- CC/CXX - compiler paths (zig cc if no system compiler)
+
+Example:
+```toml
+[[steps]]
+action = "setup_build_env"
+
+[[steps]]
+action = "configure_make"
+source_dir = "curl-{version}"
+configure_args = ["--with-openssl", "--with-zlib"]
+```
+
+The setup_build_env action validates that dependencies can be discovered by the build system.
+
+**Example use case**: Manual recipe authoring for tools distributed as source tarballs, or when Homebrew formulas lack pre-built bottles.
 
 ### Composite Actions (Recipe Authoring)
 
@@ -71,6 +138,25 @@ Composite actions are shortcuts for recipe authors. They decompose into primitiv
 |-----------|---------------|--------------------|
 | `apply_patch` | download_file + apply_patch_file (or just apply_patch_file) | Apply patch from URL or inline data |
 | `homebrew` | download_file + extract + homebrew_relocate | Install Homebrew GHCR bottles |
+
+##### Patch Application
+
+Patches are used to modify source code before building, common in Homebrew formulas and source-based installs:
+
+```toml
+[[steps]]
+action = "apply_patch"
+url = "https://raw.githubusercontent.com/Homebrew/formula-patches/master/example/fix.patch"
+checksum = "sha256:abc123..."
+strip = 1  # Strip leading path components (-p1)
+```
+
+The `apply_patch` composite:
+1. Downloads patch file with checksum verification (if URL provided)
+2. Applies patch using `apply_patch_file` primitive
+3. Validates patch application succeeded
+
+For inline patches, omit the `url` parameter and provide patch data directly.
 
 #### Ecosystem Install Composites
 
