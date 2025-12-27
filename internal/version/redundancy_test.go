@@ -25,7 +25,7 @@ func TestDetectRedundantVersion(t *testing.T) {
 			wantLen: 0,
 		},
 		{
-			name: "redundant - go_install with goproxy",
+			name: "no redundancy - go_install with goproxy",
 			recipe: &recipe.Recipe{
 				Version: recipe.VersionSection{Source: "goproxy"},
 				Steps: []recipe.Step{{
@@ -33,8 +33,7 @@ func TestDetectRedundantVersion(t *testing.T) {
 					Params: map[string]interface{}{"module": "mvdan.cc/gofumpt"},
 				}},
 			},
-			wantLen: 1,
-			wantMsg: "source=\"goproxy\" is redundant",
+			wantLen: 0, // go_install has no inference, so explicit is required
 		},
 		{
 			name: "redundant - cargo_install with crates_io",
