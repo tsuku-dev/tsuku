@@ -1,4 +1,4 @@
-# Platform Tuple Support for install_guide and when Clauses
+# Platform Tuple Support for install_guide
 
 ## Status
 
@@ -6,7 +6,7 @@ Proposed
 
 ## Context and Problem Statement
 
-PR #685 implemented platform-aware recipes with OS and architecture constraints using the `supported_os` and `supported_arch` arrays. While this provides recipe-level platform filtering, it operates at OS-level granularity only for step-level features like `install_guide` and the `when` clause.
+PR #685 implemented platform-aware recipes with OS and architecture constraints using the `supported_os` and `supported_arch` arrays. While this provides recipe-level platform filtering, the step-level `install_guide` field operates at OS-level granularity only.
 
 The `install_guide` field in the `require_system` action currently maps OS strings (`darwin`, `linux`) to installation instructions. However, some system dependencies have different installation methods or package names based on both OS _and_ architecture. For example:
 
@@ -14,8 +14,6 @@ The `install_guide` field in the `require_system` action currently maps OS strin
 - **darwin/amd64** (Intel Mac): Homebrew installed at `/usr/local`
 
 These architectural differences can require different install commands or package managers, but the current implementation only allows OS-level keys like `darwin` or `linux`.
-
-Similarly, the step-level `when` clause (defined in `Step.When` but currently undocumented and unused) only supports `os` and `arch` arrays for independent filtering, not platform tuples that combine both dimensions.
 
 ### Current Limitation
 
@@ -26,19 +24,18 @@ Given this recipe fragment:
 action = "require_system"
 command = "gcc"
 install_guide = { darwin = "brew install gcc", linux = "apt install gcc" }
-when = { os = ["darwin", "linux"] }
 ```
 
 This assumes all darwin architectures use the same Homebrew location and command, which is not true for Apple Silicon vs Intel Macs.
 
 ### Why This Matters Now
 
-With platform-aware recipe support (#228) merged, recipes can now declare precise platform constraints. However, the step-level execution features have not been updated to match this precision. This creates an architectural inconsistency:
+With platform-aware recipe support (#228) merged, recipes can now declare precise platform constraints. However, the step-level `install_guide` field has not been updated to match this precision. This creates an architectural inconsistency:
 
 - **Recipe-level**: Can express "linux/arm64 only" via `supported_os` + `supported_arch`
-- **Step-level**: Can only express "darwin" or "linux" in `install_guide` and `when`
+- **Step-level**: Can only express "darwin" or "linux" in `install_guide`
 
-This limitation prevents recipes from providing architecture-specific installation guidance or conditionally executing steps based on exact platform tuples.
+This limitation prevents recipes from providing architecture-specific installation guidance for system dependencies.
 
 ### Scope
 
@@ -48,10 +45,10 @@ This limitation prevents recipes from providing architecture-specific installati
 - Validation: ensure `install_guide` has either complete tuple coverage or OS-level fallbacks for all supported platforms
 
 **Out of scope:**
-- Step-level `when` clause support (currently undocumented and unused; should be addressed in separate design)
 - Changes to recipe-level platform constraints (`supported_os`, `supported_arch` work as-is)
 - New action types or execution semantics
 - Website or CLI display changes (already handled by existing platform support)
+- Step-level conditional execution (see issue #690 for platform tuple support in `when` clauses)
 
 **Current Usage:**
 Only 2 recipes currently use `install_guide` (docker.toml and cuda.toml), both with OS-level keys only. This is a forward-looking enhancement to support architecture-specific system dependencies as they become more common.
@@ -125,13 +122,6 @@ func getPlatformGuide(installGuide map[string]string, platform string) string {
 ```
 
 This function is called with `runtime.GOOS`, so it currently only supports OS-level keys. The fallback pattern is already established.
-
-### Step When Clause (Undocumented)
-
-The `Step.When` field exists in types.go but is not currently used:
-- Defined in recipe types but no runtime enforcement
-- Would need executor changes to support conditional step execution
-- Out of scope for install_guide support (can be addressed separately)
 
 ### Patterns to Follow
 
