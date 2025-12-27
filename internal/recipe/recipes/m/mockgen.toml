@@ -4,10 +4,6 @@ description = "Mock generator for Go interfaces"
 homepage = "https://github.com/uber-go/mock"
 version_format = "semver"
 
-[version]
-source = "goproxy"
-module = "go.uber.org/mock"
-
 [[steps]]
 action = "go_install"
 module = "go.uber.org/mock/mockgen"
