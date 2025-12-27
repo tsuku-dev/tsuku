@@ -30,10 +30,11 @@ type Resource struct {
 // Patch represents a source modification to apply before building.
 // Patches can be URL-based or inline (embedded in the recipe).
 type Patch struct {
-	URL    string `toml:"url,omitempty"`    // URL to download patch file (mutually exclusive with Data)
-	Data   string `toml:"data,omitempty"`   // Inline patch content (mutually exclusive with URL)
-	Strip  int    `toml:"strip,omitempty"`  // Strip level for patch command (-p flag), default 1
-	Subdir string `toml:"subdir,omitempty"` // Subdirectory to apply patch in (relative to source root)
+	URL      string `toml:"url,omitempty"`      // URL to download patch file (mutually exclusive with Data)
+	Data     string `toml:"data,omitempty"`     // Inline patch content (mutually exclusive with URL)
+	Checksum string `toml:"checksum,omitempty"` // SHA256 checksum for URL-based patches (required for url, optional for data)
+	Strip    int    `toml:"strip,omitempty"`    // Strip level for patch command (-p flag), default 1
+	Subdir   string `toml:"subdir,omitempty"`   // Subdirectory to apply patch in (relative to source root)
 }
 
 // TextReplace represents a text substitution (maps to Homebrew's inreplace).
@@ -106,6 +107,9 @@ func (r *Recipe) ToTOML() ([]byte, error) {
 			// Use triple-quoted string for multiline patch data
 			buf.WriteString(fmt.Sprintf("data = %q\n", patch.Data))
 		}
+		if patch.Checksum != "" {
+			buf.WriteString(fmt.Sprintf("checksum = %q\n", patch.Checksum))
+		}
 		if patch.Strip != 0 {
 			buf.WriteString(fmt.Sprintf("strip = %d\n", patch.Strip))
 		}
@@ -153,6 +157,11 @@ type MetadataSection struct {
 	Type                     string   `toml:"type"`                       // Recipe type: "tool" (default) or "library"
 	LLMValidation            string   `toml:"llm_validation,omitempty"`   // LLM validation status: "skipped" or empty
 	Binaries                 []string `toml:"binaries,omitempty"`         // Explicit binary paths for homebrew recipes
+
+	// Platform constraints (optional, defaults provide universal support)
+	SupportedOS          []string `toml:"supported_os,omitempty"`          // Allowed OS values (default: all OS)
+	SupportedArch        []string `toml:"supported_arch,omitempty"`        // Allowed architecture values (default: all arch)
+	UnsupportedPlatforms []string `toml:"unsupported_platforms,omitempty"` // Platform exceptions in "os/arch" format (default: empty)
 }
 
 // VersionSection specifies how to resolve versions

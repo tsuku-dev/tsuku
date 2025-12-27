@@ -35,14 +35,20 @@ func (a *SetRpathAction) Execute(ctx *ExecutionContext, params map[string]interf
 		return fmt.Errorf("set_rpath action requires 'binaries' parameter")
 	}
 
+	// Build vars for variable substitution
+	vars := GetStandardVars(ctx.Version, ctx.InstallDir, ctx.WorkDir, ctx.LibsDir)
+
 	// Get rpath (defaults to $ORIGIN/../lib per design doc)
 	rpath, _ := GetString(params, "rpath")
 	if rpath == "" {
 		rpath = "$ORIGIN/../lib"
 	}
 
+	// Expand variables in rpath
+	rpath = ExpandVars(rpath, vars)
+
 	// Validate RPATH value for security
-	if err := validateRpath(rpath); err != nil {
+	if err := validateRpath(rpath, ctx.LibsDir); err != nil {
 		return fmt.Errorf("invalid rpath value: %w", err)
 	}
 
@@ -51,9 +57,6 @@ func (a *SetRpathAction) Execute(ctx *ExecutionContext, params map[string]interf
 	if val, ok := GetBool(params, "create_wrapper"); ok {
 		createWrapper = val
 	}
-
-	// Build vars for variable substitution
-	vars := GetStandardVars(ctx.Version, ctx.InstallDir, ctx.WorkDir)
 
 	fmt.Printf("   Setting RPATH: %s\n", rpath)
 
@@ -80,7 +83,7 @@ func (a *SetRpathAction) Execute(ctx *ExecutionContext, params map[string]interf
 		var setErr error
 		switch format {
 		case "elf":
-			setErr = setRpathLinux(binaryPath, rpath)
+			setErr = setRpathLinux(ctx, binaryPath, rpath)
 		case "macho":
 			setErr = setRpathMacOS(binaryPath, rpath)
 		default:
@@ -140,16 +143,42 @@ func detectBinaryFormat(path string) (string, error) {
 }
 
 // setRpathLinux uses patchelf to modify RPATH on Linux binaries
-func setRpathLinux(binaryPath, rpath string) error {
-	// Check if patchelf is available
-	patchelf, err := exec.LookPath("patchelf")
+func setRpathLinux(ctx *ExecutionContext, binaryPath, rpath string) error {
+	// Find patchelf - check ExecPaths first (for installed dependencies), then fall back to PATH
+	patchelfPath := ""
+	for _, p := range ctx.ExecPaths {
+		candidatePath := filepath.Join(p, "patchelf")
+		if _, err := os.Stat(candidatePath); err == nil {
+			patchelfPath = candidatePath
+			break
+		}
+	}
+	if patchelfPath == "" {
+		// Fall back to system PATH
+		var err error
+		patchelfPath, err = exec.LookPath("patchelf")
+		if err != nil {
+			return fmt.Errorf("patchelf not found: install with 'apt install patchelf' or 'yum install patchelf'")
+		}
+	}
+
+	// Homebrew bottles often have read-only files; make writable before patching
+	info, err := os.Stat(binaryPath)
 	if err != nil {
-		return fmt.Errorf("patchelf not found: install with 'apt install patchelf' or 'yum install patchelf'")
+		return fmt.Errorf("failed to stat binary: %w", err)
+	}
+	originalMode := info.Mode()
+	if originalMode&0200 == 0 {
+		if err := os.Chmod(binaryPath, originalMode|0200); err != nil {
+			return fmt.Errorf("failed to make binary writable: %w", err)
+		}
+		// Restore original mode after patching (best-effort cleanup)
+		defer func() { _ = os.Chmod(binaryPath, originalMode) }()
 	}
 
 	// First, remove existing RPATH/RUNPATH (security requirement)
 	// Using --remove-rpath removes both RPATH and RUNPATH
-	removeCmd := exec.Command(patchelf, "--remove-rpath", binaryPath)
+	removeCmd := exec.Command(patchelfPath, "--remove-rpath", binaryPath)
 	if output, err := removeCmd.CombinedOutput(); err != nil {
 		// Some binaries don't have RPATH, which is fine
 		if !strings.Contains(string(output), "cannot find") {
@@ -161,7 +190,7 @@ func setRpathLinux(binaryPath, rpath string) error {
 	// Set new RPATH using --force-rpath to set DT_RPATH instead of DT_RUNPATH
 	// DT_RPATH takes precedence over LD_LIBRARY_PATH, providing better security
 	// DT_RUNPATH (patchelf default) is overridden by LD_LIBRARY_PATH
-	setCmd := exec.Command(patchelf, "--force-rpath", "--set-rpath", rpath, binaryPath)
+	setCmd := exec.Command(patchelfPath, "--force-rpath", "--set-rpath", rpath, binaryPath)
 	if output, err := setCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("patchelf --set-rpath failed: %s: %w", strings.TrimSpace(string(output)), err)
 	}
@@ -355,36 +384,58 @@ func validatePathWithinDir(targetPath, baseDir string) error {
 }
 
 // validateRpath validates that an RPATH value is safe
-// This prevents RPATH injection attacks
-func validateRpath(rpath string) error {
+// This prevents RPATH injection attacks while allowing tsuku dependency paths
+func validateRpath(rpath string, libsDir string) error {
 	// Allow empty rpath (will use default)
 	if rpath == "" {
 		return nil
 	}
 
-	// Check for dangerous patterns
-	// Reject colons which could add multiple paths
-	if strings.Contains(rpath, ":") {
-		return fmt.Errorf("RPATH cannot contain ':' (multiple paths)")
-	}
+	// Split colon-separated paths for validation
+	paths := strings.Split(rpath, ":")
 
-	// Reject absolute paths that don't use $ORIGIN/@executable_path
-	// These could point to attacker-controlled directories
-	if filepath.IsAbs(rpath) {
-		return fmt.Errorf("RPATH must be relative using $ORIGIN or @executable_path")
-	}
-
-	// Allow relative paths with $ORIGIN or @executable_path/@loader_path prefix
-	validPrefixes := []string{"$ORIGIN", "@executable_path", "@loader_path", "@rpath"}
-	hasValidPrefix := false
-	for _, prefix := range validPrefixes {
-		if strings.HasPrefix(rpath, prefix) {
-			hasValidPrefix = true
-			break
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
 		}
-	}
-	if !hasValidPrefix {
-		return fmt.Errorf("RPATH must start with $ORIGIN, @executable_path, @loader_path, or @rpath")
+
+		// Note: We don't block ".." in paths because it's commonly used in RPATH
+		// (e.g., "$ORIGIN/../lib"). The real security check is ensuring absolute
+		// paths stay within $TSUKU_HOME/libs/.
+
+		// Check if it's an absolute path
+		if filepath.IsAbs(path) {
+			// Absolute paths are only allowed within $TSUKU_HOME/libs/
+			// This allows dependency libraries while preventing arbitrary system paths
+			if libsDir != "" {
+				// Clean paths for comparison
+				cleanPath := filepath.Clean(path)
+				cleanLibsDir := filepath.Clean(libsDir)
+
+				// Check if path is within libsDir
+				if !strings.HasPrefix(cleanPath, cleanLibsDir+string(filepath.Separator)) &&
+					cleanPath != cleanLibsDir {
+					return fmt.Errorf("absolute RPATH must be within tsuku libs directory (%s): %s", cleanLibsDir, path)
+				}
+			} else {
+				// If libsDir is not set, reject absolute paths for safety
+				return fmt.Errorf("RPATH must be relative using $ORIGIN or @executable_path: %s", path)
+			}
+		} else {
+			// Relative paths must use platform-specific prefixes
+			validPrefixes := []string{"$ORIGIN", "@executable_path", "@loader_path", "@rpath"}
+			hasValidPrefix := false
+			for _, prefix := range validPrefixes {
+				if strings.HasPrefix(path, prefix) {
+					hasValidPrefix = true
+					break
+				}
+			}
+			if !hasValidPrefix {
+				return fmt.Errorf("relative RPATH must start with $ORIGIN, @executable_path, @loader_path, or @rpath: %s", path)
+			}
+		}
 	}
 
 	return nil

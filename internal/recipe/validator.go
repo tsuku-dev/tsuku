@@ -81,13 +81,32 @@ func ValidateBytes(data []byte) *ValidationResult {
 
 	result.Recipe = &recipe
 
-	// Run all validations
-	validateMetadata(result, &recipe)
-	validateVersion(result, &recipe)
-	validateSteps(result, &recipe)
-	validateVerify(result, &recipe)
+	// Run validations on the parsed recipe
+	runRecipeValidations(result, &recipe)
 
 	return result
+}
+
+// ValidateRecipe validates an already-parsed Recipe object.
+// Use this when you have a Recipe loaded from the registry or loader,
+// rather than raw TOML bytes or a file path.
+func ValidateRecipe(r *Recipe) *ValidationResult {
+	result := &ValidationResult{Valid: true, Recipe: r}
+	runRecipeValidations(result, r)
+	return result
+}
+
+// runRecipeValidations runs all validation checks on a Recipe.
+// This is the common validation logic shared by ValidateBytes and ValidateRecipe.
+func runRecipeValidations(result *ValidationResult, r *Recipe) {
+	validateMetadata(result, r)
+	validateVersion(result, r)
+	validatePatches(result, r)
+	validateSteps(result, r)
+	validateVerify(result, r)
+	validatePlatformConstraints(result, r)
+	// Note: Shadowed dependency validation is done at the CLI layer
+	// to avoid circular dependencies between recipe and actions packages
 }
 
 // validateMetadata checks the metadata section
@@ -204,9 +223,44 @@ func canInferVersionFromActions(r *Recipe) bool {
 			if _, ok := step.Params["repo"].(string); ok {
 				return true // InferredGitHubStrategy
 			}
+		case "require_system":
+			// System dependencies don't use version providers - version is detected directly
+			return true
 		}
 	}
 	return false
+}
+
+// validatePatches checks patch configuration
+func validatePatches(result *ValidationResult, r *Recipe) {
+	for i, patch := range r.Patches {
+		patchField := fmt.Sprintf("patches[%d]", i)
+
+		// Check mutual exclusivity of url and data
+		if patch.URL != "" && patch.Data != "" {
+			result.addError(patchField, "cannot specify both 'url' and 'data' (must be mutually exclusive)")
+			continue
+		}
+		if patch.URL == "" && patch.Data == "" {
+			result.addError(patchField, "must specify either 'url' or 'data'")
+			continue
+		}
+
+		// Validate checksum format if provided (will be passed to apply_patch action)
+		if patch.Checksum != "" {
+			if len(patch.Checksum) != 64 {
+				result.addError(patchField+".checksum", "checksum must be 64 characters (SHA256 hex)")
+			} else {
+				// Check if all characters are hex
+				for _, c := range patch.Checksum {
+					if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+						result.addError(patchField+".checksum", "checksum must be hexadecimal (0-9, a-f)")
+						break
+					}
+				}
+			}
+		}
+	}
 }
 
 // validateSteps checks all steps
@@ -216,34 +270,7 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 		return
 	}
 
-	// Known action types
-	knownActions := map[string]bool{
-		"download":          true,
-		"download_archive":  true,
-		"extract":           true,
-		"chmod":             true,
-		"install_binaries":  true,
-		"install_libraries": true,
-		"link_dependencies": true,
-		"set_env":           true,
-		"set_rpath":         true,
-		"run_command":       true,
-		"apt_install":       true,
-		"yum_install":       true,
-		"brew_install":      true,
-		"npm_install":       true,
-		"pipx_install":      true,
-		"pip_exec":          true,
-		"cargo_install":     true,
-		"go_install":        true,
-		"gem_install":       true,
-		"cpan_install":      true,
-		"nix_install":       true,
-		"github_archive":    true,
-		"github_file":       true,
-		"homebrew":          true,
-		"configure_make":    true,
-	}
+	av := GetActionValidator()
 
 	for i, step := range r.Steps {
 		stepField := fmt.Sprintf("steps[%d]", i)
@@ -253,120 +280,91 @@ func validateSteps(result *ValidationResult, r *Recipe) {
 			continue
 		}
 
-		if !knownActions[step.Action] {
-			// Try to suggest similar actions
-			suggestion := suggestSimilar(step.Action, knownActions)
-			if suggestion != "" {
-				result.addError(stepField+".action", fmt.Sprintf("unknown action '%s' (did you mean '%s'?)", step.Action, suggestion))
-			} else {
-				result.addError(stepField+".action", fmt.Sprintf("unknown action '%s'", step.Action))
+		// Validate action via registered ActionValidator (avoids circular import)
+		if av != nil {
+			actionResult := av.ValidateAction(step.Action, step.Params)
+
+			// Process errors from action validation
+			for _, errMsg := range actionResult.Errors {
+				// Check if this is an "unknown action" error (action not registered)
+				if strings.Contains(errMsg, "unknown action") {
+					// Build suggestion map for typo detection
+					knownActions := make(map[string]bool)
+					for _, name := range av.RegisteredNames() {
+						knownActions[name] = true
+					}
+					suggestion := suggestSimilar(step.Action, knownActions)
+					if suggestion != "" {
+						result.addError(stepField+".action", fmt.Sprintf("unknown action '%s' (did you mean '%s'?)", step.Action, suggestion))
+					} else {
+						result.addError(stepField+".action", errMsg)
+					}
+				} else {
+					// Action exists but parameter validation failed (Preflight error)
+					result.addError(stepField, errMsg)
+				}
 			}
-			continue
+
+			// Process warnings from action validation
+			for _, warnMsg := range actionResult.Warnings {
+				result.addWarning(stepField, warnMsg)
+			}
+
+			if actionResult.HasErrors() {
+				continue
+			}
 		}
 
-		// Validate action-specific parameters
-		validateActionParams(result, stepField, &step)
+		// Validate path-like parameters for security (path traversal, etc.)
+		validatePathParams(result, stepField, &step)
 	}
 }
 
-// validateActionParams validates parameters for a specific action
-func validateActionParams(result *ValidationResult, stepField string, step *Step) {
-	switch step.Action {
-	case "download":
-		if _, ok := step.Params["url"]; !ok {
-			result.addError(stepField, "download action requires 'url' parameter")
-		} else {
-			validateURLParam(result, stepField+".url", step.Params["url"])
-		}
-
-	case "download_archive":
-		if _, ok := step.Params["url"]; !ok {
-			result.addError(stepField, "download_archive action requires 'url' parameter")
-		} else {
-			validateURLParam(result, stepField+".url", step.Params["url"])
-		}
-
-	case "extract":
-		if _, ok := step.Params["archive"]; !ok {
-			result.addError(stepField, "extract action requires 'archive' parameter")
-		}
-
-	case "install_binaries":
-		if _, ok := step.Params["binaries"]; !ok {
-			if _, ok := step.Params["binary"]; !ok {
-				result.addError(stepField, "install_binaries action requires 'binaries' or 'binary' parameter")
-			}
-		}
-
-	case "github_archive", "github_file":
-		if _, ok := step.Params["repo"]; !ok {
-			result.addError(stepField, fmt.Sprintf("%s action requires 'repo' parameter", step.Action))
-		}
-		if _, ok := step.Params["asset_pattern"]; !ok {
-			result.addError(stepField, fmt.Sprintf("%s action requires 'asset_pattern' parameter", step.Action))
-		}
-
-	case "npm_install":
-		if _, ok := step.Params["package"]; !ok {
-			result.addError(stepField, "npm_install action requires 'package' parameter")
-		}
-
-	case "pipx_install":
-		if _, ok := step.Params["package"]; !ok {
-			result.addError(stepField, "pipx_install action requires 'package' parameter")
-		}
-
-	case "cargo_install":
-		if _, ok := step.Params["crate"]; !ok {
-			result.addError(stepField, "cargo_install action requires 'crate' parameter")
-		}
-
-	case "go_install":
-		if _, ok := step.Params["module"]; !ok {
-			result.addError(stepField, "go_install action requires 'module' parameter")
-		}
-
-	case "gem_install":
-		if _, ok := step.Params["gem"]; !ok {
-			result.addError(stepField, "gem_install action requires 'gem' parameter")
-		}
-
-	case "cpan_install":
-		if _, ok := step.Params["distribution"]; !ok {
-			result.addError(stepField, "cpan_install action requires 'distribution' parameter")
-		}
-		if _, ok := step.Params["executables"]; !ok {
-			result.addError(stepField, "cpan_install action requires 'executables' parameter")
-		}
-		// Check for redundant module parameter
-		validateCpanModule(result, stepField, step)
-
-	case "run_command":
-		if _, ok := step.Params["command"]; !ok {
-			result.addError(stepField, "run_command action requires 'command' parameter")
-		}
-
-	case "homebrew":
-		if _, ok := step.Params["formula"]; !ok {
-			result.addError(stepField, "homebrew action requires 'formula' parameter")
-		}
-
-	case "configure_make":
-		if _, ok := step.Params["source_dir"]; !ok {
-			result.addError(stepField, "configure_make action requires 'source_dir' parameter")
-		}
-		if _, ok := step.Params["executables"]; !ok {
-			result.addError(stepField, "configure_make action requires 'executables' parameter")
-		}
-	}
-
-	// Check for path traversal in any path-like parameters
+// validatePathParams checks path-like parameters for security issues (path traversal, etc.)
+func validatePathParams(result *ValidationResult, stepField string, step *Step) {
 	pathParams := []string{"dest", "archive", "binary", "src", "path"}
 	for _, param := range pathParams {
 		if val, ok := step.Params[param]; ok {
 			if str, ok := val.(string); ok {
 				validatePathParam(result, stepField+"."+param, str)
 			}
+		}
+	}
+
+	// Validate URL parameters when present
+	if url, ok := step.Params["url"]; ok {
+		validateURLParam(result, stepField+".url", url)
+	}
+
+	// Validate SHA256 checksum format when present
+	if sha256Param, ok := step.Params["sha256"]; ok {
+		validateSHA256Param(result, stepField+".sha256", sha256Param)
+	}
+
+	// Check for redundant cpan_install module parameter
+	if step.Action == "cpan_install" {
+		validateCpanModule(result, stepField, step)
+	}
+}
+
+// validateSHA256Param validates a SHA256 checksum parameter format
+func validateSHA256Param(result *ValidationResult, field string, value interface{}) {
+	sha256Str, ok := value.(string)
+	if !ok {
+		return
+	}
+
+	// Validate checksum format (SHA256 is 64 hex characters)
+	if len(sha256Str) != 64 {
+		result.addError(field, "sha256 must be 64 characters (SHA256 hex)")
+		return
+	}
+
+	// Check if all characters are hex
+	for _, c := range sha256Str {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			result.addError(field, "sha256 must be hexadecimal (0-9, a-f)")
+			return
 		}
 	}
 }
@@ -610,4 +608,22 @@ func levenshteinDistance(s1, s2 string) int {
 	}
 
 	return matrix[len(s1)][len(s2)]
+}
+
+// validatePlatformConstraints checks platform-related constraints
+func validatePlatformConstraints(result *ValidationResult, r *Recipe) {
+	// Validate platform constraint configuration
+	warnings, err := r.ValidatePlatformConstraints()
+	if err != nil {
+		result.addError("metadata.platform_constraints", err.Error())
+	}
+	for _, w := range warnings {
+		result.addWarning("metadata.platform_constraints", w.Message)
+	}
+
+	// Validate steps against platform constraints
+	stepErrors := r.ValidateStepsAgainstPlatforms()
+	for _, stepErr := range stepErrors {
+		result.addError("steps", stepErr.Error())
+	}
 }

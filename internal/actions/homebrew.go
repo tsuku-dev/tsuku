@@ -26,8 +26,28 @@ type HomebrewAction struct{ BaseAction }
 // IsDeterministic returns true because homebrew downloads with checksums.
 func (HomebrewAction) IsDeterministic() bool { return true }
 
+// Dependencies returns patchelf as a Linux-only install-time dependency.
+// The homebrew action decomposes to homebrew_relocate which requires patchelf for RPATH fixup on Linux.
+// macOS uses install_name_tool (system-provided) instead.
+// TODO(#644): Remove this method once composite actions automatically aggregate primitive dependencies.
+// This is a workaround because dependency resolution happens before decomposition.
+func (HomebrewAction) Dependencies() ActionDeps {
+	return ActionDeps{
+		LinuxInstallTime: []string{"patchelf"},
+	}
+}
+
 // Name returns the action name
 func (a *HomebrewAction) Name() string { return "homebrew" }
+
+// Preflight validates parameters without side effects.
+func (a *HomebrewAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
+	if _, ok := GetString(params, "formula"); !ok {
+		result.AddError("homebrew action requires 'formula' parameter")
+	}
+	return result
+}
 
 // Execute downloads a Homebrew bottle and extracts it to the install directory
 //
@@ -155,9 +175,16 @@ type ghcrTokenResponse struct {
 	Token string `json:"token"`
 }
 
+// formulaToGHCRPath converts a formula name to the GHCR repository path.
+// Homebrew uses @ for versioned formulas (e.g., openssl@3) but GHCR uses / (e.g., openssl/3).
+func formulaToGHCRPath(formula string) string {
+	return strings.ReplaceAll(formula, "@", "/")
+}
+
 // getGHCRToken obtains an anonymous token for GHCR access
 func (a *HomebrewAction) getGHCRToken(formula string) (string, error) {
-	url := fmt.Sprintf("https://ghcr.io/token?service=ghcr.io&scope=repository:homebrew/core/%s:pull", formula)
+	ghcrPath := formulaToGHCRPath(formula)
+	url := fmt.Sprintf("https://ghcr.io/token?service=ghcr.io&scope=repository:homebrew/core/%s:pull", ghcrPath)
 
 	resp, err := ghcrHTTPClient().Get(url)
 	if err != nil {
@@ -203,7 +230,8 @@ type ghcrPlatform struct {
 // getBlobSHA queries the GHCR manifest to find the platform-specific blob SHA
 func (a *HomebrewAction) getBlobSHA(formula, version, platformTag, token string) (string, error) {
 	// Query the manifest index
-	url := fmt.Sprintf("https://ghcr.io/v2/homebrew/core/%s/manifests/%s", formula, version)
+	ghcrPath := formulaToGHCRPath(formula)
+	url := fmt.Sprintf("https://ghcr.io/v2/homebrew/core/%s/manifests/%s", ghcrPath, version)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -261,7 +289,8 @@ func (a *HomebrewAction) getBlobSHA(formula, version, platformTag, token string)
 
 // downloadBottle downloads a bottle blob from GHCR
 func (a *HomebrewAction) downloadBottle(formula, blobSHA, token, destPath string) error {
-	url := fmt.Sprintf("https://ghcr.io/v2/homebrew/core/%s/blobs/sha256:%s", formula, blobSHA)
+	ghcrPath := formulaToGHCRPath(formula)
+	url := fmt.Sprintf("https://ghcr.io/v2/homebrew/core/%s/blobs/sha256:%s", ghcrPath, blobSHA)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -365,7 +394,8 @@ func (a *HomebrewAction) Decompose(ctx *EvalContext, params map[string]interface
 	}
 
 	// Construct the download URL
-	url := fmt.Sprintf("https://ghcr.io/v2/homebrew/core/%s/blobs/sha256:%s", formula, blobSHA)
+	ghcrPath := formulaToGHCRPath(formula)
+	url := fmt.Sprintf("https://ghcr.io/v2/homebrew/core/%s/blobs/sha256:%s", ghcrPath, blobSHA)
 	destFile := fmt.Sprintf("%s.tar.gz", formula)
 
 	// Download the file to verify accessibility and cache it

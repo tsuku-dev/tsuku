@@ -3,11 +3,12 @@ name = "btop"
 description = "Resource monitor that shows usage and stats"
 homepage = "https://github.com/aristocratos/btop"
 version_format = "semver"
+supported_os = ["linux"]
 
 [[steps]]
 action = "github_archive"
 repo = "aristocratos/btop"
-asset_pattern = "btop-{arch}-{os}-musl.tbz"
+asset_pattern = "btop-{arch}-unknown-{os}-musl.tbz"
 archive_format = "tbz"
 strip_dirs = 0
 binaries = ["btop/bin/btop"]

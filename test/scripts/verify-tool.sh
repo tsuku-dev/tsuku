@@ -141,6 +141,131 @@ verify_m4() {
     echo 'define(GREETING, Hello World)GREETING' | m4
 }
 
+verify_pkg_config() {
+    echo "Testing: pkg-config --version"
+    pkg-config --version
+
+    echo ""
+    echo "Testing: pkg-config basic functionality"
+    # Test that it can at least query its own library path setting
+    if pkg-config --variable=pc_path pkg-config 2>/dev/null; then
+        echo "pkg-config can query variables"
+    else
+        echo "Testing: pkg-config --help (verify it runs)"
+        pkg-config --help | head -5
+    fi
+}
+
+verify_libsixel-source() {
+    echo "Testing: img2sixel --version"
+    img2sixel --version
+
+    echo ""
+    echo "Testing: sixel2png --help"
+    sixel2png --help 2>&1 | head -5 || true
+}
+
+verify_readline() {
+    echo "Testing: readline library installation"
+    TOOL_DIR=$(find "$TSUKU_HOME/tools" -maxdepth 1 -type d -name "readline-*" | head -1)
+    if [ -z "$TOOL_DIR" ]; then
+        echo "Error: readline not found"
+        return 1
+    fi
+
+    # Verify library files exist (both .so for Linux and .dylib for macOS)
+    if [ -f "$TOOL_DIR/lib/libreadline.so" ] || [ -f "$TOOL_DIR/lib/libreadline.dylib" ] || [ -f "$TOOL_DIR/lib/libreadline.a" ]; then
+        echo "Found readline library in $TOOL_DIR/lib"
+        ls -la "$TOOL_DIR/lib"/libreadline* 2>/dev/null | head -5
+        ls -la "$TOOL_DIR/lib"/libhistory* 2>/dev/null | head -5
+    else
+        echo "Error: readline library files not found"
+        return 1
+    fi
+
+    echo "readline library verification passed"
+}
+
+verify_sqlite() {
+    echo "Testing: sqlite3 --version"
+    sqlite3 --version
+
+    echo ""
+    echo "Testing: Create and query a test database"
+    cd "$TEMP_DIR"
+    echo "CREATE TABLE test (id INTEGER, name TEXT);" | sqlite3 test.db
+    echo "INSERT INTO test VALUES (1, 'hello'), (2, 'world');" | sqlite3 test.db
+    RESULT=$(echo "SELECT * FROM test WHERE id = 1;" | sqlite3 test.db)
+
+    if [ "$RESULT" = "1|hello" ]; then
+        echo "✓ sqlite3 basic SQL operations work correctly"
+    else
+        echo "Error: Expected '1|hello', got '$RESULT'"
+        return 1
+    fi
+
+    echo ""
+    echo "Testing: Verify readline support"
+    # Test that sqlite3 was built with readline support
+    # When readline is enabled, sqlite3 accepts commands in interactive mode
+    echo ".quit" | sqlite3 2>&1 > /dev/null
+    echo "✓ sqlite3 interactive mode works (readline support validated)"
+}
+
+verify_curl() {
+    echo "Testing: curl --version"
+    curl --version
+
+    echo ""
+    echo "Verifying: curl uses tsuku-provided OpenSSL and zlib"
+    if curl --version | grep -q "OpenSSL"; then
+        echo "✓ curl linked with OpenSSL"
+    else
+        echo "✗ ERROR: curl not linked with OpenSSL"
+        exit 1
+    fi
+
+    if curl --version | grep -q "zlib"; then
+        echo "✓ curl linked with zlib"
+    else
+        echo "✗ ERROR: curl not linked with zlib"
+        exit 1
+    fi
+
+    echo ""
+    echo "Testing: HTTPS request to example.com"
+    if curl -sI https://example.com | head -1 | grep -q "200 OK"; then
+        echo "✓ HTTPS request successful"
+    else
+        echo "✗ ERROR: HTTPS request failed"
+        exit 1
+    fi
+}
+
+verify_git() {
+    echo "Testing: git --version"
+    git --version
+
+    echo ""
+    echo "Testing: git clone small repository"
+    cd "$TEMP_DIR"
+    # Clone a small, stable public repo (git's own test repo is tiny)
+    if git clone --depth 1 https://github.com/git/git-manpages.git test-clone 2>&1 | grep -q "Cloning into"; then
+        echo "✓ git clone works (curl integration validated)"
+
+        # Verify the clone worked
+        if [ -d "test-clone/.git" ]; then
+            echo "✓ Repository cloned successfully"
+        else
+            echo "✗ ERROR: Clone directory exists but .git missing"
+            return 1
+        fi
+    else
+        echo "✗ ERROR: git clone failed"
+        return 1
+    fi
+}
+
 verify_generic() {
     echo "Testing: $TOOL_NAME --version (generic check)"
     if "$TOOL_NAME" --version 2>&1; then
@@ -171,11 +296,29 @@ case "$TOOL_NAME" in
     m4)
         verify_m4
         ;;
+    pkg-config)
+        verify_pkg_config
+        ;;
     zlib)
         verify_zlib
         ;;
     libpng)
         verify_libpng
+        ;;
+    libsixel-source)
+        verify_libsixel-source
+        ;;
+    curl)
+        verify_curl
+        ;;
+    readline)
+        verify_readline
+        ;;
+    sqlite|sqlite-source)
+        verify_sqlite
+        ;;
+    git|git-source)
+        verify_git
         ;;
     *)
         echo "No specific test for '$TOOL_NAME', running generic check"

@@ -15,7 +15,7 @@ import (
 )
 
 // ExpandVars replaces variables in a string with their values
-// Supported variables: {version}, {os}, {arch}, {install_dir}, {work_dir}
+// Supported variables: {version}, {os}, {arch}, {install_dir}, {work_dir}, {libs_dir}
 func ExpandVars(s string, vars map[string]string) string {
 	result := s
 	for k, v := range vars {
@@ -25,13 +25,14 @@ func ExpandVars(s string, vars map[string]string) string {
 }
 
 // GetStandardVars returns standard variable mappings
-func GetStandardVars(version, installDir, workDir string) map[string]string {
+func GetStandardVars(version, installDir, workDir, libsDir string) map[string]string {
 	return map[string]string{
 		"version":     version,
 		"os":          MapOS(runtime.GOOS),
 		"arch":        MapArch(runtime.GOARCH),
 		"install_dir": installDir,
 		"work_dir":    workDir,
+		"libs_dir":    libsDir,
 	}
 }
 
@@ -224,6 +225,29 @@ func GetStringSlice(params map[string]interface{}, key string) ([]string, bool) 
 		return result, true
 	default:
 		return nil, false
+	}
+}
+
+// DetectArchiveFormat auto-detects archive format from URL or filename
+func DetectArchiveFormat(urlOrFilename string) string {
+	lower := strings.ToLower(urlOrFilename)
+	switch {
+	case strings.HasSuffix(lower, ".tar.gz"), strings.HasSuffix(lower, ".tgz"):
+		return "tar.gz"
+	case strings.HasSuffix(lower, ".tar.xz"), strings.HasSuffix(lower, ".txz"):
+		return "tar.xz"
+	case strings.HasSuffix(lower, ".tar.bz2"), strings.HasSuffix(lower, ".tbz2"), strings.HasSuffix(lower, ".tbz"):
+		return "tar.bz2"
+	case strings.HasSuffix(lower, ".tar.zst"), strings.HasSuffix(lower, ".tzst"):
+		return "tar.zst"
+	case strings.HasSuffix(lower, ".tar.lz"), strings.HasSuffix(lower, ".tlz"):
+		return "tar.lz"
+	case strings.HasSuffix(lower, ".tar"):
+		return "tar"
+	case strings.HasSuffix(lower, ".zip"):
+		return "zip"
+	default:
+		return ""
 	}
 }
 

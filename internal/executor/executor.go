@@ -28,6 +28,7 @@ type Executor struct {
 	reqVersion       string   // Requested version (optional)
 	execPaths        []string // Additional bin paths for execution (e.g., nodejs for npm tools)
 	toolsDir         string   // Tools directory (~/.tsuku/tools/) for finding other installed tools
+	libsDir          string   // Libraries directory (~/.tsuku/libs/) for finding installed libraries
 }
 
 // New creates a new executor
@@ -166,6 +167,11 @@ func (e *Executor) SetToolsDir(dir string) {
 	e.toolsDir = dir
 }
 
+// SetLibsDir sets the libraries directory for finding installed libraries
+func (e *Executor) SetLibsDir(dir string) {
+	e.libsDir = dir
+}
+
 // expandVars replaces {var} placeholders in a string
 func expandVars(s string, vars map[string]string) string {
 	result := s
@@ -203,7 +209,7 @@ func (e *Executor) DryRun(ctx context.Context) error {
 	fmt.Printf("  Actions:\n")
 
 	// Build variable map for expansion
-	vars := actions.GetStandardVars(versionInfo.Version, "", "")
+	vars := actions.GetStandardVars(versionInfo.Version, "", "", "")
 
 	stepNum := 0
 	for _, step := range e.recipe.Steps {
@@ -321,6 +327,9 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 		}
 	}
 
+	// Resolve dependencies for build environment setup
+	resolvedDeps := actions.ResolveDependencies(recipeForContext)
+
 	// Create execution context from plan
 	execCtx := &actions.ExecutionContext{
 		Context:          ctx,
@@ -328,6 +337,7 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 		InstallDir:       e.installDir,
 		ToolInstallDir:   "",
 		ToolsDir:         e.toolsDir,
+		LibsDir:          e.libsDir,
 		DownloadCacheDir: e.downloadCacheDir,
 		Version:          plan.Version,
 		VersionTag:       plan.Version, // Plan doesn't track tag separately
@@ -336,10 +346,22 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 		Recipe:           recipeForContext,
 		ExecPaths:        e.execPaths,
 		Logger:           log.Default(),
+		Dependencies:     resolvedDeps,
 	}
 	e.ctx = execCtx
 
 	fmt.Println()
+
+	// Validate all steps before execution (fail fast)
+	for i, step := range allSteps {
+		action := actions.Get(step.Action)
+		if action == nil {
+			return fmt.Errorf("step %d: unknown action '%s'", i+1, step.Action)
+		}
+		if result := actions.ValidateAction(step.Action, step.Params); result.HasErrors() {
+			return fmt.Errorf("step %d (%s): %s", i+1, step.Action, result.ToError())
+		}
+	}
 
 	// Execute each step (including flattened dependency steps)
 	for i, step := range allSteps {
@@ -362,7 +384,7 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 				return fmt.Errorf("step %d (%s) failed: %w", i+1, step.Action, err)
 			}
 		} else {
-			// Execute other steps normally
+			// Execute (validation already done upfront)
 			if err := action.Execute(execCtx, step.Params); err != nil {
 				return fmt.Errorf("step %d (%s) failed: %w", i+1, step.Action, err)
 			}
@@ -400,7 +422,7 @@ func (e *Executor) executeDownloadWithVerification(
 	step ResolvedStep,
 	plan *InstallationPlan,
 ) error {
-	// Execute the download action
+	// Execute the download action (validation already done upfront)
 	action := actions.Get("download")
 	if err := action.Execute(execCtx, step.Params); err != nil {
 		return err
@@ -538,6 +560,9 @@ func (e *Executor) installSingleDependency(ctx context.Context, dep *DependencyP
 		}
 	}
 
+	// Resolve dependencies for this dependency's build environment
+	depResolvedDeps := actions.ResolveDependencies(depRecipe)
+
 	// Create execution context for this dependency
 	execCtx := &actions.ExecutionContext{
 		Context:          ctx,
@@ -545,6 +570,7 @@ func (e *Executor) installSingleDependency(ctx context.Context, dep *DependencyP
 		InstallDir:       depInstallDir,
 		ToolInstallDir:   "",
 		ToolsDir:         e.toolsDir,
+		LibsDir:          e.libsDir,
 		DownloadCacheDir: e.downloadCacheDir,
 		Version:          dep.Version,
 		VersionTag:       dep.Version,
@@ -553,6 +579,18 @@ func (e *Executor) installSingleDependency(ctx context.Context, dep *DependencyP
 		Recipe:           depRecipe,
 		ExecPaths:        e.execPaths,
 		Logger:           log.Default(),
+		Dependencies:     depResolvedDeps,
+	}
+
+	// Validate all steps before execution (fail fast)
+	for i, step := range dep.Steps {
+		action := actions.Get(step.Action)
+		if action == nil {
+			return fmt.Errorf("dependency %s step %d: unknown action '%s'", dep.Tool, i+1, step.Action)
+		}
+		if result := actions.ValidateAction(step.Action, step.Params); result.HasErrors() {
+			return fmt.Errorf("dependency %s step %d (%s): %s", dep.Tool, i+1, step.Action, result.ToError())
+		}
 	}
 
 	// Execute each step for this dependency
@@ -568,6 +606,7 @@ func (e *Executor) installSingleDependency(ctx context.Context, dep *DependencyP
 			return fmt.Errorf("unknown action: %s", step.Action)
 		}
 
+		// Execute (validation already done upfront)
 		if err := action.Execute(execCtx, step.Params); err != nil {
 			return fmt.Errorf("step %d (%s) failed: %w", i+1, step.Action, err)
 		}

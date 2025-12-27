@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/tsukumogami/tsuku/internal/recipe"
@@ -34,13 +35,14 @@ type ResolvedDeps struct {
 
 // ResolveDependencies collects dependencies from a recipe by examining
 // each step's action and merging with step-level and recipe-level overrides.
+// Uses runtime.GOOS for platform-specific dependency resolution.
 //
 // The resolution process follows precedence rules:
 // 1. For each step:
 //   - If step has "dependencies", use those (replaces action implicit)
-//   - Otherwise, use action's InstallTime deps + step's extra_dependencies
+//   - Otherwise, use action's InstallTime deps + platform-specific deps + step's extra_dependencies
 //   - If step has "runtime_dependencies", use those (replaces action implicit)
-//   - Otherwise, use action's Runtime deps + step's extra_runtime_dependencies
+//   - Otherwise, use action's Runtime deps + platform-specific deps + step's extra_runtime_dependencies
 //
 // 2. Recipe-level replace (if set, overrides everything from steps):
 //   - Dependencies replaces all install deps
@@ -52,6 +54,12 @@ type ResolvedDeps struct {
 //
 // Note: Transitive resolution is handled separately.
 func ResolveDependencies(r *recipe.Recipe) ResolvedDeps {
+	return ResolveDependenciesForPlatform(r, runtime.GOOS)
+}
+
+// ResolveDependenciesForPlatform resolves dependencies for a specific target OS.
+// This allows testing platform-specific behavior without mocking runtime.GOOS.
+func ResolveDependenciesForPlatform(r *recipe.Recipe, targetOS string) ResolvedDeps {
 	result := ResolvedDeps{
 		InstallTime: make(map[string]string),
 		Runtime:     make(map[string]string),
@@ -61,7 +69,23 @@ func ResolveDependencies(r *recipe.Recipe) ResolvedDeps {
 	for _, step := range r.Steps {
 		actionDeps := GetActionDeps(step.Action)
 
-		// Install-time: step replace OR (action implicit + step extend)
+		// Aggregate dependencies from primitive actions if this is a composite action
+		// This ensures composite actions automatically inherit dependencies from their primitives
+		aggregatedDeps := aggregatePrimitiveDeps(step.Action, step.Params)
+
+		// Merge aggregated deps with explicit action deps
+		// Explicit deps take precedence for version constraints
+		combinedDeps := ActionDeps{
+			InstallTime:       append(append([]string{}, actionDeps.InstallTime...), aggregatedDeps.InstallTime...),
+			Runtime:           append(append([]string{}, actionDeps.Runtime...), aggregatedDeps.Runtime...),
+			LinuxInstallTime:  append(append([]string{}, actionDeps.LinuxInstallTime...), aggregatedDeps.LinuxInstallTime...),
+			DarwinInstallTime: append(append([]string{}, actionDeps.DarwinInstallTime...), aggregatedDeps.DarwinInstallTime...),
+			LinuxRuntime:      append(append([]string{}, actionDeps.LinuxRuntime...), aggregatedDeps.LinuxRuntime...),
+			DarwinRuntime:     append(append([]string{}, actionDeps.DarwinRuntime...), aggregatedDeps.DarwinRuntime...),
+		}
+		actionDeps = combinedDeps
+
+		// Install-time: step replace OR (action implicit + platform-specific + step extend)
 		if stepDeps := getStringSliceParam(step.Params, "dependencies"); stepDeps != nil {
 			// Step-level replace: use only what's declared
 			for _, dep := range stepDeps {
@@ -69,9 +93,19 @@ func ResolveDependencies(r *recipe.Recipe) ResolvedDeps {
 				result.InstallTime[name] = version
 			}
 		} else {
-			// Action implicit
+			// Action implicit (cross-platform)
 			for _, dep := range actionDeps.InstallTime {
-				result.InstallTime[dep] = "latest"
+				// Skip self-dependencies to prevent circular loops
+				// (e.g., patchelf uses homebrew which depends on patchelf)
+				if dep != r.Metadata.Name {
+					result.InstallTime[dep] = "latest"
+				}
+			}
+			// Platform-specific install deps
+			for _, dep := range getPlatformInstallDeps(actionDeps, targetOS) {
+				if dep != r.Metadata.Name {
+					result.InstallTime[dep] = "latest"
+				}
 			}
 			// Step-level extend
 			if extraDeps := getStringSliceParam(step.Params, "extra_dependencies"); extraDeps != nil {
@@ -82,7 +116,7 @@ func ResolveDependencies(r *recipe.Recipe) ResolvedDeps {
 			}
 		}
 
-		// Runtime: step replace OR (action implicit + step extend)
+		// Runtime: step replace OR (action implicit + platform-specific + step extend)
 		if stepRuntimeDeps := getStringSliceParam(step.Params, "runtime_dependencies"); stepRuntimeDeps != nil {
 			// Step-level replace: use only what's declared
 			for _, dep := range stepRuntimeDeps {
@@ -90,9 +124,18 @@ func ResolveDependencies(r *recipe.Recipe) ResolvedDeps {
 				result.Runtime[name] = version
 			}
 		} else {
-			// Action implicit
+			// Action implicit (cross-platform)
 			for _, dep := range actionDeps.Runtime {
-				result.Runtime[dep] = "latest"
+				// Skip self-dependencies to prevent circular loops
+				if dep != r.Metadata.Name {
+					result.Runtime[dep] = "latest"
+				}
+			}
+			// Platform-specific runtime deps
+			for _, dep := range getPlatformRuntimeDeps(actionDeps, targetOS) {
+				if dep != r.Metadata.Name {
+					result.Runtime[dep] = "latest"
+				}
 			}
 			// Step-level extend
 			if extraRuntimeDeps := getStringSliceParam(step.Params, "extra_runtime_dependencies"); extraRuntimeDeps != nil {
@@ -135,6 +178,32 @@ func ResolveDependencies(r *recipe.Recipe) ResolvedDeps {
 	return result
 }
 
+// getPlatformInstallDeps returns platform-specific install-time dependencies
+// for the given target OS.
+func getPlatformInstallDeps(deps ActionDeps, targetOS string) []string {
+	switch targetOS {
+	case "linux":
+		return deps.LinuxInstallTime
+	case "darwin":
+		return deps.DarwinInstallTime
+	default:
+		return nil
+	}
+}
+
+// getPlatformRuntimeDeps returns platform-specific runtime dependencies
+// for the given target OS.
+func getPlatformRuntimeDeps(deps ActionDeps, targetOS string) []string {
+	switch targetOS {
+	case "linux":
+		return deps.LinuxRuntime
+	case "darwin":
+		return deps.DarwinRuntime
+	default:
+		return nil
+	}
+}
+
 // getStringSliceParam extracts a []string from step params.
 // Returns nil if the param doesn't exist or isn't a string slice.
 func getStringSliceParam(params map[string]interface{}, key string) []string {
@@ -172,6 +241,29 @@ func parseDependency(dep string) (name, version string) {
 		}
 	}
 	return dep, "latest"
+}
+
+// aggregatePrimitiveDeps returns the dependencies declared by an action.
+// This allows composite actions (like cargo_install, go_install) to automatically
+// provide their dependencies (rust, go) without recipes needing to declare them.
+// Returns empty ActionDeps if the action doesn't exist.
+func aggregatePrimitiveDeps(action string, params map[string]interface{}) ActionDeps {
+	// Get the action from registry
+	act := Get(action)
+	if act == nil {
+		return ActionDeps{}
+	}
+
+	// If action is primitive, return its dependencies directly
+	if IsPrimitive(action) {
+		return act.Dependencies()
+	}
+
+	// For non-primitive actions (composite/decomposable), return their own declared deps
+	// Don't try to decompose here to avoid chicken-and-egg problem with EvalTime dependencies
+	// (e.g., cargo_install needs rust at EvalTime to decompose, but we're trying to figure out
+	// what dependencies to install)
+	return act.Dependencies()
 }
 
 // ResolveTransitive expands dependencies transitively by loading each dependency's

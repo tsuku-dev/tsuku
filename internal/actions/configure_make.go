@@ -20,6 +20,24 @@ func (a *ConfigureMakeAction) Name() string {
 	return "configure_make"
 }
 
+// Preflight validates parameters without side effects.
+func (a *ConfigureMakeAction) Preflight(params map[string]interface{}) *PreflightResult {
+	result := &PreflightResult{}
+	if _, ok := GetString(params, "source_dir"); !ok {
+		result.AddError("configure_make action requires 'source_dir' parameter")
+	}
+	if _, ok := GetStringSlice(params, "executables"); !ok {
+		result.AddError("configure_make action requires 'executables' parameter")
+	}
+	return result
+}
+
+// Dependencies returns the dependencies needed for configure_make builds.
+// Install-time dependencies are make (for building), zig (as C compiler), and pkg-config (for library discovery).
+func (ConfigureMakeAction) Dependencies() ActionDeps {
+	return ActionDeps{InstallTime: []string{"make", "zig", "pkg-config"}}
+}
+
 // Execute builds software using autotools
 //
 // Parameters:
@@ -101,8 +119,13 @@ func (a *ConfigureMakeAction) Execute(ctx *ExecutionContext, params map[string]i
 		fmt.Printf("   Configure args: %v\n", configureArgs)
 	}
 
-	// Build environment
-	env := buildAutotoolsEnv()
+	// Build environment - use shared environment from setup_build_env if available
+	var env []string
+	if len(ctx.Env) > 0 {
+		env = ctx.Env
+	} else {
+		env = buildAutotoolsEnv(ctx)
+	}
 
 	// Step 1: Run ./configure
 	fmt.Printf("   Running: ./configure --prefix=%s\n", prefix)
@@ -169,20 +192,88 @@ func (a *ConfigureMakeAction) Execute(ctx *ExecutionContext, params map[string]i
 }
 
 // buildAutotoolsEnv creates an environment for autotools builds.
-func buildAutotoolsEnv() []string {
+// It sets PKG_CONFIG_PATH, CPPFLAGS, and LDFLAGS from dependency paths.
+func buildAutotoolsEnv(ctx *ExecutionContext) []string {
 	env := os.Environ()
 
 	// Set deterministic build variables
 	filteredEnv := make([]string, 0, len(env))
 	for _, e := range env {
 		// Filter variables that could cause non-determinism
-		if !strings.HasPrefix(e, "SOURCE_DATE_EPOCH=") {
+		if !strings.HasPrefix(e, "SOURCE_DATE_EPOCH=") &&
+			!strings.HasPrefix(e, "PKG_CONFIG_PATH=") &&
+			!strings.HasPrefix(e, "CPPFLAGS=") &&
+			!strings.HasPrefix(e, "LDFLAGS=") {
 			filteredEnv = append(filteredEnv, e)
 		}
 	}
 
 	// Set SOURCE_DATE_EPOCH for reproducible builds
 	filteredEnv = append(filteredEnv, "SOURCE_DATE_EPOCH=0")
+
+	// Override libtool's system library path detection to prevent RPATH stripping
+	// Libtool filters out RPATH for paths it considers "system defaults", but our
+	// tsuku-provided libraries are NOT system libraries. Setting this to empty
+	// forces libtool to preserve RPATH for all dependency paths.
+	filteredEnv = append(filteredEnv, "lt_cv_sys_lib_dlsearch_path_spec=")
+
+	// Build paths from dependencies
+	var pkgConfigPaths []string
+	var cppFlags []string
+	var ldFlags []string
+
+	// Iterate over install-time dependencies to build paths
+	for depName, depVersion := range ctx.Dependencies.InstallTime {
+		// Check both tools and libs directories for the dependency
+		// Libraries are installed to ~/.tsuku/libs/, tools to ~/.tsuku/tools/
+		var depDir string
+		toolsDepDir := filepath.Join(ctx.ToolsDir, depName+"-"+depVersion)
+		libsDepDir := filepath.Join(ctx.LibsDir, depName+"-"+depVersion)
+
+		// Prefer libs directory if it exists, otherwise use tools directory
+		// We don't check if either exists here - let the subdirectory checks below
+		// handle whether to add flags. This preserves the original behavior.
+		if _, err := os.Stat(libsDepDir); err == nil {
+			depDir = libsDepDir
+		} else {
+			depDir = toolsDepDir
+		}
+
+		// PKG_CONFIG_PATH: check for lib/pkgconfig directory
+		pkgConfigDir := filepath.Join(depDir, "lib", "pkgconfig")
+		if _, err := os.Stat(pkgConfigDir); err == nil {
+			pkgConfigPaths = append(pkgConfigPaths, pkgConfigDir)
+		}
+
+		// CPPFLAGS: check for include directory
+		includeDir := filepath.Join(depDir, "include")
+		if _, err := os.Stat(includeDir); err == nil {
+			cppFlags = append(cppFlags, "-I"+includeDir)
+		}
+
+		// LDFLAGS: check for lib directory
+		libDir := filepath.Join(depDir, "lib")
+		if _, err := os.Stat(libDir); err == nil {
+			ldFlags = append(ldFlags, "-L"+libDir)
+			// Add RPATH for runtime library resolution
+			ldFlags = append(ldFlags, "-Wl,-rpath,"+libDir)
+		}
+	}
+
+	// Set PKG_CONFIG_PATH if any paths found
+	if len(pkgConfigPaths) > 0 {
+		filteredEnv = append(filteredEnv, "PKG_CONFIG_PATH="+strings.Join(pkgConfigPaths, ":"))
+	}
+
+	// Set CPPFLAGS if any flags found
+	if len(cppFlags) > 0 {
+		filteredEnv = append(filteredEnv, "CPPFLAGS="+strings.Join(cppFlags, " "))
+	}
+
+	// Set LDFLAGS if any flags found
+	if len(ldFlags) > 0 {
+		filteredEnv = append(filteredEnv, "LDFLAGS="+strings.Join(ldFlags, " "))
+	}
 
 	// Set up C compiler if not using system compiler
 	if !hasSystemCompiler() {

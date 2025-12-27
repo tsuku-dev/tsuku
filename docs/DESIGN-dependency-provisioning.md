@@ -13,8 +13,8 @@ Current
 | Issue | Title | Dependencies | Status |
 |-------|-------|--------------|--------|
 | [#539](https://github.com/tsukumogami/tsuku/issues/539) | ci(build): add 4-platform test matrix for build essentials | None | Done |
-| [#540](https://github.com/tsukumogami/tsuku/issues/540) | feat(recipes): add zlib recipe using homebrew_bottle | None | Done |
-| [#541](https://github.com/tsukumogami/tsuku/issues/541) | feat(recipes): add make recipe using homebrew_bottle | None | Done |
+| [#540](https://github.com/tsukumogami/tsuku/issues/540) | feat(recipes): add zlib recipe using homebrew | None | Done |
+| [#541](https://github.com/tsukumogami/tsuku/issues/541) | feat(recipes): add make recipe using homebrew | None | Done |
 | [#542](https://github.com/tsukumogami/tsuku/issues/542) | feat(recipes): add zig recipe and validate cc wrapper | None | Done |
 | [#543](https://github.com/tsukumogami/tsuku/issues/543) | feat(scripts): add build essential validation scripts | None | Done |
 | [#544](https://github.com/tsukumogami/tsuku/issues/544) | feat(recipes): add pngcrush recipe to validate zlib dependency | [#540](https://github.com/tsukumogami/tsuku/issues/540) | Done |
@@ -49,11 +49,11 @@ graph LR
 | Issue | Title | Dependencies | Status |
 |-------|-------|--------------|--------|
 | [#547](https://github.com/tsukumogami/tsuku/issues/547) | feat(actions): declare implicit dependencies for build actions | None | Done |
-| [#548](https://github.com/tsukumogami/tsuku/issues/548) | feat(recipes): add pkg-config recipe using homebrew_bottle | None | Done |
-| [#549](https://github.com/tsukumogami/tsuku/issues/549) | feat(recipes): add cmake recipe using homebrew_bottle | None | Done |
+| [#548](https://github.com/tsukumogami/tsuku/issues/548) | feat(recipes): add pkg-config recipe using homebrew | None | Done |
+| [#549](https://github.com/tsukumogami/tsuku/issues/549) | feat(recipes): add cmake recipe using homebrew | None | Done |
 | [#550](https://github.com/tsukumogami/tsuku/issues/550) | feat(actions): enhance buildAutotoolsEnv with dependency paths | [#541](https://github.com/tsukumogami/tsuku/issues/541), [#542](https://github.com/tsukumogami/tsuku/issues/542), [#548](https://github.com/tsukumogami/tsuku/issues/548) | Done |
 | [#551](https://github.com/tsukumogami/tsuku/issues/551) | feat(actions): implement setup_build_env action | [#550](https://github.com/tsukumogami/tsuku/issues/550) | Done |
-| [#552](https://github.com/tsukumogami/tsuku/issues/552) | feat(recipes): add openssl recipe using homebrew_bottle | [#540](https://github.com/tsukumogami/tsuku/issues/540) | Done |
+| [#552](https://github.com/tsukumogami/tsuku/issues/552) | feat(recipes): add openssl recipe using homebrew | [#540](https://github.com/tsukumogami/tsuku/issues/540) | Done |
 | [#553](https://github.com/tsukumogami/tsuku/issues/553) | feat(recipes): add ncurses recipe to validate pkg-config | [#551](https://github.com/tsukumogami/tsuku/issues/551) | Done |
 | [#554](https://github.com/tsukumogami/tsuku/issues/554) | feat(recipes): add curl recipe to validate openssl | [#551](https://github.com/tsukumogami/tsuku/issues/551), [#552](https://github.com/tsukumogami/tsuku/issues/552) | Done |
 | [#555](https://github.com/tsukumogami/tsuku/issues/555) | feat(actions): implement cmake_build action | [#549](https://github.com/tsukumogami/tsuku/issues/549) | Done |
@@ -91,15 +91,14 @@ graph LR
     classDef blocked fill:#fff9c4
     classDef external fill:#e0e0e0
 
-    class I540,I541,I542 external
-    class I547,I548,I549,I550,I551,I552,I553,I554,I555,I556 done
+    class I540,I541,I542,I547,I548,I549,I550,I551,I552,I553,I554,I555,I556 done
 ```
 
 ### Milestone: [Dependency Provisioning: Full Integration](https://github.com/tsukumogami/tsuku/milestone/20)
 
 | Issue | Title | Dependencies | Status |
 |-------|-------|--------------|--------|
-| [#557](https://github.com/tsukumogami/tsuku/issues/557) | feat(recipes): add readline recipe using homebrew_bottle | [#553](https://github.com/tsukumogami/tsuku/issues/553) | Done |
+| [#557](https://github.com/tsukumogami/tsuku/issues/557) | feat(recipes): add readline recipe using homebrew | [#553](https://github.com/tsukumogami/tsuku/issues/553) | Done |
 | [#558](https://github.com/tsukumogami/tsuku/issues/558) | feat(recipes): add sqlite recipe to validate readline | [#557](https://github.com/tsukumogami/tsuku/issues/557) | Done |
 | [#559](https://github.com/tsukumogami/tsuku/issues/559) | feat(recipes): add git recipe to validate complete toolchain | [#554](https://github.com/tsukumogami/tsuku/issues/554) | Done |
 
@@ -120,8 +119,7 @@ graph LR
     classDef blocked fill:#fff9c4
     classDef external fill:#e0e0e0
 
-    class I553,I554 external
-    class I557,I558,I559 done
+    class I553,I554,I557,I558,I559 done
 ```
 
 ### Milestone: [Dependency Provisioning: System-Required](https://github.com/tsukumogami/tsuku/milestone/21)
@@ -132,8 +130,8 @@ graph LR
 | [#561](https://github.com/tsukumogami/tsuku/issues/561) | feat(recipes): add docker recipe using require_system | [#560](https://github.com/tsukumogami/tsuku/issues/560) | Done |
 | [#562](https://github.com/tsukumogami/tsuku/issues/562) | feat(recipes): add cuda recipe using require_system | [#560](https://github.com/tsukumogami/tsuku/issues/560) | Done |
 | [#563](https://github.com/tsukumogami/tsuku/issues/563) | feat(cli): add tsuku check-deps command | [#560](https://github.com/tsukumogami/tsuku/issues/560) | Done |
-| [#643](https://github.com/tsukumogami/tsuku/issues/643) | feat(deps): support platform-conditional dependencies | None | Done |
-| [#644](https://github.com/tsukumogami/tsuku/issues/644) | feat: aggregate primitive action dependencies in composite actions | None | Done |
+| [#643](https://github.com/tsukumogami/tsuku/issues/643) | feat(actions): add platform-conditional dependencies | None | Done |
+| [#644](https://github.com/tsukumogami/tsuku/issues/644) | feat(actions): aggregate primitive action dependencies in composites | None | Done |
 
 ```mermaid
 graph LR
@@ -159,7 +157,7 @@ graph LR
 
 Tsuku recipes need to declare dependencies on external tools and libraries. These dependencies have different provisioning strategies:
 
-1. **Downloadable**: Tools tsuku downloads and installs (pre-built binaries, Homebrew bottles)
+1. **Downloadable**: Tools tsuku downloads and installs (pre-built binaries, Homebrew)
 2. **Buildable**: Tools tsuku builds from source (using compilers it provides)
 3. **System-required**: Tools that must already exist on the system (Docker, CUDA, kernel modules)
 
@@ -178,7 +176,7 @@ This creates friction:
 
 **All dependencies should be recipes.** The recipe's *actions* determine how to provision:
 
-- `homebrew_bottle` → download and install pre-built binary
+- `homebrew` → download and install pre-built binary
 - `configure_make` → build from source
 - `require_system` → validate system has it, guide user if missing
 
@@ -239,7 +237,7 @@ This design extends that model:
 
 **In scope:**
 - **Unified Recipe Model**: All dependencies are recipes with appropriate actions
-  - Provisionable tools use `homebrew_bottle`, `configure_make`, etc.
+  - Provisionable tools use `homebrew`, `configure_make`, etc.
   - System-required tools use new `require_system` action
   - Recipe authors just declare `dependencies = ["docker", "gcc"]`
 - **Build Essentials**: Proactively provide compilers, build tools, and libraries
@@ -332,7 +330,7 @@ Every dependency has a recipe. The recipe's actions determine provisioning strat
 ```toml
 # gcc.toml - provisionable via Homebrew
 [[steps]]
-action = "homebrew_bottle"
+action = "homebrew"
 formula = "gcc"
 
 # docker.toml - system-required
@@ -365,7 +363,7 @@ dependencies = ["docker", "gcc", "zlib"]  # No prefix needed
 
 ### Summary
 
-All dependencies are recipes. Provisionable tools (gcc, zlib) have recipes with `homebrew_bottle` or `configure_make` actions. System-required tools (Docker, CUDA) have recipes with the new `require_system` action. Recipe authors just declare `dependencies = ["docker", "gcc"]` without any special syntax - tsuku looks up each recipe and provisions according to its actions.
+All dependencies are recipes. Provisionable tools (gcc, zlib) have recipes with `homebrew` or `configure_make` actions. System-required tools (Docker, CUDA) have recipes with the new `require_system` action. Recipe authors just declare `dependencies = ["docker", "gcc"]` without any special syntax - tsuku looks up each recipe and provisions according to its actions.
 
 ### Rationale
 
@@ -391,9 +389,9 @@ The unified model solves these problems:
 | Tool | Purpose | Source | Priority |
 |------|---------|--------|----------|
 | zig | C/C++ compiler (via zig cc) | GitHub release | P0 (default) |
-| gcc | C/C++ compiler | Homebrew bottle | P1 (fallback if zig edge cases) |
-| clang/llvm | C/C++ compiler | Homebrew bottle | P2 |
-| binutils | Linker, assembler | Homebrew bottle | P1 (if needed) |
+| gcc | C/C++ compiler | Homebrew | P1 (fallback if zig edge cases) |
+| clang/llvm | C/C++ compiler | Homebrew | P2 |
+| binutils | Linker, assembler | Homebrew | P1 (if needed) |
 
 **Note**: Zig is the default compiler because it's a single relocatable binary. GCC can be added later if specific tools require it.
 
@@ -557,7 +555,7 @@ func (a *RequireSystemAction) Execute(ctx *ExecutionContext) error {
 
 **Docker (system-required):**
 ```toml
-# recipes/docker.toml
+# internal/recipe/recipes/d/docker.toml
 [metadata]
 name = "docker"
 description = "Container runtime"
@@ -582,7 +580,7 @@ fallback = "See https://docs.docker.com/engine/install/"
 
 **CUDA (system-required):**
 ```toml
-# recipes/cuda.toml
+# internal/recipe/recipes/c/cuda.toml
 [metadata]
 name = "cuda"
 description = "NVIDIA CUDA Toolkit"
@@ -604,7 +602,7 @@ message = "CUDA 11.0+ required"
 
 **GCC (provisionable - for comparison):**
 ```toml
-# recipes/gcc.toml
+# internal/recipe/recipes/g/gcc.toml
 [metadata]
 name = "gcc"
 description = "GNU Compiler Collection"
@@ -614,7 +612,7 @@ source = "homebrew"
 formula = "gcc"
 
 [[steps]]
-action = "homebrew_bottle"
+action = "homebrew"
 formula = "gcc"
 
 [[steps]]
@@ -627,7 +625,7 @@ binaries = ["bin/gcc", "bin/g++", "bin/cpp"]
 Recipe authors simply declare dependencies - no special syntax:
 
 ```toml
-# recipes/my-docker-tool.toml
+# internal/recipe/recipes/m/my-docker-tool.toml
 [metadata]
 name = "my-docker-tool"
 
@@ -641,13 +639,13 @@ binaries = ["my-tool"]
 ```
 
 ```toml
-# recipes/gpu-app.toml
+# internal/recipe/recipes/g/gpu-app.toml
 [metadata]
 name = "gpu-app"
 
 [[steps]]
 action = "cmake_build"
-dependencies = ["cuda", "zlib"]  # cuda = require_system, zlib = homebrew_bottle
+dependencies = ["cuda", "zlib"]  # cuda = require_system, zlib = homebrew
 
 [[steps]]
 action = "install_binaries"
@@ -717,7 +715,7 @@ tsuku install my-docker-tool
 ┌─────────────────────────────────────────┐
 │ 2. For each dependency, load its recipe │
 │    - docker.toml → has require_system   │
-│    - curl.toml → has homebrew_bottle    │
+│    - curl.toml → has homebrew           │
 └─────────────────────────────────────────┘
         │
         ▼
@@ -727,7 +725,7 @@ tsuku install my-docker-tool
 │      → Check: docker --version          │
 │      → Found? Continue                  │
 │      → Missing? Show guide, FAIL        │
-│    - curl: Execute homebrew_bottle      │
+│    - curl: Execute homebrew             │
 │      → Download and install             │
 └─────────────────────────────────────────┘
         │
@@ -746,9 +744,9 @@ tsuku install my-docker-tool
 | `internal/actions/dependencies.go` | Add build tools to action implicit deps |
 | `internal/actions/setup_build_env.go` | NEW: Action to configure build environment |
 | `internal/executor/executor.go` | Ensure implicit deps installed before build |
-| `recipes/gcc.toml` | NEW: GCC compiler recipe |
-| `recipes/make.toml` | NEW: GNU Make recipe |
-| `recipes/zlib.toml` | NEW: zlib library recipe |
+| `internal/recipe/recipes/g/gcc.toml` | NEW: GCC compiler recipe |
+| `internal/recipe/recipes/m/make.toml` | NEW: GNU Make recipe |
+| `internal/recipe/recipes/z/zlib.toml` | NEW: zlib library recipe |
 
 #### System-Required Dependencies
 
@@ -756,9 +754,9 @@ tsuku install my-docker-tool
 |-----------|--------|
 | `internal/actions/require_system.go` | NEW: `require_system` action implementation |
 | `internal/actions/registry.go` | Register `require_system` as primitive action |
-| `recipes/docker.toml` | NEW: Docker system-required recipe |
-| `recipes/cuda.toml` | NEW: CUDA system-required recipe |
-| `recipes/systemd.toml` | NEW: systemd system-required recipe |
+| `internal/recipe/recipes/d/docker.toml` | NEW: Docker system-required recipe |
+| `internal/recipe/recipes/c/cuda.toml` | NEW: CUDA system-required recipe |
+| `internal/recipe/recipes/s/systemd.toml` | NEW: systemd system-required recipe |
 
 ## Validation Tooling
 
@@ -865,10 +863,10 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/zlib.toml` using `homebrew_bottle` action |
+| 1 | Create `internal/recipe/recipes/z/zlib.toml` using `homebrew` action |
 | 2 | Validate bottle availability on all 4 platforms |
 | 3 | Test relocation: verify no hardcoded paths in `libz.so`/`libz.dylib` |
-| 4 | Create `recipes/expat.toml` that declares `dependencies = ["zlib"]` |
+| 4 | Create `internal/recipe/recipes/e/expat.toml` that declares `dependencies = ["zlib"]` |
 | 5 | CI: Install zlib, build expat, verify `xmlwf --version` works |
 | 6 | CI: Run in minimal container (ubuntu:22.04) with no system zlib |
 
@@ -884,9 +882,9 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/make.toml` using `homebrew_bottle` action |
+| 1 | Create `internal/recipe/recipes/m/make.toml` using `homebrew` action |
 | 2 | Validate make executable works from relocated path |
-| 3 | Create `recipes/gdbm.toml` using `configure_make` action |
+| 3 | Create `internal/recipe/recipes/g/gdbm.toml` using `configure_make` action |
 | 4 | Implement basic `configure_make` action (uses system gcc temporarily) |
 | 5 | CI: Install make, build gdbm from source, verify `gdbmtool --version` |
 
@@ -907,14 +905,14 @@ Each build essential must pass these tests on all 4 platforms:
 | Step | Description |
 |------|-------------|
 | 1 | Verify zig recipe exists and installs correctly on all 4 platforms |
-| 2 | Create `recipes/m4.toml` using `configure_make` action |
+| 2 | Create `internal/recipe/recipes/m/m4.toml` using `configure_make` action |
 | 3 | CI: Build m4 from source in minimal container with NO system gcc |
 | 4 | Validate zig wrapper scripts work (`cc`, `c++` symlinks) |
 | 5 | Document any configure script edge cases that require real gcc |
 
 **Gate**: m4 compiles and runs on all 4 platforms using zig (no system compiler).
 
-**Future**: If edge cases accumulate, add `recipes/gcc.toml` using `homebrew_bottle` as alternative.
+**Future**: If edge cases accumulate, add `internal/recipe/recipes/g/gcc.toml` using `homebrew` as alternative.
 
 ### Phase 4: pkg-config + Build Environment
 
@@ -926,10 +924,10 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/pkg-config.toml` using `homebrew_bottle` action |
+| 1 | Create `internal/recipe/recipes/p/pkg-config.toml` using `homebrew` action |
 | 2 | Update `buildAutotoolsEnv()` to set `PKG_CONFIG_PATH` from tsuku deps |
 | 3 | Update `buildAutotoolsEnv()` to set `CPPFLAGS`, `LDFLAGS` for tsuku deps |
-| 4 | Create `recipes/ncurses.toml` using `configure_make` |
+| 4 | Create `internal/recipe/recipes/n/ncurses.toml` using `configure_make` |
 | 5 | CI: Build ncurses, verify pkg-config finds zlib |
 
 **Gate**: ncurses builds and pkg-config correctly reports flags on all 4 platforms.
@@ -944,9 +942,9 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/openssl.toml` using `homebrew_bottle` action |
+| 1 | Create `internal/recipe/recipes/o/openssl.toml` using `homebrew` action |
 | 2 | Validate openssl libraries relocate correctly (complex RPATH) |
-| 3 | Create `recipes/curl.toml` with `dependencies = ["openssl", "zlib"]` |
+| 3 | Create `internal/recipe/recipes/c/curl.toml` with `dependencies = ["openssl", "zlib"]` |
 | 4 | CI: Build curl from source, verify `curl --version` shows OpenSSL |
 | 5 | CI: Verify `curl https://example.com` works (TLS functional) |
 
@@ -962,9 +960,9 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/cmake.toml` using `homebrew_bottle` action |
+| 1 | Create `internal/recipe/recipes/c/cmake.toml` using `homebrew` action |
 | 2 | Implement `cmake_build` action |
-| 3 | Create `recipes/ninja.toml` using `cmake_build` action |
+| 3 | Create `internal/recipe/recipes/n/ninja.toml` using `cmake_build` action |
 | 4 | CI: Build ninja from source using tsuku cmake/gcc/make |
 
 **Gate**: ninja builds using cmake on all 4 platforms.
@@ -977,9 +975,9 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/readline.toml` (depends on ncurses) |
-| 2 | Create `recipes/sqlite.toml` (depends on readline) |
-| 3 | Create `recipes/git.toml` (depends on curl, openssl, zlib, expat) |
+| 1 | Create `internal/recipe/recipes/r/readline.toml` (depends on ncurses) |
+| 2 | Create `internal/recipe/recipes/s/sqlite.toml` (depends on readline) |
+| 3 | Create `internal/recipe/recipes/g/git.toml` (depends on curl, openssl, zlib, expat) |
 | 4 | CI: Build git from source, verify `git --version` |
 | 5 | CI: Verify git can clone a repository (full functional test) |
 | 6 | CI: Build sqlite, verify `sqlite3 --version` |
@@ -1007,8 +1005,8 @@ Each build essential must pass these tests on all 4 platforms:
 
 | Step | Description |
 |------|-------------|
-| 1 | Create `recipes/docker.toml` with `require_system` action |
-| 2 | Create `recipes/cuda.toml` with `require_system` action |
+| 1 | Create `internal/recipe/recipes/d/docker.toml` with `require_system` action |
+| 2 | Create `internal/recipe/recipes/c/cuda.toml` with `require_system` action |
 | 3 | Add `tsuku check-deps <recipe>` command |
 | 4 | CI: Test error messages when docker is missing |
 | 5 | CI: Test success path when docker is present (use docker runner) |
@@ -1064,7 +1062,7 @@ name: Build Essentials
 
 on:
   push:
-    paths: ['recipes/gcc.toml', 'recipes/make.toml', ...]
+    paths: ['internal/recipe/recipes/**/*.toml']
   schedule:
     - cron: '0 4 * * *'  # Nightly full validation
 

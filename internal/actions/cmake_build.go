@@ -19,6 +19,12 @@ func (a *CMakeBuildAction) Name() string {
 	return "cmake_build"
 }
 
+// Dependencies returns the dependencies needed for cmake builds.
+// Install-time dependencies are cmake (build system), make (for building), zig (as C compiler), and pkg-config (for library discovery).
+func (CMakeBuildAction) Dependencies() ActionDeps {
+	return ActionDeps{InstallTime: []string{"cmake", "make", "zig", "pkg-config"}}
+}
+
 // Execute builds software using CMake
 //
 // Parameters:
@@ -96,8 +102,13 @@ func (a *CMakeBuildAction) Execute(ctx *ExecutionContext, params map[string]inte
 		fmt.Printf("   CMake args: %v\n", cmakeArgs)
 	}
 
-	// Build environment
-	env := buildCMakeEnv()
+	// Build environment - use shared environment from setup_build_env if available
+	var env []string
+	if len(ctx.Env) > 0 {
+		env = ctx.Env
+	} else {
+		env = buildCMakeEnv()
+	}
 
 	// Create build directory
 	if err := os.MkdirAll(buildDir, 0755); err != nil {

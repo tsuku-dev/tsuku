@@ -16,6 +16,7 @@ type ExecutionContext struct {
 	InstallDir       string            // Installation directory (~/.tsuku/tools/.install/)
 	ToolInstallDir   string            // Tool-specific directory for directory-based installations (~/.tsuku/tools/{name}-{version}/)
 	ToolsDir         string            // Tools directory (~/.tsuku/tools/) for finding other installed tools
+	LibsDir          string            // Libraries directory (~/.tsuku/libs/) for finding installed libraries
 	DownloadCacheDir string            // Download cache directory (~/.tsuku/cache/downloads/)
 	Version          string            // Resolved version (e.g., "1.29.3")
 	VersionTag       string            // Original version tag (e.g., "v1.29.3" or "1.29.3")
@@ -25,6 +26,8 @@ type ExecutionContext struct {
 	ExecPaths        []string          // Additional bin paths needed for execution (e.g., nodejs bin for npm tools)
 	Resolver         *version.Resolver // Version resolver (for GitHub API access, asset resolution)
 	Logger           log.Logger        // Logger for structured logging (optional, falls back to log.Default())
+	Dependencies     ResolvedDeps      // Resolved dependencies with their versions
+	Env              []string          // Shared environment variables set by setup_build_env, used by build actions
 }
 
 // Log returns the logger for this context.
@@ -40,10 +43,24 @@ func (ctx *ExecutionContext) Log() log.Logger {
 // InstallTime deps are needed during `tsuku install`.
 // Runtime deps are needed when the installed tool runs.
 // EvalTime deps are needed during `tsuku eval` for actions that implement Decomposable.
+//
+// Platform-specific fields (LinuxInstallTime, DarwinInstallTime, etc.) are only
+// applied when the target OS matches. This allows actions to declare dependencies
+// that are only needed on certain platforms, reducing unnecessary installations.
 type ActionDeps struct {
-	InstallTime []string // Needed during tsuku install
-	Runtime     []string // Needed when tool runs
+	InstallTime []string // Needed during tsuku install (all platforms)
+	Runtime     []string // Needed when tool runs (all platforms)
 	EvalTime    []string // Needed during tsuku eval (for Decompose)
+
+	// Platform-specific install-time dependencies.
+	// Only applied when runtime.GOOS matches the platform.
+	LinuxInstallTime  []string // Linux-only install deps
+	DarwinInstallTime []string // macOS-only install deps
+
+	// Platform-specific runtime dependencies.
+	// Only applied when runtime.GOOS matches the platform.
+	LinuxRuntime  []string // Linux-only runtime deps
+	DarwinRuntime []string // macOS-only runtime deps
 }
 
 // Action represents an executable action with metadata.
@@ -130,6 +147,7 @@ func init() {
 	Register(&AptInstallAction{})
 	Register(&YumInstallAction{})
 	Register(&BrewInstallAction{})
+	Register(&RequireSystemAction{})
 
 	// Package manager actions (composite)
 	Register(&NpmInstallAction{})
@@ -148,7 +166,9 @@ func init() {
 	Register(&NixRealizeAction{})
 	Register(&ConfigureMakeAction{})
 	Register(&CMakeBuildAction{})
+	Register(&MesonBuildAction{})
 	Register(&PipExecAction{})
+	Register(&SetupBuildEnvAction{})
 
 	// Homebrew actions
 	Register(&HomebrewAction{})

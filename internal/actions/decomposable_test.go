@@ -99,9 +99,10 @@ func TestIsPrimitive(t *testing.T) {
 func TestPrimitives(t *testing.T) {
 	prims := Primitives()
 
-	// Should have exactly 22 primitives (11 core + 11 ecosystem)
-	if len(prims) != 22 {
-		t.Errorf("len(Primitives()) = %d, want 22", len(prims))
+	// Should have exactly 24 primitives (11 core + 13 ecosystem)
+	// Updated from 23 to 24 after setup_build_env was added to main
+	if len(prims) != 24 {
+		t.Errorf("len(Primitives()) = %d, want 24", len(prims))
 	}
 
 	// Sort for deterministic comparison
@@ -123,12 +124,14 @@ func TestPrimitives(t *testing.T) {
 		"install_gem_direct",
 		"install_libraries",
 		"link_dependencies",
+		"meson_build",
 		"nix_realize",
 		"npm_exec",
 		"pip_exec",
 		"pip_install",
 		"set_env",
 		"set_rpath",
+		"setup_build_env",
 		"text_replace",
 	}
 

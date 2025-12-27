@@ -43,7 +43,7 @@ The same pattern should apply to native library dependencies. Ruby should declar
 
 **In scope:**
 - Library recipes: Define libraries as recipes with `type = "library"` metadata
-- `homebrew_bottle` action: Download, extract, and relocate Homebrew bottles with runtime version resolution
+- `homebrew` action: Download, extract, and relocate Homebrew bottles with runtime version resolution
 - `install_libraries` action: Copy libraries and preserve symlink structure
 - `link_dependencies` action: Create symlinks from tool lib/ to shared libs/
 - `set_rpath` action: Cross-platform RPATH modification (patchelf/install_name_tool)
@@ -121,7 +121,7 @@ RPATH is the primary mechanism. Wrapper scripts serve as fallback for signed bin
 
 ### Option 1: Library as Recipe with Runtime Actions
 
-Libraries become first-class recipes with `type = "library"`. A suite of actions handles the full workflow: `homebrew_bottle` for download/extraction, `install_libraries` for copying, `link_dependencies` for symlinks, and `set_rpath` for binary patching. Version resolution happens at runtime via Homebrew API.
+Libraries become first-class recipes with `type = "library"`. A suite of actions handles the full workflow: `homebrew` for download/extraction, `install_libraries` for copying, `link_dependencies` for symlinks, and `set_rpath` for binary patching. Version resolution happens at runtime via Homebrew API.
 
 **Library recipe (libyaml.toml):**
 ```toml
@@ -135,7 +135,7 @@ source = "homebrew"
 formula = "libyaml"
 
 [[steps]]
-action = "homebrew_bottle"
+action = "homebrew"
 formula = "libyaml"
 
 [[steps]]
@@ -262,7 +262,7 @@ This option was chosen because:
 The library dependency system consists of these components:
 
 1. **Library Recipes**: TOML files with `type = "library"` that define how to obtain and install libraries
-2. **homebrew_bottle Action**: Downloads and extracts Homebrew bottles with runtime version resolution
+2. **homebrew Action**: Downloads and extracts Homebrew bottles with runtime version resolution
 3. **install_libraries Action**: Copies libraries and preserves symlink structure
 4. **link_dependencies Action**: Creates symlinks from tool lib/ to shared libs/
 5. **set_rpath Action**: Cross-platform RPATH modification
@@ -334,7 +334,7 @@ source = "homebrew"
 formula = "libyaml"
 
 [[steps]]
-action = "homebrew_bottle"
+action = "homebrew"
 formula = "libyaml"
 
 [[steps]]
@@ -346,7 +346,7 @@ patterns = ["lib/*.so*", "lib/*.dylib"]
 
 | Action | Purpose | Key Constraints |
 |--------|---------|-----------------|
-| `homebrew_bottle` | Download and extract Homebrew bottles | Must relocate `@@HOMEBREW_PREFIX@@` placeholders; verify SHA256 from GHCR manifest |
+| `homebrew` | Download and extract Homebrew bottles | Must relocate `@@HOMEBREW_PREFIX@@` placeholders; verify SHA256 from GHCR manifest |
 | `install_libraries` | Copy libraries to shared location | Must preserve symlink structure (don't resolve symlinks) |
 | `link_dependencies` | Create symlinks from tool to shared libs | Must check for file collisions before overwriting |
 | `set_rpath` | Modify binary RPATH | Must strip existing RPATH before setting new value; use `$ORIGIN/../lib` not bare `$ORIGIN` |
@@ -449,7 +449,7 @@ Security best practices for RPATH:
 - `set_rpath` action implementation
 - Platform-specific: patchelf for Linux, install_name_tool for macOS
 
-**Rationale:** RPATH utilities are foundational for both library installation and homebrew_bottle. Moving them earlier reduces rework.
+**Rationale:** RPATH utilities are foundational for both library installation and homebrew. Moving them earlier reduces rework.
 
 ### Phase 3: Library Installation Actions
 
@@ -459,7 +459,7 @@ Security best practices for RPATH:
 ### Phase 4: Homebrew Integration
 
 - Homebrew version provider for `source = "homebrew"`
-- `homebrew_bottle` action: GHCR auth, download, extract, placeholder relocation
+- `homebrew` action: GHCR auth, download, extract, placeholder relocation
 
 ### Phase 5: Ruby Recipe Migration
 
@@ -519,7 +519,7 @@ Security best practices for RPATH:
 - [#219](https://github.com/tsukumogami/tsuku/issues/219): feat(action): implement install_libraries action
 - [#220](https://github.com/tsukumogami/tsuku/issues/220): feat(action): implement link_dependencies action
 - [#221](https://github.com/tsukumogami/tsuku/issues/221): feat(install): resolve library dependencies during tool installation
-- [#222](https://github.com/tsukumogami/tsuku/issues/222): feat(action): implement homebrew_bottle action
+- [#222](https://github.com/tsukumogami/tsuku/issues/222): feat(action): implement homebrew action
 
 **Migration (blocked by actions):**
 - [#223](https://github.com/tsukumogami/tsuku/issues/223): feat(recipe): add libyaml library recipe
