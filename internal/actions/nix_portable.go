@@ -261,7 +261,10 @@ func GetNixFlakeMetadata(ctx context.Context, flakeRef string) (*FlakeMetadata, 
 	}
 
 	cmd := exec.CommandContext(ctx, nixPath, "nix", "flake", "metadata", "--json", flakeRef)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("NP_LOCATION=%s", npLocation))
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("NP_LOCATION=%s", npLocation),
+		"NP_GIT=git", // Suppress "Installing git" message to stdout
+	)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -292,7 +295,10 @@ func GetNixDerivationPath(ctx context.Context, flakeRef string) (string, string,
 
 	// Use nix derivation show to get paths without building
 	cmd := exec.CommandContext(ctx, nixPath, "nix", "derivation", "show", flakeRef)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("NP_LOCATION=%s", npLocation))
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("NP_LOCATION=%s", npLocation),
+		"NP_GIT=git", // Suppress "Installing git" message to stdout
+	)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
