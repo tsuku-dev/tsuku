@@ -189,31 +189,31 @@ Add tests for:
 ## Implementation Steps
 
 1. **Add `recipe.ParseFile` function**
-   - Implement in `internal/recipe/loader.go`
-   - Add unit tests in `internal/recipe/loader_test.go`
+   - [x] Implement in `internal/recipe/loader.go`
+   - [x] Add unit tests in `internal/recipe/loader_test.go`
 
-2. **Add `isFilePath` helper function**
-   - Implement in `cmd/tsuku/eval.go`
-   - Add unit tests in `cmd/tsuku/eval_test.go`
+2. **Add `--recipe` flag to eval command** (changed from isFilePath detection to match install UX)
+   - [x] Add `evalRecipePath` flag in `cmd/tsuku/eval.go`
+   - [x] Update command help text with examples
 
-3. **Modify `runEval` to handle file paths**
-   - Early detection of file path vs registry name
-   - Load recipe from file or registry
-   - Set appropriate `RecipeSource` in PlanConfig
+3. **Modify `runEval` to handle --recipe flag**
+   - [x] Validate mutually exclusive options (--recipe vs tool name)
+   - [x] Load recipe from file using shared `loadLocalRecipe` function
+   - [x] Set appropriate `RecipeSource` in PlanConfig
 
-4. **Update command documentation**
-   - Update `Use` field
-   - Update `Long` description with examples
+4. **Update `loadLocalRecipe` to use shared ParseFile**
+   - [x] Modified `cmd/tsuku/install_sandbox.go` to use `recipe.ParseFile`
+   - [x] Both eval and install now share the same recipe loading logic
 
 5. **Verify OS/Arch handling works correctly**
-   - Test with file path + `--os darwin --arch arm64`
-   - Confirm platform filtering applies to file-loaded recipes
+   - [x] Test with --recipe + `--os darwin --arch arm64`
+   - [x] Confirm platform filtering applies to file-loaded recipes
 
 6. **Run tests and validation**
-   - `go vet ./...`
-   - `go test ./...`
-   - `go build ./cmd/tsuku`
-   - Manual testing with sample recipe file
+   - [x] `go vet ./...`
+   - [x] `go test ./...`
+   - [x] `go build ./cmd/tsuku`
+   - [x] Manual testing with sample recipe file
 
 ## Testing Strategy
 
