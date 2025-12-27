@@ -327,8 +327,9 @@ func (e *Executor) ExecutePlan(ctx context.Context, plan *InstallationPlan) erro
 		}
 	}
 
-	// Resolve dependencies for build environment setup
-	resolvedDeps := actions.ResolveDependencies(recipeForContext)
+	// Build resolved dependencies from plan (contains actual installed versions)
+	// rather than from recipe (which may contain "latest" constraints)
+	resolvedDeps := buildResolvedDepsFromPlan(plan.Dependencies)
 
 	// Create execution context from plan
 	execCtx := &actions.ExecutionContext{
@@ -693,4 +694,30 @@ func copyDir(src, dst string) error {
 		_, err = io.Copy(dstFile, srcFile)
 		return err
 	})
+}
+
+// buildResolvedDepsFromPlan creates a ResolvedDeps from the plan's dependency list.
+// This ensures we use actual installed versions (e.g., "3.6.0") rather than
+// version constraints (e.g., "latest") from recipe parsing.
+func buildResolvedDepsFromPlan(deps []DependencyPlan) actions.ResolvedDeps {
+	result := actions.ResolvedDeps{
+		InstallTime: make(map[string]string),
+		Runtime:     make(map[string]string),
+	}
+
+	// Collect all dependencies recursively (flatten the tree)
+	var collectDeps func(deps []DependencyPlan)
+	collectDeps = func(deps []DependencyPlan) {
+		for _, dep := range deps {
+			// Use actual resolved version from plan
+			result.InstallTime[dep.Tool] = dep.Version
+			// Recursively collect nested dependencies
+			if len(dep.Dependencies) > 0 {
+				collectDeps(dep.Dependencies)
+			}
+		}
+	}
+
+	collectDeps(deps)
+	return result
 }
