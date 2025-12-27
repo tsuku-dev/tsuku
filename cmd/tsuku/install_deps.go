@@ -424,6 +424,9 @@ func installWithDependencies(toolName, reqVersion, versionConstraint string, isE
 	// Set download cache directory
 	exec.SetDownloadCacheDir(cfg.DownloadCacheDir)
 
+	// Set key cache directory for PGP signature verification
+	exec.SetKeyCacheDir(cfg.KeyCacheDir)
+
 	// Get or generate installation plan (two-phase flow)
 	planCfg := planRetrievalConfig{
 		Tool:              toolName,
