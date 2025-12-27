@@ -21,16 +21,16 @@ Follow the design document `docs/DESIGN-checksum-pinning.md`. The implementation
 - `internal/install/checksum_test.go` - Unit tests for checksum functions
 
 ## Implementation Steps
-- [ ] Add `BinaryChecksums` field to `VersionState` in `state.go`
-- [ ] Create `internal/install/checksum.go` with `ComputeFileChecksum()` helper
-- [ ] Implement `ComputeBinaryChecksums(toolDir, binaries)` to compute SHA256 for all binaries
-- [ ] Implement `VerifyBinaryChecksums(toolDir, stored)` to compare computed vs stored
-- [ ] Integrate checksum computation into `Manager.InstallWithOptions()` after install
-- [ ] Update `InstallOptions` to expose checksums or compute inline
-- [ ] Add integrity verification step to `verifyVisibleTool()` in verify.go
-- [ ] Add integrity verification step to `verifyWithAbsolutePath()` in verify.go
-- [ ] Add unit tests for checksum.go functions
-- [ ] Add backward compatibility test (old state without checksums)
+- [x] Add `BinaryChecksums` field to `VersionState` in `state.go`
+- [x] Create `internal/install/checksum.go` with `ComputeFileChecksum()` helper
+- [x] Implement `ComputeBinaryChecksums(toolDir, binaries)` to compute SHA256 for all binaries
+- [x] Implement `VerifyBinaryChecksums(toolDir, stored)` to compare computed vs stored
+- [x] Integrate checksum computation into `Manager.InstallWithOptions()` after install
+- [x] ~~Update `InstallOptions` to expose checksums or compute inline~~ (not needed - computed inline)
+- [x] Add integrity verification step to `verifyVisibleTool()` in verify.go
+- [x] Add integrity verification step to `verifyWithAbsolutePath()` in verify.go
+- [x] Add unit tests for checksum.go functions
+- [x] Add backward compatibility test (old state without checksums) - graceful handling in verify.go
 - [ ] Update documentation in `tsuku verify --help`
 
 ## Testing Strategy
