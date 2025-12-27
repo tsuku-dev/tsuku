@@ -1,0 +1,473 @@
+package recipe
+
+import (
+	"testing"
+)
+
+func TestSupportsPlatform(t *testing.T) {
+	tests := []struct {
+		name            string
+		supportedOS     []string
+		supportedArch   []string
+		unsupportedPlat []string
+		targetOS        string
+		targetArch      string
+		expectedSupport bool
+		description     string
+	}{
+		{
+			name:            "missing fields support all platforms",
+			supportedOS:     nil,
+			supportedArch:   nil,
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "Recipe without constraints should support all platforms",
+		},
+		{
+			name:            "empty arrays override to empty set",
+			supportedOS:     []string{},
+			supportedArch:   []string{},
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "amd64",
+			expectedSupport: false,
+			description:     "Empty arrays should mean no platforms supported",
+		},
+		{
+			name:            "OS-only constraint (linux)",
+			supportedOS:     []string{"linux"},
+			supportedArch:   nil,
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "Linux on any arch should be supported",
+		},
+		{
+			name:            "OS-only constraint (darwin rejected)",
+			supportedOS:     []string{"linux"},
+			supportedArch:   nil,
+			unsupportedPlat: nil,
+			targetOS:        "darwin",
+			targetArch:      "amd64",
+			expectedSupport: false,
+			description:     "macOS should be rejected when only Linux is supported",
+		},
+		{
+			name:            "arch-only constraint (amd64)",
+			supportedOS:     nil,
+			supportedArch:   []string{"amd64"},
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "amd64 on any OS should be supported",
+		},
+		{
+			name:            "arch-only constraint (arm64 rejected)",
+			supportedOS:     nil,
+			supportedArch:   []string{"amd64"},
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "arm64",
+			expectedSupport: false,
+			description:     "arm64 should be rejected when only amd64 is supported",
+		},
+		{
+			name:            "denylist-only (darwin/arm64 rejected)",
+			supportedOS:     nil,
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			targetOS:        "darwin",
+			targetArch:      "arm64",
+			expectedSupport: false,
+			description:     "macOS ARM64 should be rejected when in denylist",
+		},
+		{
+			name:            "denylist-only (darwin/amd64 allowed)",
+			supportedOS:     nil,
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			targetOS:        "darwin",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "macOS x86_64 should be allowed when only ARM64 is denied",
+		},
+		{
+			name:            "combined allowlist + denylist",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			targetOS:        "darwin",
+			targetArch:      "arm64",
+			expectedSupport: false,
+			description:     "macOS ARM64 should be rejected even though darwin is in allowlist",
+		},
+		{
+			name:            "combined allowlist + denylist (allowed case)",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			targetOS:        "darwin",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "macOS x86_64 should be allowed",
+		},
+		{
+			name:            "combined allowlist + denylist (linux allowed)",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			targetOS:        "linux",
+			targetArch:      "arm64",
+			expectedSupport: true,
+			description:     "Linux ARM64 should be allowed (only darwin/arm64 is denied)",
+		},
+		{
+			name:            "multiple OS and arch constraints",
+			supportedOS:     []string{"linux", "darwin", "windows"},
+			supportedArch:   []string{"amd64", "arm64"},
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "Linux amd64 should be in the Cartesian product",
+		},
+		{
+			name:            "multiple OS and arch constraints (rejected)",
+			supportedOS:     []string{"linux", "darwin", "windows"},
+			supportedArch:   []string{"amd64", "arm64"},
+			unsupportedPlat: nil,
+			targetOS:        "linux",
+			targetArch:      "386",
+			expectedSupport: false,
+			description:     "Linux 386 should be rejected (not in arch allowlist)",
+		},
+		{
+			name:            "multiple denylist entries",
+			supportedOS:     nil,
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64", "windows/arm64"},
+			targetOS:        "windows",
+			targetArch:      "arm64",
+			expectedSupport: false,
+			description:     "Windows ARM64 should be rejected (in denylist)",
+		},
+		{
+			name:            "complex: allowlist + multiple denies",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   []string{"amd64", "arm64"},
+			unsupportedPlat: []string{"darwin/arm64", "linux/arm64"},
+			targetOS:        "darwin",
+			targetArch:      "amd64",
+			expectedSupport: true,
+			description:     "macOS amd64 should be allowed (in Cartesian product, not denied)",
+		},
+		{
+			name:            "complex: allowlist + multiple denies (rejected)",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   []string{"amd64", "arm64"},
+			unsupportedPlat: []string{"darwin/arm64", "linux/arm64"},
+			targetOS:        "linux",
+			targetArch:      "arm64",
+			expectedSupport: false,
+			description:     "Linux ARM64 should be rejected (denied)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Recipe{
+				Metadata: MetadataSection{
+					SupportedOS:          tt.supportedOS,
+					SupportedArch:        tt.supportedArch,
+					UnsupportedPlatforms: tt.unsupportedPlat,
+				},
+			}
+
+			result := r.SupportsPlatform(tt.targetOS, tt.targetArch)
+			if result != tt.expectedSupport {
+				t.Errorf("%s: expected %v, got %v", tt.description, tt.expectedSupport, result)
+			}
+		})
+	}
+}
+
+func TestSupportsPlatformRuntime(t *testing.T) {
+	// Test the convenience method that uses runtime.GOOS and runtime.GOARCH
+	r := &Recipe{
+		Metadata: MetadataSection{}, // No constraints
+	}
+
+	// Should support current runtime
+	if !r.SupportsPlatformRuntime() {
+		t.Error("Recipe without constraints should support current runtime platform")
+	}
+}
+
+func TestValidatePlatformConstraints(t *testing.T) {
+	tests := []struct {
+		name            string
+		supportedOS     []string
+		supportedArch   []string
+		unsupportedPlat []string
+		expectError     bool
+		expectWarnings  int
+		description     string
+	}{
+		{
+			name:            "valid constraints (no warnings)",
+			supportedOS:     []string{"linux"},
+			supportedArch:   []string{"amd64"},
+			unsupportedPlat: nil,
+			expectError:     false,
+			expectWarnings:  0,
+			description:     "Simple Linux+amd64 constraint should be valid",
+		},
+		{
+			name:            "valid denylist",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			expectError:     false,
+			expectWarnings:  0,
+			description:     "Denying darwin/arm64 when darwin is in allowlist should be valid",
+		},
+		{
+			name:            "warning: no-op exclusion",
+			supportedOS:     []string{"linux"},
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			expectError:     false,
+			expectWarnings:  1,
+			description:     "Denying darwin/arm64 when only linux is allowed should warn",
+		},
+		{
+			name:            "multiple no-op exclusions",
+			supportedOS:     []string{"linux"},
+			supportedArch:   []string{"amd64"},
+			unsupportedPlat: []string{"darwin/arm64", "windows/386"},
+			expectError:     false,
+			expectWarnings:  2,
+			description:     "Multiple no-op exclusions should each generate a warning",
+		},
+		{
+			name:            "error: empty result set",
+			supportedOS:     []string{"linux"},
+			supportedArch:   []string{"arm64"},
+			unsupportedPlat: []string{"linux/arm64"},
+			expectError:     true,
+			expectWarnings:  0,
+			description:     "Excluding the only allowed platform should error",
+		},
+		{
+			name:            "error: empty allowlist",
+			supportedOS:     []string{},
+			supportedArch:   []string{},
+			unsupportedPlat: nil,
+			expectError:     true,
+			expectWarnings:  0,
+			description:     "Empty allowlists should result in error (no platforms)",
+		},
+		{
+			name:            "no constraints (valid)",
+			supportedOS:     nil,
+			supportedArch:   nil,
+			unsupportedPlat: nil,
+			expectError:     false,
+			expectWarnings:  0,
+			description:     "Recipe without constraints should be valid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Recipe{
+				Metadata: MetadataSection{
+					SupportedOS:          tt.supportedOS,
+					SupportedArch:        tt.supportedArch,
+					UnsupportedPlatforms: tt.unsupportedPlat,
+				},
+			}
+
+			warnings, err := r.ValidatePlatformConstraints()
+
+			// Check error expectation
+			if tt.expectError && err == nil {
+				t.Errorf("%s: expected error, got nil", tt.description)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("%s: expected no error, got: %v", tt.description, err)
+			}
+
+			// Check warning count
+			if len(warnings) != tt.expectWarnings {
+				t.Errorf("%s: expected %d warnings, got %d", tt.description, tt.expectWarnings, len(warnings))
+			}
+		})
+	}
+}
+
+func TestGetSupportedPlatforms(t *testing.T) {
+	tests := []struct {
+		name             string
+		supportedOS      []string
+		supportedArch    []string
+		unsupportedPlat  []string
+		minExpected      int
+		shouldContain    []string
+		shouldNotContain []string
+		description      string
+	}{
+		{
+			name:             "no constraints returns all platforms",
+			supportedOS:      nil,
+			supportedArch:    nil,
+			unsupportedPlat:  nil,
+			minExpected:      100, // There are many GOOS/GOARCH combinations
+			shouldContain:    []string{"linux/amd64", "darwin/arm64", "windows/amd64"},
+			shouldNotContain: nil,
+			description:      "Recipe without constraints should return all platform combinations",
+		},
+		{
+			name:             "OS-only constraint",
+			supportedOS:      []string{"linux"},
+			supportedArch:    nil,
+			unsupportedPlat:  nil,
+			minExpected:      10, // linux with all archs
+			shouldContain:    []string{"linux/amd64", "linux/arm64"},
+			shouldNotContain: []string{"darwin/amd64", "windows/amd64"},
+			description:      "Linux-only should include all linux/arch combinations",
+		},
+		{
+			name:             "denylist exclusion",
+			supportedOS:      []string{"linux", "darwin"},
+			supportedArch:    nil,
+			unsupportedPlat:  []string{"darwin/arm64"},
+			minExpected:      10,
+			shouldContain:    []string{"linux/amd64", "darwin/amd64"},
+			shouldNotContain: []string{"darwin/arm64"},
+			description:      "Should exclude darwin/arm64 but include other darwin archs",
+		},
+		{
+			name:             "specific OS and arch",
+			supportedOS:      []string{"linux"},
+			supportedArch:    []string{"amd64", "arm64"},
+			unsupportedPlat:  nil,
+			minExpected:      2,
+			shouldContain:    []string{"linux/amd64", "linux/arm64"},
+			shouldNotContain: []string{"linux/386", "darwin/amd64"},
+			description:      "Should only include specified OS/arch combinations",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Recipe{
+				Metadata: MetadataSection{
+					SupportedOS:          tt.supportedOS,
+					SupportedArch:        tt.supportedArch,
+					UnsupportedPlatforms: tt.unsupportedPlat,
+				},
+			}
+
+			platforms := r.GetSupportedPlatforms()
+
+			// Check minimum count
+			if len(platforms) < tt.minExpected {
+				t.Errorf("%s: expected at least %d platforms, got %d",
+					tt.description, tt.minExpected, len(platforms))
+			}
+
+			// Check should contain
+			for _, expected := range tt.shouldContain {
+				found := false
+				for _, platform := range platforms {
+					if platform == expected {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("%s: expected to contain %s, but not found",
+						tt.description, expected)
+				}
+			}
+
+			// Check should not contain
+			for _, notExpected := range tt.shouldNotContain {
+				for _, platform := range platforms {
+					if platform == notExpected {
+						t.Errorf("%s: should not contain %s, but found it",
+							tt.description, notExpected)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestFormatPlatformConstraints(t *testing.T) {
+	tests := []struct {
+		name            string
+		supportedOS     []string
+		supportedArch   []string
+		unsupportedPlat []string
+		expectedSubstr  string
+		description     string
+	}{
+		{
+			name:            "no constraints",
+			supportedOS:     nil,
+			supportedArch:   nil,
+			unsupportedPlat: nil,
+			expectedSubstr:  "all platforms",
+			description:     "Recipe without constraints should say 'all platforms'",
+		},
+		{
+			name:            "OS-only constraint",
+			supportedOS:     []string{"linux"},
+			supportedArch:   nil,
+			unsupportedPlat: nil,
+			expectedSubstr:  "OS: linux",
+			description:     "Should show OS constraint",
+		},
+		{
+			name:            "arch-only constraint",
+			supportedOS:     nil,
+			supportedArch:   []string{"amd64", "arm64"},
+			unsupportedPlat: nil,
+			expectedSubstr:  "Arch: amd64, arm64",
+			description:     "Should show arch constraint",
+		},
+		{
+			name:            "with denylist",
+			supportedOS:     []string{"linux", "darwin"},
+			supportedArch:   nil,
+			unsupportedPlat: []string{"darwin/arm64"},
+			expectedSubstr:  "Except: darwin/arm64",
+			description:     "Should show exception",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Recipe{
+				Metadata: MetadataSection{
+					SupportedOS:          tt.supportedOS,
+					SupportedArch:        tt.supportedArch,
+					UnsupportedPlatforms: tt.unsupportedPlat,
+				},
+			}
+
+			result := r.FormatPlatformConstraints()
+			// Use the contains function from types_test.go for substring checking
+			if !contains(result, tt.expectedSubstr) {
+				t.Errorf("%s: expected substring '%s' in '%s'",
+					tt.description, tt.expectedSubstr, result)
+			}
+		})
+	}
+}
